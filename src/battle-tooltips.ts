@@ -2144,6 +2144,45 @@ class BattleTooltips {
 		return value;
 	}
 	getPokemonTypes(pokemon: Pokemon | ServerPokemon, preterastallized = false): ReadonlyArray<TypeName> {
+
+		if (pokemon.fusion) {
+
+			const typeChanges: {[key: string]: string[]} = {
+				"magnemite":  ["Steel", "Electric"],
+				"magneton":   ["Steel", "Electric"],
+				"magnezone":  ["Steel", "Electric"],
+				"dewgong":    ["Ice", "Water"],
+				"omanyte":    ["Water", "Rock"],
+				"omastar":    ["Water", "Rock"],
+				"scizor":     ["Steel", "Bug"],
+				"empoleon":   ["Steel", "Water"],
+				"spiritomb":  ["Dark", "Ghost"],
+				"ferrothorn": ["Steel", "Grass"],
+				"celebi":     ["Grass", "Psychic"],
+				"bulbasaur":  ["Grass"],    "ivysaur":   ["Grass"],
+				"venusaur":   ["Grass"],    "charizard": ["Fire"],
+				"geodude":    ["Rock"],     "graveler":  ["Rock"],
+				"golem":      ["Rock"],     "gastly":    ["Ghost"],
+				"haunter":    ["Ghost"],    "gengar":    ["Ghost"],
+				"onix":       ["Rock"],     "scyther":   ["Bug"],
+				"gyarados":   ["Water"],    "articuno":  ["Ice"],
+				"zapdos":     ["Electric"], "moltres":   ["Fire"],
+				"dragonite":  ["Dragon"],   "steelix":   ["Steel",]
+			};
+
+			const fusionSpecies = Dex.species.get(pokemon.fusion);
+			const species = Dex.species.get(pokemon.speciesForme);
+
+			const speciesTypes = species.id in typeChanges ? typeChanges[species.id] : species.types;
+			const fusionTypes = fusionSpecies.id in typeChanges ? typeChanges[fusionSpecies.id] : fusionSpecies.types;
+
+			const typesSet = new Set([speciesTypes[0] as TypeName]);
+			const bonusType = fusionTypes[fusionTypes.length - 1];
+			typesSet.add(bonusType as TypeName);
+			if (fusionTypes.length === 2 && typesSet.size === 1) typesSet.add(fusionTypes[0]);
+			return Array.from(typesSet);
+		}
+
 		if (!(pokemon as Pokemon).getTypes) {
 			return this.battle.dex.species.get(pokemon.speciesForme).types;
 		}
