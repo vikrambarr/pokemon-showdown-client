@@ -32,6 +32,12 @@
 					} else {
 						alert('Unrecognised query string syntax: ' + location.search);
 					}
+				} if (location.pathname.includes('debug.pokeathlon.com')) {
+					Config.server = {
+							id: showdown,
+							host: 'debug.pokeathlon.com',
+							port: 8000
+						};
 				}
 			})();
 		</script>
