@@ -9,7 +9,7 @@ const rootDir = path.resolve(__dirname, '..');
 process.chdir(rootDir);
 
 if (!fs.existsSync('data/pokemon-showdown')) {
-	child_process.execSync('git clone https://github.com/smogon/pokemon-showdown.git', {
+	child_process.execSync('git clone https://github.com/dunscy/pokemon-showdown.git', {
 		cwd: 'data',
 	});
 }
@@ -17,6 +17,28 @@ if (!fs.existsSync('data/pokemon-showdown')) {
 process.stdout.write("Syncing data from Git repository... ");
 child_process.execSync('git pull', {cwd: 'data/pokemon-showdown'});
 child_process.execSync('npm run build', {cwd: 'data/pokemon-showdown'});
+console.log("DONE");
+
+if (!fs.existsSync('sprites/fusion-sprites')) {
+	child_process.execSync('git clone https://gitlab.com/pokemoninfinitefusion/customsprites.git fusion-sprites', {
+		cwd: 'sprites',
+	}); child_process.execSync('rm -rf Other', {
+		cwd: 'sprites/fusion-sprites',
+	});
+}
+
+process.stdout.write("Syncing IF sprites from Gitlab repository... ");
+child_process.execSync('git pull', {cwd: 'sprites/fusion-sprites'});
+console.log("DONE");
+
+if (!fs.existsSync('sprites/fangame-sprites')) {
+	child_process.execSync('git clone https://github.com/vikrambarr/fangame-sprites', {
+		cwd: 'sprites',
+	});
+}
+
+process.stdout.write("Syncing fangame sprites... ");
+child_process.execSync('git pull', {cwd: 'sprites/fangame-sprites'});
 console.log("DONE");
 
 const Dex = require('../data/pokemon-showdown/dist/sim/dex').Dex;
@@ -322,7 +344,7 @@ process.stdout.write("Building `data/teambuilder-tables.js`... ");
 	const LC = GENS.map(num => num + 0.7);
 	const STADIUM = [2.04, 1.04];
 	const NATDEX = [9.1, 8.1];
-	const OTHER = [9.9, 9.41, 9.4, 9.2, -9.4, 8.6, 8.4, 8.2, 8.1, -8.4, -8.6, 7.1];
+	const OTHER = [9.9, 9.8, 9.41, 9.4, 9.2, -9.4, 8.6, 8.4, 8.2, 8.1, -8.4, -8.6, 7.81, 7.1];
 
 	// process.stdout.write("\n  ");
 	for (const genIdent of [...GENS, ...DOUBLES, ...VGC, ...NFE, ...STADIUM, ...OTHER, ...NATDEX, ...LC]) {
@@ -338,9 +360,12 @@ process.stdout.write("Building `data/teambuilder-tables.js`... ");
 		const isDoubles = (genIdent < 0);
 		const isVGC = ('' + genIdent).endsWith('.5');
 		const isGen9BH = genIdent === 9.9;
+		const isNatDexFusions = genIdent === 9.8;
+		const isFusions = genIdent === 7.81;
 		const genNum = Math.floor(isDoubles ? -genIdent : genIdent);
 		const gen = (() => {
 			let genStr = 'gen' + genNum;
+			if (isNatDexFusions || isFusions) genStr += 'infinitefusion';
 			if (isSSDLC1) genStr += 'dlc1';
 			if (isLetsGo) genStr += 'letsgo';
 			if (isBDSP) genStr += 'bdsp';
@@ -434,6 +459,18 @@ process.stdout.write("Building `data/teambuilder-tables.js`... ");
 					return species.tags.includes('Mythical') ? 'Mythical' :
 						species.tags.includes('Restricted Legendary') ? 'Restricted Legendary' :
 							species.nfe ? (species.prevo ? 'NFE' : 'LC') : 'Regular';
+				}
+				if (isNatDexFusions) {
+					let tier = species.natDexTier;
+					if (species.isMega) tier = 'Uber';
+					return tier;
+				}
+				if (isFusions) {
+					let tier = Dex.mod('gen7').species.get(species.name).tier;
+					if (species.isMega ||
+						species.num <= 0 ||
+						species.isNonstandard === "Unobtainable") tier = 'Illegal';
+					return tier;
 				}
 				if (species.tier === 'CAP' || species.tier === 'CAP NFE' || species.tier === 'CAP LC') {
 					return species.tier;
@@ -534,6 +571,12 @@ process.stdout.write("Building `data/teambuilder-tables.js`... ");
 			BattleTeambuilderTable['bh'].tiers = tiers;
 			BattleTeambuilderTable['bh'].overrideTier = overrideTier;
 			BattleTeambuilderTable['bh'].formatSlices = formatSlices;
+		} else if (isNatDexFusions || isFusions) {
+			BattleTeambuilderTable[gen] = {};
+			BattleTeambuilderTable[gen].tiers = tiers;
+			BattleTeambuilderTable[gen].overrideTier = overrideTier;
+			BattleTeambuilderTable[gen].formatSlices = formatSlices;
+			BattleTeambuilderTable[gen].items = items;
 		} else if (gen === 'gen9') {
 			BattleTeambuilderTable.tiers = tiers;
 			BattleTeambuilderTable.items = items;
@@ -616,7 +659,7 @@ process.stdout.write("Building `data/teambuilder-tables.js`... ");
 				continue;
 			}
 			if (item.isNonstandard && !isMetBattle) {
-				if (isNatDex) {
+				if (isNatDex || isNatDexFusions) {
 					if (item.isNonstandard !== "Past") continue;
 					if (!item.itemUser && !item.zMove) continue;
 				} else if (genNum !== 2) {
@@ -1003,7 +1046,7 @@ process.stdout.write("Building `data/teambuilder-tables.js`... ");
 	}
 
 	// Client relevant data that should be overriden by past gens and mods
-	const overrideSpeciesKeys = ['abilities', 'baseStats', 'cosmeticFormes', 'isNonstandard', 'requiredItems', 'types', 'unreleasedHidden'];
+	const overrideSpeciesKeys = ['abilities', 'baseStats', 'cosmeticFormes', 'isNonstandard', 'requiredItems', 'types', 'unreleasedHidden', 'num'];
 	const overrideMoveKeys = ['accuracy', 'basePower', 'category', 'desc', 'flags', 'isNonstandard', 'noSketch', 'pp', 'priority', 'shortDesc', 'target', 'type'];
 	const overrideAbilityKeys = ['desc', 'isNonstandard', 'rating', 'shortDesc'];
 
@@ -1090,7 +1133,7 @@ process.stdout.write("Building `data/teambuilder-tables.js`... ");
 	// Mods
 	//
 
-	for (const mod of ['gen7letsgo', 'gen8bdsp']) {
+	for (const mod of ['gen7letsgo', 'gen8bdsp', 'gen9infinitefusion', 'gen7infinitefusion']) {
 		const modDex = Dex.mod(mod);
 		const modData = modDex.data;
 		const parentDex = Dex.forGen(modDex.gen);
@@ -1296,6 +1339,47 @@ process.stdout.write("Building `data/moves,items,abilities,typechart,learnsets.j
 
 	const buf = 'exports.BattleText = ' + es3stringify(Text) + ';';
 	fs.writeFileSync('data/text.js', buf);
+}
+
+console.log("DONE")
+
+/*********************************************************
+ * Build fusion-index.js
+ *********************************************************/
+
+process.stdout.write("Building fusion data...");
+
+{
+	let BattleFusionIndex = {};
+	let fusionFiles = fs.readdirSync('sprites/fusion-sprites/CustomBattlers/');
+
+	for (let file of fusionFiles) {
+		const parts = file.split('.');
+		if (parts[2] !== 'png') continue;
+		if (parts[0] in BattleFusionIndex) {
+			BattleFusionIndex[parts[0]].push(parts[1]);
+		} else {
+			BattleFusionIndex[parts[0]] = [parts[1]];
+		}
+	}
+	const buf = `exports.BattleFusionIndex = JSON.parse('${JSON.stringify(BattleFusionIndex).replace(/['\\]/g, "\\$&")}');\n\n`;
+	fs.writeFileSync('data/fusion-index.js', buf);
+}
+
+/*********************************************************
+ * Build fusion-credits.js
+ *********************************************************/
+
+{
+	let FusionCredit = {};
+	let rawCredit = fs.readFileSync('sprites/fusion-sprites/Sprite Credits.csv').toString();
+	
+	for (let line of rawCredit.split('\n')) {
+		const parts = line.split(',');
+		FusionCredit[parts[0]] = parts[1];
+	}
+	const buf = `exports.FusionCredit = JSON.parse('${JSON.stringify(FusionCredit).replace(/['\\]/g, "\\$&")}');\n\n`;
+	fs.writeFileSync('data/fusion-credits.js', buf);
 }
 
 console.log("DONE");

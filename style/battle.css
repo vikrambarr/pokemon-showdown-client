@@ -353,6 +353,7 @@ License: GPLv2
 .teamicons span {
 	float: left;
 }
+.flip,
 .leftbar .trainer div.trainersprite,
 .leftbar .teamicons span {
 	-moz-transform: scaleX(-1);

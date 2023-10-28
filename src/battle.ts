@@ -80,6 +80,7 @@ export class Pokemon implements PokemonDetails, PokemonHealth {
 	maxhp = 1000;
 	level = 100;
 	gender: GenderName = 'N';
+	fusion: string;
 	shiny = false;
 
 	hpcolor: HPColor = 'g';
@@ -117,6 +118,7 @@ export class Pokemon implements PokemonDetails, PokemonHealth {
 		this.level = data.level;
 		this.shiny = data.shiny;
 		this.gender = data.gender || 'N';
+		this.fusion = data.fusion;
 		this.ident = data.ident;
 		this.terastallized = data.terastallized || '';
 		this.searchid = data.searchid;
@@ -476,6 +478,43 @@ export class Pokemon implements PokemonDetails, PokemonHealth {
 	}
 	getTypes(serverPokemon?: ServerPokemon, preterastallized = false): [ReadonlyArray<TypeName>, TypeName | ''] {
 		let types: ReadonlyArray<TypeName>;
+		if (this.fusion) {
+
+			const typeChanges: {[key: string]: string[]} = {
+				"magnemite":  ["Steel", "Electric"],
+				"magneton":   ["Steel", "Electric"],
+				"magnezone":  ["Steel", "Electric"],
+				"dewgong":    ["Ice", "Water"],
+				"omanyte":    ["Water", "Rock"],
+				"omastar":    ["Water", "Rock"],
+				"scizor":     ["Steel", "Bug"],
+				"empoleon":   ["Steel", "Water"],
+				"spiritomb":  ["Dark", "Ghost"],
+				"ferrothorn": ["Steel", "Grass"],
+				"celebi":     ["Grass", "Psychic"],
+				"bulbasaur":  ["Grass"],    "ivysaur":   ["Grass"],
+				"venusaur":   ["Grass"],    "charizard": ["Fire"],
+				"geodude":    ["Rock"],     "graveler":  ["Rock"],
+				"golem":      ["Rock"],     "gastly":    ["Ghost"],
+				"haunter":    ["Ghost"],    "gengar":    ["Ghost"],
+				"onix":       ["Rock"],     "scyther":   ["Bug"],
+				"gyarados":   ["Water"],    "articuno":  ["Ice"],
+				"zapdos":     ["Electric"], "moltres":   ["Fire"],
+				"dragonite":  ["Dragon"],   "steelix":   ["Steel",]
+			};
+
+			const fusionSpecies = Dex.species.get(this.fusion);
+			const species = Dex.species.get(this.speciesForme);
+
+			const speciesTypes = species.id in typeChanges ? typeChanges[species.id] : species.types;
+			const fusionTypes = fusionSpecies.id in typeChanges ? typeChanges[fusionSpecies.id] : fusionSpecies.types;
+
+			const typesSet = new Set([speciesTypes[0] as TypeName]);
+			const bonusType = fusionTypes[fusionTypes.length - 1];
+			typesSet.add(bonusType as TypeName);
+			if (fusionTypes.length === 2 && typesSet.size === 1) typesSet.add(fusionTypes[0]);
+			return [Array.from(typesSet), ''];
+		}
 		if (this.terastallized && !preterastallized) {
 			types = [this.terastallized as TypeName];
 		} else if (this.volatiles.typechange) {
@@ -968,6 +1007,7 @@ export interface PokemonDetails {
 	gender: GenderName | '';
 	ident: string;
 	terastallized: string;
+	fusion: string;
 	searchid: string;
 }
 export interface PokemonHealth {
@@ -2442,7 +2482,11 @@ export class Battle {
 			}
 
 			poke.speciesForme = newSpeciesForme;
-			poke.ability = poke.baseAbility = (species.abilities ? species.abilities['0'] : '');
+			
+			poke.fusion = this.parseDetails(poke.name, args[1], poke.details).fusion;
+			if (!poke.fusion) {
+				poke.ability = poke.baseAbility = (species.abilities ? species.abilities['0'] : '');
+			}
 
 			poke.details = args[2];
 			poke.searchid = args[1].substr(0, 2) + args[1].substr(3) + '|' + args[2];
@@ -3164,6 +3208,10 @@ export class Battle {
 		let splitDetails = details.split(', ');
 		if (splitDetails[splitDetails.length - 1].startsWith('tera:')) {
 			output.terastallized = splitDetails[splitDetails.length - 1].slice(5);
+			splitDetails.pop();
+		}
+		if (splitDetails[splitDetails.length - 1].startsWith('fusion: ')) {
+			output.fusion = splitDetails[splitDetails.length - 1].slice(8);
 			splitDetails.pop();
 		}
 		if (splitDetails[splitDetails.length - 1] === 'shiny') {

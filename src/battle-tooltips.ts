@@ -793,9 +793,15 @@ class BattleTooltips {
 			name += ' <small>(' + BattleLog.escapeHTML(pokemon.speciesForme) + ')</small>';
 		}
 
+		let fuseBuf = pokemon.fusion ? ` <small>Fusion: ${pokemon.fusion}</small><br />`: ``;
+		let fusionData = Dex.getFusionData(pokemon);
+		let creditBuf = '';
+		if (fusionData.extension !== '') {
+			creditBuf = fusionData.credit !== '' ? ` <small>Sprite by ${fusionData.credit}</small><br />`: ``;
+		}
 		let levelBuf = (pokemon.level !== 100 ? ` <small>L${pokemon.level}</small>` : ``);
 		if (!illusionIndex || illusionIndex === 1) {
-			text += `<h2>${name}${genderBuf}${illusionIndex ? '' : levelBuf}<br />`;
+			text += `<h2>${name}${genderBuf}${illusionIndex ? '' : levelBuf}<br />${fuseBuf}${creditBuf}`;
 
 			if (clientPokemon?.volatiles.formechange) {
 				if (clientPokemon.volatiles.transform) {
@@ -1045,6 +1051,7 @@ class BattleTooltips {
 		}
 
 		const species = Dex.species.get(serverPokemon.speciesForme).baseSpecies;
+		const fusionSpecies = Dex.species.get(serverPokemon.fusion).baseSpecies;
 		const isTransform = clientPokemon?.volatiles.transform;
 		const speciesName = isTransform && clientPokemon?.volatiles.formechange?.[1] && this.battle.gen <= 4 ?
 			this.battle.dex.species.get(clientPokemon.volatiles.formechange[1]).baseSpecies : species;
@@ -1053,18 +1060,18 @@ class BattleTooltips {
 
 		// check for light ball, thick club, metal/quick powder
 		// the only stat modifying items in gen 2 were light ball, thick club, metal powder
-		if (item === 'lightball' && speciesName === 'Pikachu' && this.battle.gen !== 4) {
+		if (item === 'lightball' && (speciesName === 'Pikachu' || fusionSpecies === 'Pikachu') && this.battle.gen !== 4) {
 			if (this.battle.gen > 4) stats.atk *= 2;
 			stats.spa *= 2;
 		}
 
 		if (item === 'thickclub') {
-			if (speciesName === 'Marowak' || speciesName === 'Cubone') {
+			if (speciesName === 'Marowak' || speciesName === 'Cubone' || fusionSpecies === 'Marowak' || fusionSpecies === 'Cubone') {
 				stats.atk *= 2;
 			}
 		}
 
-		if (speciesName === 'Ditto' && !(clientPokemon && 'transform' in clientPokemon.volatiles)) {
+		if ((speciesName === 'Ditto' || fusionSpecies === 'Ditto') && !(clientPokemon && 'transform' in clientPokemon.volatiles)) {
 			if (item === 'quickpowder') {
 				speedModifiers.push(2);
 			}
@@ -1173,9 +1180,20 @@ class BattleTooltips {
 					// Pokemon with Hisui evolutions
 					evoSpecies.isNonstandard === "Unobtainable";
 		});
-		if (item === 'eviolite' && (isNFE || this.battle.dex.species.get(serverPokemon.speciesForme).id === 'dipplin')) {
-			stats.def = Math.floor(stats.def * 1.5);
-			stats.spd = Math.floor(stats.spd * 1.5);
+		const isNFEFusion = this.battle.dex.species.get(serverPokemon.fusion).evos?.some(evo => {
+			const evoSpecies = this.battle.dex.species.get(evo);
+			return !evoSpecies.isNonstandard ||
+					evoSpecies.isNonstandard === this.battle.dex.species.get(serverPokemon.speciesForme)?.isNonstandard ||
+					// Pokemon with Hisui evolutions
+					evoSpecies.isNonstandard === "Unobtainable";
+		});
+		if (item === 'eviolite' && (isNFE || isNFEFusion || this.battle.dex.species.get(serverPokemon.speciesForme).id === 'dipplin')) {
+			let boost = 1.5;
+			if (this.battle.dex.species.get(serverPokemon.fusion).exists) {
+				boost = 1 + (Number(isNFE !== undefined) + Number(isNFEFusion !== undefined)) / 4;
+			}
+			stats.def = Math.floor(stats.def * boost);
+			stats.spd = Math.floor(stats.spd * boost);
 		}
 		if (ability === 'grasspelt' && this.battle.hasPseudoWeather('Grassy Terrain')) {
 			stats.def = Math.floor(stats.def * 1.5);
@@ -1191,7 +1209,7 @@ class BattleTooltips {
 		if (item === 'choicespecs' && !clientPokemon?.volatiles['dynamax']) {
 			stats.spa = Math.floor(stats.spa * 1.5);
 		}
-		if (item === 'deepseatooth' && species === 'Clamperl') {
+		if (item === 'deepseatooth' && (species === 'Clamperl' || serverPokemon.fusion === 'Clamperl')) {
 			stats.spa *= 2;
 		}
 		if (item === 'souldew' && this.battle.gen <= 6 && (species === 'Latios' || species === 'Latias')) {
@@ -1215,7 +1233,7 @@ class BattleTooltips {
 		if (item === 'assaultvest') {
 			stats.spd = Math.floor(stats.spd * 1.5);
 		}
-		if (item === 'deepseascale' && species === 'Clamperl') {
+		if (item === 'deepseascale' && (species === 'Clamperl' || serverPokemon.fusion === 'Clamperl')) {
 			stats.spd *= 2;
 		}
 		if (item === 'choicescarf' && !clientPokemon?.volatiles['dynamax']) {
@@ -1359,6 +1377,7 @@ class BattleTooltips {
 		const tr = Math.trunc || Math.floor;
 		const species = pokemon.getSpecies();
 		let baseSpe = species.baseStats.spe;
+		if (pokemon.fusion) baseSpe = Math.floor((baseSpe / 3) + (this.battle.dex.species.get(pokemon.fusion).baseStats.spe * 2/3));
 		if (this.battle.rules['Scalemons Mod']) {
 			const bstWithoutHp = species.bst - species.baseStats.hp;
 			const scale = 600 - species.baseStats.hp;
@@ -1462,12 +1481,13 @@ class BattleTooltips {
 		}
 
 		// Aura Wheel as Morpeko-Hangry changes the type to Dark
-		if (move.id === 'aurawheel' && pokemon.getSpeciesForme() === 'Morpeko-Hangry') {
+		if (move.id === 'aurawheel' && [pokemon.getSpeciesForme(), pokemon.fusion].includes('Morpeko-Hangry')) {
 			moveType = 'Dark';
 		}
 		// Raging Bull's type depends on the Tauros forme
 		if (move.id === 'ragingbull') {
-			switch (pokemon.getSpeciesForme()) {
+			const forme = pokemon.getSpeciesForme().includes('Tauros-Paldea') ? pokemon.getSpeciesForme() : pokemon.fusion;
+			switch (forme) {
 			case 'Tauros-Paldea-Combat':
 				moveType = 'Fighting';
 				break;
@@ -1481,7 +1501,8 @@ class BattleTooltips {
 		}
 		// Ivy Cudgel's type depends on the Ogerpon forme
 		if (move.id === 'ivycudgel') {
-			switch (pokemon.getSpeciesForme()) {
+			const forme = pokemon.getSpeciesForme().includes('Ogerpon') ? pokemon.getSpeciesForme() : pokemon.fusion;
+			switch (forme) {
 			case 'Ogerpon-Wellspring': case 'Ogerpon-Wellspring-Tera':
 				moveType = 'Water';
 				break;
@@ -1769,7 +1790,7 @@ class BattleTooltips {
 			}
 		}
 		if (
-			move.id === 'watershuriken' && pokemon.getSpeciesForme() === 'Greninja-Ash' && pokemon.ability === 'Battle Bond'
+			move.id === 'watershuriken' && [pokemon.getSpeciesForme(), pokemon.fusion].includes('Greninja-Ash') && pokemon.ability === 'Battle Bond'
 		) {
 			value.set(20, 'Battle Bond');
 		}
@@ -2200,6 +2221,14 @@ class BattleTooltips {
 		}
 		if (!text && abilityData.possibilities.length && !hidePossible) {
 			text = '<small>Possible abilities:</small> ' + abilityData.possibilities.join(', ');
+			if (clientPokemon && clientPokemon.fusion) {
+				let fuseAbilityData = Object.keys(Dex.species.get(clientPokemon.fusion).abilities).map(key => Dex.species.get(clientPokemon.fusion).abilities[key]);
+				let fuseBuf = [];
+				for (let fuseAbility of fuseAbilityData) {
+					if (!text.includes(fuseAbility)) fuseBuf.push(fuseAbility);
+				}
+				if (fuseBuf.length) text += ', ' + fuseBuf.join(', ');
+			}
 		}
 		return text;
 	}
@@ -2245,6 +2274,8 @@ interface PokemonSet {
 	gigantamax?: boolean;
 	/** Defaults to the primary type */
 	teraType?: string;
+	/** Defaults to nothing */
+	fusion?: string;
 }
 
 class BattleStatGuesser {

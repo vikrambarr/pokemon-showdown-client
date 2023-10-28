@@ -626,8 +626,18 @@ abstract class BattleTypedSearch<T extends SearchType> {
 		if (format.includes('nationaldex') || format.startsWith('nd') || format.includes('natdex')) {
 			format = (format.startsWith('nd') ? format.slice(2) :
 				format.includes('natdex') ? format.slice(6) : format.slice(11)) as ID;
+			if (format.startsWith('infinitefusion')) {
+				format = format.slice(14) as ID;
+				this.dex = Dex.mod('gen9infinitefusion' as ID);
+			}
 			this.formatType = 'natdex';
 			if (!format) format = 'ou' as ID;
+		}
+		if (format.includes('infinitefusiondex')) {
+			this.formatType = 'natdex';
+			if (format.endsWith('ou')) format = 'ou' as ID;
+			else format = 'ubers' as ID;
+			this.dex = Dex.mod('gen7infinitefusion' as ID);
 		}
 		if (format.includes('doubles') && this.dex.gen > 4 && !this.formatType) this.formatType = 'doubles';
 		if (this.formatType === 'letsgo') format = format.slice(6) as ID;
@@ -818,6 +828,7 @@ abstract class BattleTypedSearch<T extends SearchType> {
 			this.formatType === 'predlc' ? 'gen9predlc' :
 			this.formatType === 'predlcdoubles' ? 'gen9predlcdoubles' :
 			this.formatType === 'predlcnatdex' ? 'gen9predlcnatdex' :
+			this.dex.modid.includes('infinitefusion') ? this.dex.modid :
 			this.formatType === 'natdex' ? `gen${gen}natdex` :
 			this.formatType === 'stadium' ? `gen${gen}stadium${gen > 1 ? gen : ''}` :
 			`gen${gen}`;
@@ -929,6 +940,8 @@ class BattlePokemonSearch extends BattleTypedSearch<'pokemon'> {
 			table = table['gen8' + this.formatType];
 		} else if (this.formatType === 'letsgo') {
 			table = table['gen7letsgo'];
+		} else if (this.dex.modid.includes('infinitefusion')) {
+			table = table[this.dex.modid];
 		} else if (this.formatType === 'natdex') {
 			table = table['gen' + dex.gen + 'natdex'];
 		} else if (this.formatType === 'metronome') {
@@ -1103,28 +1116,38 @@ class BattleAbilitySearch extends BattleTypedSearch<'ability'> {
 	getBaseResults() {
 		if (!this.species) return this.getDefaultResults();
 		const format = this.format;
+		const dex = this.dex;
+		const isFusion = (this.set?.fusion && dex.species.get(this.set?.fusion).exists);
 		const isHackmons = (format.includes('hackmons') || format.endsWith('bh'));
 		const isAAA = (format === 'almostanyability' || format.includes('aaa'));
-		const dex = this.dex;
 		let species = dex.species.get(this.species);
 		let abilitySet: SearchRow[] = [['header', "Abilities"]];
+
+		let fusionSpecies;
+		if (isFusion) {
+			fusionSpecies = dex.species.get(this.set?.fusion);
+		}
 
 		if (species.isMega) {
 			abilitySet.unshift(['html', `Will be <strong>${species.abilities['0']}</strong> after Mega Evolving.`]);
 			species = dex.species.get(species.baseSpecies);
 		}
 		abilitySet.push(['ability', toID(species.abilities['0'])]);
+		if (isFusion && !Object.values(species.abilities).includes(fusionSpecies.abilities['0'])) abilitySet.push(['ability', toID(fusionSpecies.abilities['0'])]);
 		if (species.abilities['1']) {
 			abilitySet.push(['ability', toID(species.abilities['1'])]);
 		}
+		if (isFusion && fusionSpecies.abilities['1'] && !Object.values(species.abilities).includes(fusionSpecies.abilities['1'])) abilitySet.push(['ability', toID(fusionSpecies.abilities['1'])]);
 		if (species.abilities['H']) {
-			abilitySet.push(['header', "Hidden Ability"]);
+			abilitySet.push(['header', "Hidden Abilities"]);
 			abilitySet.push(['ability', toID(species.abilities['H'])]);
 		}
+		if (isFusion && fusionSpecies.abilities['H'] && !Object.values(species.abilities).includes(fusionSpecies.abilities['H'])) abilitySet.push(['ability', toID(fusionSpecies.abilities['H'])]);
 		if (species.abilities['S']) {
-			abilitySet.push(['header', "Special Event Ability"]);
+			abilitySet.push(['header', "Special Event Abilities"]);
 			abilitySet.push(['ability', toID(species.abilities['S'])]);
 		}
+		if (isFusion && fusionSpecies.abilities['S'] && !Object.values(species.abilities).includes(fusionSpecies.abilities['S'])) abilitySet.push(['ability', toID(fusionSpecies.abilities['S'])]);
 		if (isAAA || format.includes('metronomebattle') || isHackmons) {
 			let abilities: ID[] = [];
 			for (let i in this.getTable()) {
@@ -1184,6 +1207,8 @@ class BattleItemSearch extends BattleTypedSearch<'item'> {
 		let table = BattleTeambuilderTable;
 		if (this.formatType?.startsWith('bdsp')) {
 			table = table['gen8bdsp'];
+		} else if (this.dex.modid.includes('infinitefusion')) {
+			table = table[this.dex.modid];
 		} else if (this.formatType === 'natdex') {
 			table = table['gen' + this.dex.gen + 'natdex'];
 		} else if (this.formatType === 'metronome') {
@@ -1209,7 +1234,7 @@ class BattleItemSearch extends BattleTypedSearch<'item'> {
 		const speciesSpecific: SearchRow[] = [];
 		for (const row of results) {
 			if (row[0] !== 'item') continue;
-			if (this.dex.items.get(row[1]).itemUser?.includes(speciesName)) {
+			if (this.dex.items.get(row[1]).itemUser?.includes(speciesName) || (['Light Ball', 'Thick Club', 'Deep Sea Tooth', 'Deep Sea Scale', 'Metal Powder', 'Quick Powder', 'Leek', 'Lucky Punch'].includes(this.dex.items.get(row[1]).name) && this.dex.items.get(row[1]).itemUser?.includes(this.set?.fusion))) {
 				speciesSpecific.push(row);
 			}
 		}
@@ -1497,6 +1522,7 @@ class BattleMoveSearch extends BattleTypedSearch<'move'> {
 		const dex = this.dex;
 		let species = dex.species.get(this.species);
 		const format = this.format;
+		const isFusion = (this.set?.fusion && dex.species.get(this.set?.fusion).exists);
 		const isHackmons = (format.includes('hackmons') || format.endsWith('bh'));
 		const isSTABmons = (format.includes('stabmons') || format === 'staaabmons');
 		const isTradebacks = format.includes('tradebacks');
@@ -1556,6 +1582,46 @@ class BattleMoveSearch extends BattleTypedSearch<'move'> {
 				}
 			}
 			learnsetid = this.nextLearnsetid(learnsetid, species.id);
+		}
+		if (isFusion) {
+			learnsetid = this.firstLearnsetid(toID(this.set?.fusion));
+			while (learnsetid) {
+				let learnset = lsetTable.learnsets[learnsetid];
+				if (learnset) {
+					for (let moveid in learnset) {
+						let learnsetEntry = learnset[moveid];
+						const move = dex.moves.get(moveid);
+						const minGenCode: {[gen: number]: string} = {6: 'p', 7: 'q', 8: 'g', 9: 'a'};
+						if (regionBornLegality && !learnsetEntry.includes(minGenCode[dex.gen])) {
+							continue;
+						}
+						if (
+							!learnsetEntry.includes(gen) &&
+							(!isTradebacks ? true : !(move.gen <= dex.gen && learnsetEntry.includes('' + (dex.gen + 1))))
+						) {
+							continue;
+						}
+						if (this.formatType !== 'natdex' && move.isNonstandard === "Past") {
+							continue;
+						}
+						if (
+							this.formatType?.startsWith('dlc1') &&
+							BattleTeambuilderTable['gen8dlc1']?.nonstandardMoves.includes(moveid)
+						) {
+							continue;
+						}
+						if (moves.includes(moveid)) continue;
+						moves.push(moveid);
+						if (moveid === 'sketch') sketch = true;
+						if (moveid === 'hiddenpower') {
+							moves.push(
+								'hiddenpowerbug', 'hiddenpowerdark', 'hiddenpowerdragon', 'hiddenpowerelectric', 'hiddenpowerfighting', 'hiddenpowerfire', 'hiddenpowerflying', 'hiddenpowerghost', 'hiddenpowergrass', 'hiddenpowerground', 'hiddenpowerice', 'hiddenpowerpoison', 'hiddenpowerpsychic', 'hiddenpowerrock', 'hiddenpowersteel', 'hiddenpowerwater'
+							);
+						}
+					}
+				}
+				learnsetid = this.nextLearnsetid(learnsetid, toID(this.set?.fusion));
+			}
 		}
 		if (sketch || isHackmons) {
 			if (isHackmons) moves = [];

@@ -81,7 +81,7 @@ let compiledFiles = 0;
 let compileOpts = Object.assign(eval('(' + fs.readFileSync('.babelrc') + ')'), {
 	babelrc: false,
 	incremental: true,
-	ignore: ['src/battle-animations.js', 'src/battle-animations-moves.js'],
+	ignore: ['src/battle-animations.js', 'src/battle-animations-moves.js', 'src/battle-split-names.js'],
 });
 if (process.argv[2] === 'full') {
 	delete compileOpts.ignore;
@@ -110,7 +110,7 @@ compiledFiles += compiler.compileToFile(
 
 if (!compileOpts.ignore) {
 	compiledFiles += compiler.compileToFile(
-		['src/battle-animations.ts', 'src/battle-animations-moves.ts'],
+		['src/battle-animations.ts', 'src/battle-animations-moves.ts', 'src/battle-split-names.ts'],
 		'data/graphics.js',
 		compileOpts
 	);

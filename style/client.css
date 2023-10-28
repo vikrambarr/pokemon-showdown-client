@@ -1276,10 +1276,7 @@ p.or:after {
 	position: absolute;
 	left: -30px;
 	bottom: -5px;
-	background: url(https://play.pokemonshowdown.com/sprites/gen5/meloetta.png) center no-repeat;
-}
-.roomcounters button:hover .usercount {
-	background: url(https://play.pokemonshowdown.com/sprites/gen5ani/meloetta.gif) center no-repeat;
+	background: url(https://play.pokemonshowdown.com/sprites/gen5ani/jirachi.gif) center no-repeat;
 }
 .roomcounters .battlecount {
 	display: block;
@@ -1288,10 +1285,7 @@ p.or:after {
 	position: absolute;
 	right: -30px;
 	bottom: -10px;
-	background: url(https://play.pokemonshowdown.com/sprites/gen5/meloetta-pirouette.png) center no-repeat;
-}
-.roomcounters button:hover .battlecount {
-	background: url(https://play.pokemonshowdown.com/sprites/gen5ani/meloetta-pirouette.gif) center no-repeat;
+	background: url(https://play.pokemonshowdown.com/sprites/gen5ani/victini.gif) center no-repeat;
 }
 
 .roomlist {
@@ -2616,7 +2610,7 @@ a.ilink.yours {
 	background: transparent;
 	border: 1px solid transparent;
 	border-radius: 4px;
-	padding: 2px 5px;
+	padding: 2px 2px;
 	margin: 0;
 	font-size: 9pt;
 	font-family: Verdana, sans-serif;
@@ -2639,6 +2633,18 @@ a.ilink.yours {
 .setchart-nickname {
 	position: absolute;
 	left: -4px;
+	top: 5px;
+	border: 1px solid #999999;
+	background: #CBD6E1;
+	border-radius: 5px;
+	padding: 1px 0 0 0;
+	width: 110px;
+
+	box-shadow: inset 1px 1px 0 rgba(255,255,255,.6);
+}
+.setcell-fusion {
+	position: absolute;
+	left: 172px;
 	top: 5px;
 	border: 1px solid #999999;
 	background: #CBD6E1;
@@ -2711,6 +2717,7 @@ a.ilink.yours {
 	padding-bottom: 1px;
 }
 .setchart label,
+.setcell-fusion label,
 .setchart-nickname label {
 	display: block;
 	font-size: 8pt;
@@ -2722,6 +2729,10 @@ a.ilink.yours {
 	text-shadow: #DAE5F0 1px 1px 0, #DAE5F0 1px -1px 0, #DAE5F0 -1px 1px 0, #DAE5F0 -1px -1px 0;
 }
 .setchart-nickname label {
+	font-size: 7pt;
+	margin-bottom: -1px;
+}
+.setcell-fusion label {
 	font-size: 7pt;
 	margin-bottom: -1px;
 }
@@ -2858,6 +2869,7 @@ a.ilink.yours {
 }
 .setchart input,
 .setchart-nickname input,
+.setcell-fusion input,
 .statform input.inputform {
 	display: block;
 	padding: 1px;
@@ -2870,6 +2882,8 @@ a.ilink.yours {
 	border-color: #CC3311;
 }
 .setchart-nickname input {
+}
+.setcell-fusion input {
 }
 .setchart .setcell-details input {
 	width: 216px;
@@ -3589,6 +3603,7 @@ a.ilink.yours {
 }
 
 .dark .setchart,
+.dark .setcell-fusion,
 .dark .setchart-nickname {
 	background-color: #5A6570;
 	box-shadow: none;
@@ -3598,6 +3613,7 @@ a.ilink.yours {
 }
 .dark .setchart label,
 .dark .setchart-nickname label,
+.dark .setcell-fusion label,
 .dark .setchart .statrow-head em {
 	color: #BBB;
 }
@@ -3648,4 +3664,72 @@ blink {
 	animation-timing-function: cubic-bezier(1.0,0,0,1.0);
 	animation-duration: 1s;
 	text-decoration: none;
+}
+
+/*********************************************************
+ * <rainbow>
+ *********************************************************/
+
+.rainbow{
+	animation: rainbow 2.5s linear;
+	animation-iteration-count: infinite;
+}
+
+.rainbowshadow{
+	animation: rainbowshadow 2.5s linear;
+	animation-iteration-count: infinite;
+}
+
+@keyframes rainbow{
+	100%, 0% {
+		color: rgb(205,50,50);
+	}
+	8% {
+		color: rgb(205,77,50);
+	}
+	16% {
+		color: rgb(205,205,50);
+	}
+	25% {
+		color: rgb(77,205,50);
+	}
+	33% {
+		color: rgb(50,205,50);
+	}
+	41% {
+		color: rgb(50,205,77);
+	}
+	50% {
+		color: rgb(50,205,205);
+	}
+	58% {
+		color: rgb(50,77,205);
+	}
+	66% {
+		color: rgb(50,50,205);
+	}
+	75% {
+		color: rgb(77,50,205);
+	}
+	83% {
+		color: rgb(205,50,205);
+	}
+	91% {
+		color: rgb(205,50,77);
+	}
+}
+
+@keyframes rainbowshadow {
+	100%, 0% { filter: drop-shadow(0px 0px 2px rgb(205,50,50)) }
+	8% { filter: drop-shadow(0px 0px 2px rgb(205,77,50)) }
+	16% { filter: drop-shadow(0px 0px 2px rgb(205,205,50)) }
+	25% { filter: drop-shadow(0px 0px 2px rgb(77,205,50)) }
+	33% { filter: drop-shadow(0px 0px 2px rgb(50,205,50)) }
+	41% { filter: drop-shadow(0px 0px 2px rgb(50,205,77)) }
+	50% { filter: drop-shadow(0px 0px 2px rgb(50,205,205)) }
+	58% { filter: drop-shadow(0px 0px 2px rgb(50,77,205)) }
+	66% { filter: drop-shadow(0px 0px 2px rgb(50,50,205)) }
+	75% { filter: drop-shadow(0px 0px 2px rgb(77,50,205)) }
+	83% { filter: drop-shadow(0px 0px 2px rgb(205,50,205)) }
+	91% { filter: drop-shadow(0px 0px 2px rgb(205,50,77)) }
 }

@@ -21,6 +21,8 @@
 declare var require: any;
 declare var global: any;
 
+import {SplitNames} from './battle-split-names';
+
 if (typeof window === 'undefined') {
 	// Node
 	(global as any).window = global;
@@ -214,7 +216,7 @@ const Dex = new class implements ModdedDex {
 		if (avatar.charAt(0) === '#') {
 			return Dex.resourcePrefix + 'sprites/trainers-custom/' + toID(avatar.substr(1)) + '.png';
 		}
-		if (avatar.includes('.') && window.Config?.server?.registered) {
+		if (avatar.includes('.')) {
 			// custom avatar served by the server
 			let protocol = (Config.server.port === 443) ? 'https' : 'http';
 			return protocol + '://' + Config.server.host + ':' + Config.server.port +
@@ -484,7 +486,9 @@ const Dex = new class implements ModdedDex {
 	} = {gen: 6}) {
 		const mechanicsGen = options.gen || 6;
 		let isDynamax = !!options.dynamax;
+		let pokemon_info;
 		if (pokemon instanceof Pokemon) {
+			pokemon_info = pokemon;
 			if (pokemon.volatiles.transform) {
 				options.shiny = pokemon.volatiles.transform[2];
 				options.gender = pokemon.volatiles.transform[3];
@@ -512,6 +516,7 @@ const Dex = new class implements ModdedDex {
 			y: 0,
 			url: Dex.resourcePrefix + 'sprites/',
 			pixelated: true,
+			flip: false,
 			isFrontSprite: false,
 			cryurl: '',
 			shiny: options.shiny,
@@ -539,6 +544,25 @@ const Dex = new class implements ModdedDex {
 		//     This defaults to graphicsGen, but if the graphicsGen doesn't have a sprite for the Pokemon
 		//     (eg. Darmanitan in graphicsGen 2) then we go up gens until it exists.
 		//
+
+		const fusionData = this.getFusionData(pokemon_info);
+
+		if (fusionData.extension !== '') {
+			spriteData.url = 'sprites/fusion-sprites/CustomBattlers/' + fusionData.extension + '.png';
+			spriteData.pixelated = true;
+			spriteData.gen = 5;
+			if (!spriteData.isFrontSprite) spriteData.flip = true;
+			return spriteData;
+		}
+
+		if (species.tags.includes("Infinite Fusion")) {
+			spriteData.url = 'sprites/fangame-sprites/infinitefusion/' + species.id + '.png';
+			spriteData.pixelated = true;
+			spriteData.gen = 5;
+			if (!spriteData.isFrontSprite) spriteData.flip = true;
+			return spriteData;
+		}
+
 		let graphicsGen = mechanicsGen;
 		if (Dex.prefs('nopastgens')) graphicsGen = 6;
 		if (Dex.prefs('bwgfx') && graphicsGen >= 6) graphicsGen = 5;
@@ -716,11 +740,14 @@ const Dex = new class implements ModdedDex {
 		}
 
 		let id = toID(pokemon);
+		let fusion = '';
 		if (!pokemon || typeof pokemon === 'string') pokemon = null;
 		// @ts-ignore
 		if (pokemon?.speciesForme) id = toID(pokemon.speciesForme);
 		// @ts-ignore
 		if (pokemon?.species) id = toID(pokemon.species);
+		// @ts-ignore
+		if (pokemon?.fusion) fusion = toID(pokemon.fusion);
 		// @ts-ignore
 		if (pokemon?.volatiles?.formechange && !pokemon.volatiles.transform) {
 			// @ts-ignore
@@ -731,7 +758,7 @@ const Dex = new class implements ModdedDex {
 		let top = Math.floor(num / 12) * 30;
 		let left = (num % 12) * 40;
 		let fainted = ((pokemon as Pokemon | ServerPokemon)?.fainted ? `;opacity:.3;filter:grayscale(100%) brightness(.5)` : ``);
-		return `background:transparent url(${Dex.resourcePrefix}sprites/pokemonicons-sheet.png?v14) no-repeat scroll -${left}px -${top}px${fainted}`;
+		return `${fusion.length ? 'animation: rainbowshadow ' + ((Math.random() * 2) + 2) + 's infinite;' : ''}background:transparent url(${Dex.resourcePrefix}sprites/pokemonicons-sheet.png?v14) no-repeat scroll -${left}px -${top}px${fainted}`;
 	}
 
 	getTeambuilderSpriteData(pokemon: any, gen: number = 0): TeambuilderSpriteData {
@@ -744,7 +771,7 @@ const Dex = new class implements ModdedDex {
 		if (species.exists === false) return { spriteDir: 'sprites/gen5', spriteid: '0', x: 10, y: 5 };
 		const spriteData: TeambuilderSpriteData = {
 			spriteid,
-			spriteDir: 'sprites/dex',
+			spriteDir: 'sprites/gen5',
 			x: -2,
 			y: -3,
 		};
@@ -785,7 +812,20 @@ const Dex = new class implements ModdedDex {
 		if (!pokemon) return '';
 		const data = this.getTeambuilderSpriteData(pokemon, gen);
 		const shiny = (data.shiny ? '-shiny' : '');
-		return 'background-image:url(' + Dex.resourcePrefix + data.spriteDir + shiny + '/' + data.spriteid + '.png);background-position:' + data.x + 'px ' + data.y + 'px;background-repeat:no-repeat';
+		data.x = 5; data.y = 3;
+
+		const fusionData = this.getFusionData(pokemon);
+		if (fusionData.extension !== '') {
+			let url = 'sprites/fusion-sprites/CustomBattlers/' + fusionData.extension + '.png';
+			return 'background-image:url(' + url + ');background-position:' + data.x + 'px ' + data.y + 'px;background-repeat:no-repeat;background-size:100px;image-rendering:pixelated';
+		}
+
+		if (Dex.species.get(pokemon.species).tags.includes("Infinite Fusion")) {
+			let url = 'sprites/fangame-sprites/infinitefusion/' + toID(pokemon.species) + '.png';
+			return 'background-image:url(' + url + ');background-position:' + data.x + 'px ' + data.y + 'px;background-repeat:no-repeat;background-size:100px;image-rendering:pixelated';
+		}
+
+		return 'background-image:url(' + Dex.resourcePrefix + data.spriteDir + shiny + '/' + data.spriteid + '.png);background-position:' + data.x + 'px ' + data.y + 'px;background-repeat:no-repeat;background-size:100px;image-rendering:pixelated;';
 	}
 
 	getItemIcon(item: any) {
@@ -830,6 +870,48 @@ const Dex = new class implements ModdedDex {
 			this.pokeballs.push(data.name);
 		}
 		return this.pokeballs;
+	}
+
+	getFusionData(pokemon: any) {
+		let fusionData = {
+			extension: '',
+			credit: '',
+			nickname: '',
+		};
+
+		if ((!pokemon.species && !pokemon.speciesForme) || !pokemon.fusion) return fusionData;
+
+		const dex = Dex.mod('gen7infinitefusion' as ID);
+
+		if (dex.species.get(pokemon.fusion).exists) {
+			const head_species = dex.species.get((pokemon.speciesForme || pokemon.species));
+			const body_species = dex.species.get(pokemon.fusion);
+
+			if (head_species.id !== body_species.id && head_species.id in SplitNames && body_species.id in SplitNames) {
+				let head_name = SplitNames[toID(head_species.baseSpecies)][0];
+				let body_name = SplitNames[toID(body_species.baseSpecies)][1];
+
+				if (head_name.endsWith('-') || head_name.endsWith(' ')) {
+					body_name = body_name.replace(' ', '').replace('-', '');
+					body_name = body_name[0].toUpperCase() + body_name.slice(1);
+				}
+				fusionData.nickname = head_name + body_name;
+			}
+
+			if (head_species.num > 0 && body_species.num > 0) {
+				const head_num = head_species.num;
+				const body_num = body_species.num;
+
+				let extension = head_num + '.' + body_num;
+				const FusionIndex = window.BattleFusionIndex;
+				if (head_num.toString() in FusionIndex && FusionIndex[head_num].includes(body_num.toString())) {
+						fusionData.extension = extension;
+						if (extension in window.FusionCredit) fusionData.credit = window.FusionCredit[extension];
+				}
+			}
+		}
+
+		return fusionData;
 	}
 };
 
