@@ -887,14 +887,15 @@ const Dex = new class implements ModdedDex {
 			const head_species = dex.species.get((pokemon.speciesForme || pokemon.species));
 			const body_species = dex.species.get(pokemon.fusion);
 
-			if (head_species.id !== body_species.id && head_species.id in SplitNames && body_species.id in SplitNames) {
+			if (head_species.id !== body_species.id && toID(head_species.baseSpecies) in SplitNames && toID(body_species.baseSpecies) in SplitNames) {
 				let head_name = SplitNames[toID(head_species.baseSpecies)][0];
 				let body_name = SplitNames[toID(body_species.baseSpecies)][1];
 
 				if (head_name.endsWith('-') || head_name.endsWith(' ')) {
 					body_name = body_name.replace(' ', '').replace('-', '');
 					body_name = body_name[0].toUpperCase() + body_name.slice(1);
-				}
+				} if (head_name.endsWith(body_name.charAt(0))) body_name = body_name.slice(1);
+
 				fusionData.nickname = head_name + body_name;
 			}
 
