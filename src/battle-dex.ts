@@ -879,11 +879,11 @@ const Dex = new class implements ModdedDex {
 			nickname: '',
 		};
 
-		if ((!pokemon.species && !pokemon.speciesForme) || !pokemon.fusion) return fusionData;
+		if (!pokemon || (!pokemon.species && !pokemon.speciesForme) || !pokemon.fusion) return fusionData;
 
 		const dex = Dex.mod('gen7infinitefusion' as ID);
 
-		if (dex.species.get(pokemon.fusion).exists) {
+		if (dex.species.get(pokemon.fusion).exists && dex.species.get((pokemon.speciesForme || pokemon.species))) {
 			const head_species = dex.species.get((pokemon.speciesForme || pokemon.species));
 			const body_species = dex.species.get(pokemon.fusion);
 
