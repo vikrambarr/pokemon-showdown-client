@@ -2482,8 +2482,7 @@ export class Battle {
 			}
 
 			poke.speciesForme = newSpeciesForme;
-			
-			poke.fusion = this.parseDetails(poke.name, args[1], poke.details).fusion;
+			poke.fusion = this.parseDetails(poke.name, args[1], args[2]).fusion;
 			if (!poke.fusion) {
 				poke.ability = poke.baseAbility = (species.abilities ? species.abilities['0'] : '');
 			}
