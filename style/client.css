@@ -3185,6 +3185,7 @@ a.ilink.yours {
 	width: 110px;
 	text-align: right;
 }
+.changesprite i,
 .changeform i {
 	cursor: pointer;
 	display: block;
@@ -3199,6 +3200,7 @@ a.ilink.yours {
 	background: rgba(255,255,255,.5);
 	box-shadow: 0 1px 2px rgba(0,0,0,.2);
 }
+.changesprite i:hover,
 .changeform i:hover {
 	color: #DAE5F0;
 	background: #569;
@@ -3415,11 +3417,13 @@ a.ilink.yours {
 	background-color: #AAAAAA;
 	color: black;
 }
+.dark .changesprite i,
 .dark .changeform i {
 	border-color: #bbb;
 	color: #bbb;
 	background: rgba(0,0,0,.5);
 }
+.dark .changesprite i:hover,
 .dark .changeform i:hover {
 	border-color: #EEE;
 	color: #EEE;

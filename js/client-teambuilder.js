@@ -57,6 +57,7 @@
 			'submit .detailsform': 'detailsChange',
 			'click .changeform' : 'altForm',
 			'click .altform' : 'altForm',
+			'click .changesprite' : 'altSprite',
 
 			// stats
 			'keyup .statform input.numform': 'statChange',
@@ -1267,6 +1268,8 @@
 			buf += '<div class="setcol setcol-icon">';
 			if (species.cosmeticFormes) {
 				buf += '<div class="setcell-sprite changeform"><i class="fa fa-caret-down"></i></div>';
+			} else if (fusionData.alts.length) {
+				buf += '<div class="setcell-sprite changesprite"><i class="fa fa-caret-down"></i></div>';
 			} else {
 				buf += '<div class="setcell-sprite"></div>';
 			}
@@ -3006,6 +3009,15 @@
 			}
 			app.addPopup(AltFormPopup, {curSet: set, index: i, room: this});
 		},
+		altSprite: function (e) {
+			var set = this.curSet;
+			var i = 0;
+			if (!set) {
+				i = +$(e.currentTarget).closest('li').attr('value');
+				set = this.curSetList[i];
+			}
+			app.addPopup(AltSpritePopup, {curSet: set, index: i, room: this});
+		},
 
 		/*********************************************************
 		 * Set charts
@@ -3695,6 +3707,57 @@
 				this.curSet.species = Dex.species.get(species.baseSpecies + form).name;
 			} else if (!form) {
 				this.curSet.species = species.baseSpecies;
+			}
+			this.close();
+			if (this.room.curSet) {
+				this.room.updatePokemonSprite();
+			} else {
+				this.room.update();
+			}
+			this.room.$('input[name=pokemon]').eq(this.chartIndex).val(this.curSet.species);
+			this.room.curTeam.team = Storage.packTeam(this.room.curSetList);
+			Storage.saveTeam(this.room.curTeam);
+		}
+	});
+	var AltSpritePopup = this.AltSpritePopup = Popup.extend({
+		type: 'semimodal',
+		initialize: function (data) {
+			this.room = data.room;
+			this.curSet = data.curSet;
+			this.chartIndex = data.index;
+			var species = this.room.curTeam.dex.species.get(this.curSet.species);
+			var fusionData = Dex.getFusionData(this.curSet)
+			var alts = [''];
+			alts.push(...fusionData.alts.split(''));
+			var extension = fusionData.extension;
+			if (this.curSet.altsprite) extension = extension.slice(0, -1);
+			var spriteSize = 288;
+			var spriteDim = 'width: 288px; height: 288px;';
+
+			var buf = '';
+			buf += '<p>Pick a variant or <button name="close">Cancel</button></p>';
+			buf += '<div class="formlist">';
+
+			var altCount = alts.length;
+			for (var i = 0; i < altCount; i++) {
+				let alt = extension + alts[i];
+				var offset = '-' + (((i - 1) % 7) * spriteSize) + 'px -' + (Math.floor((i - 1) / 7) * spriteSize) + 'px';
+				buf += '<button name="setSprite" value="' + alts[i] + '"  style="';
+				buf += 'background-position:' + offset + '; background: url(sprites/fusion-sprites/CustomBattlers/' + alt + '.png) no-repeat; ' + spriteDim + '"';
+				buf +=  (alts[i] === this.curSet.altsprite ? ' class="cur"' : '') + '></button>';
+			}
+			buf += '</div>';
+
+			var height = Math.ceil(altCount / 7);
+			var width = Math.ceil(altCount / height);
+			this.$el.html(buf).css({'max-width': (4 + spriteSize) * width, 'height': 42 + (4 + spriteSize) * height});
+		},
+		setSprite: function (altsprite) {
+			var species = Dex.species.get(this.curSet.species);
+			if (altsprite.length) {
+				this.curSet.altsprite = altsprite;
+			} else {
+				this.curSet.altsprite = '';
 			}
 			this.close();
 			if (this.room.curSet) {

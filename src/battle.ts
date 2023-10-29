@@ -3208,16 +3208,16 @@ export class Battle {
 		output.ident = (!isTeamPreview ? pokemonid : '');
 		output.searchid = (!isTeamPreview ? `${pokemonid}|${details}` : '');
 		let splitDetails = details.split(', ');
-		if (splitDetails[splitDetails.length - 1].startsWith('tera:')) {
-			output.terastallized = splitDetails[splitDetails.length - 1].slice(5);
+		if (splitDetails[splitDetails.length - 1].startsWith('alt: ')) {
+			output.altsprite = splitDetails[splitDetails.length - 1].charAt(5);
 			splitDetails.pop();
 		}
 		if (splitDetails[splitDetails.length - 1].startsWith('fusion: ')) {
 			output.fusion = splitDetails[splitDetails.length - 1].slice(8);
 			splitDetails.pop();
 		}
-		if (splitDetails[splitDetails.length - 1].startsWith('alt: ')) {
-			output.altsprite = splitDetails[splitDetails.length - 1].slice(5);
+		if (splitDetails[splitDetails.length - 1].startsWith('tera:')) {
+			output.terastallized = splitDetails[splitDetails.length - 1].slice(5);
 			splitDetails.pop();
 		}
 		if (splitDetails[splitDetails.length - 1] === 'shiny') {

@@ -879,10 +879,13 @@ const Dex = new class implements ModdedDex {
 	}
 
 	getFusionData(pokemon: any) {
+		const alphabet = 'abcdefghijklmnopqrstuvwxyz';
+
 		let fusionData = {
 			extension: '',
 			credit: '',
 			nickname: '',
+			alts: '',
 		};
 
 		if (!pokemon || (!pokemon.species && !pokemon.speciesForme) || !pokemon.fusion) return fusionData;
@@ -912,8 +915,16 @@ const Dex = new class implements ModdedDex {
 				let extension = head_num + '.' + body_num;
 				const FusionIndex = window.BattleFusionIndex;
 				if (head_num.toString() in FusionIndex && FusionIndex[head_num].includes(body_num.toString())) {
-						fusionData.extension = extension;
-						if (extension in window.FusionCredit) fusionData.credit = window.FusionCredit[extension];
+					let altspriteCount = 0;
+					for (let sprite of FusionIndex[head_num]) {
+						if (sprite !== body_num.toString() &&
+						sprite.includes(body_num.toString()) &&
+						alphabet.includes(sprite.slice(-1)) &&
+						!fusionData.alts.includes(sprite.slice(-1))) fusionData.alts += sprite.slice(-1); 
+					}
+					fusionData.extension = extension;
+					if (pokemon.altsprite && FusionIndex[head_num].includes(body_num.toString() + pokemon.altsprite)) fusionData.extension += pokemon.altsprite;
+					if (extension in window.FusionCredit) fusionData.credit = window.FusionCredit[extension];
 				}
 			}
 		}
