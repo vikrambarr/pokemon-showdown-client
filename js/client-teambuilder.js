@@ -3296,6 +3296,7 @@
 				if (this.curTeam.dex.species.get(val).exists) {
 					this.curSet.fusion = val;
 					this.curSet.name = '';
+					this.curSet.altsprite = '';
 					this.updateSetTop();
 					if (selectNext) this.$(this.curSet.item || !this.$('input[name=item]').length ? (this.$('input[name=ability]').length ? 'input[name=ability]' : 'input[name=move1]') : 'input[name=item]').select();
 				}
