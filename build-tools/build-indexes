@@ -54,7 +54,7 @@ for (const mod in Dex.dexes) {
             for (const entry in modData.data[dataType]) {
                 if (!(entry in Dex.data[dataType]) && !modData.data[dataType][entry].inherit) {
                     counter ++;
-                    Dex.data[dataType][entry] = modData.data[dataType][entry];
+                    Dex.data[dataType][entry] = Dex.deepClone(modData.data[dataType][entry]);
                     if (dataType !== 'Learnsets') Dex.data[dataType][entry].isNonstandard = "Custom";
                 }
             }
