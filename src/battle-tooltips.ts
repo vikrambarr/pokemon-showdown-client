@@ -2315,6 +2315,8 @@ interface PokemonSet {
 	teraType?: string;
 	/** Defaults to nothing */
 	fusion?: string;
+	/** Defaults to nothing */
+	altsprite?: string;
 }
 
 class BattleStatGuesser {

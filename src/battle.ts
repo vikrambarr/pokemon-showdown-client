@@ -81,6 +81,7 @@ export class Pokemon implements PokemonDetails, PokemonHealth {
 	level = 100;
 	gender: GenderName = 'N';
 	fusion: string;
+	altsprite: string;
 	shiny = false;
 
 	hpcolor: HPColor = 'g';
@@ -119,6 +120,7 @@ export class Pokemon implements PokemonDetails, PokemonHealth {
 		this.shiny = data.shiny;
 		this.gender = data.gender || 'N';
 		this.fusion = data.fusion;
+		this.altsprite = data.altsprite;
 		this.ident = data.ident;
 		this.terastallized = data.terastallized || '';
 		this.searchid = data.searchid;
@@ -1008,6 +1010,7 @@ export interface PokemonDetails {
 	ident: string;
 	terastallized: string;
 	fusion: string;
+	altsprite: string;
 	searchid: string;
 }
 export interface PokemonHealth {
@@ -3211,6 +3214,10 @@ export class Battle {
 		}
 		if (splitDetails[splitDetails.length - 1].startsWith('fusion: ')) {
 			output.fusion = splitDetails[splitDetails.length - 1].slice(8);
+			splitDetails.pop();
+		}
+		if (splitDetails[splitDetails.length - 1].startsWith('alt: ')) {
+			output.altsprite = splitDetails[splitDetails.length - 1].slice(5);
 			splitDetails.pop();
 		}
 		if (splitDetails[splitDetails.length - 1] === 'shiny') {
