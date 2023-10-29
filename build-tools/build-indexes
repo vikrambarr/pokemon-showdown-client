@@ -14,7 +14,7 @@ if (!fs.existsSync('data/pokemon-showdown')) {
 	});
 }
 
-process.stdout.write("Syncing data from Git repository... ");
+process.stdout.write("Syncing data from Git repository... \n");
 child_process.execSync('git pull', {cwd: 'data/pokemon-showdown'});
 child_process.execSync('npm run build', {cwd: 'data/pokemon-showdown'});
 console.log("DONE");
@@ -27,7 +27,7 @@ if (!fs.existsSync('sprites/fusion-sprites')) {
 	});
 }
 
-process.stdout.write("Syncing IF sprites from Gitlab repository... ");
+process.stdout.write("Syncing IF sprites from Gitlab repository... \n");
 child_process.execSync('git pull', {cwd: 'sprites/fusion-sprites'});
 console.log("DONE");
 
@@ -37,7 +37,7 @@ if (!fs.existsSync('sprites/fangame-sprites')) {
 	});
 }
 
-process.stdout.write("Syncing fangame sprites... ");
+process.stdout.write("Syncing fangame sprites... \n");
 child_process.execSync('git pull', {cwd: 'sprites/fangame-sprites'});
 console.log("DONE");
 
