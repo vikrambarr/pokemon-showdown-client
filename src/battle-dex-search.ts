@@ -623,21 +623,23 @@ abstract class BattleTypedSearch<T extends SearchType> {
 			this.formatType = 'letsgo';
 			this.dex = Dex.mod('gen7letsgo' as ID);
 		}
+		if (format.includes('infinitefusion')) {
+			this.formatType = 'natdex';
+			if (format.includes('infinitefusiondex')) {
+				format = format.endsWith('ou') ? 'ou' as ID : 'ubers' as ID;
+				this.dex = Dex.mod('gen7infinitefusion' as ID);
+			} else if (format.includes('natdex')) {
+				format = format.slice(20) as ID;
+				if (format === 'doubles') format = 'ag';
+				if (!format) format = 'ou';
+				this.dex = Dex.mod('gen9infinitefusion' as ID);
+			}
+		}
 		if (format.includes('nationaldex') || format.startsWith('nd') || format.includes('natdex')) {
 			format = (format.startsWith('nd') ? format.slice(2) :
 				format.includes('natdex') ? format.slice(6) : format.slice(11)) as ID;
-			if (format.startsWith('infinitefusion')) {
-				format = format.slice(14) as ID;
-				this.dex = Dex.mod('gen9infinitefusion' as ID);
-			}
 			this.formatType = 'natdex';
 			if (!format) format = 'ou' as ID;
-		}
-		if (format.includes('infinitefusiondex')) {
-			this.formatType = 'natdex';
-			if (format.endsWith('ou')) format = 'ou' as ID;
-			else format = 'ubers' as ID;
-			this.dex = Dex.mod('gen7infinitefusion' as ID);
 		}
 		if (format.includes('doubles') && this.dex.gen > 4 && !this.formatType) this.formatType = 'doubles';
 		if (this.formatType === 'letsgo') format = format.slice(6) as ID;
