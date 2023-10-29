@@ -1768,6 +1768,7 @@
 			if (this.curSetList[i].fusion) {
 				[this.curSetList[i].species, this.curSetList[i].fusion] = [this.curSetList[i].fusion, this.curSetList[i].species];
 				this.curSetList[i].name = '';
+				this.curSetList[i].altsprite = '';
 			}
 
 			if (!this.curChartName) {
@@ -3732,8 +3733,8 @@
 			alts.push(...fusionData.alts.split(''));
 			var extension = fusionData.extension;
 			if (this.curSet.altsprite) extension = extension.slice(0, -1);
-			var spriteSize = 288;
-			var spriteDim = 'width: 288px; height: 288px;';
+			var spriteSize = 144;
+			var spriteDim = 'width: 144px; height: 144px;';
 
 			var buf = '';
 			buf += '<p>Pick a variant or <button name="close">Cancel</button></p>';
@@ -3744,7 +3745,7 @@
 				let alt = extension + alts[i];
 				var offset = '-' + (((i - 1) % 7) * spriteSize) + 'px -' + (Math.floor((i - 1) / 7) * spriteSize) + 'px';
 				buf += '<button name="setSprite" value="' + alts[i] + '"  style="';
-				buf += 'background-position:' + offset + '; background: url(sprites/fusion-sprites/CustomBattlers/' + alt + '.png) no-repeat; ' + spriteDim + '"';
+				buf += 'background-position:' + offset + '; background: url(sprites/fusion-sprites/CustomBattlers/' + alt + '.png) no-repeat; ' + spriteDim + ' background-size: 144px 144px;"';
 				buf +=  (alts[i] === this.curSet.altsprite ? ' class="cur"' : '') + '></button>';
 			}
 			buf += '</div>';
