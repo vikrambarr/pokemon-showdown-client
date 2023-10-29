@@ -740,20 +740,26 @@ const Dex = new class implements ModdedDex {
 		}
 
 		let id = toID(pokemon);
-		let fusion = '';
+		
 		if (!pokemon || typeof pokemon === 'string') pokemon = null;
 		// @ts-ignore
 		if (pokemon?.speciesForme) id = toID(pokemon.speciesForme);
 		// @ts-ignore
 		if (pokemon?.species) id = toID(pokemon.species);
 		// @ts-ignore
-		if (pokemon?.fusion) fusion = toID(pokemon.fusion);
-		// @ts-ignore
 		if (pokemon?.volatiles?.formechange && !pokemon.volatiles.transform) {
 			// @ts-ignore
 			id = toID(pokemon.volatiles.formechange[1]);
 		}
 		let num = this.getPokemonIconNum(id, pokemon?.gender === 'F', facingLeft);
+
+		let fusion = pokemon?.fusion ? toID(pokemon.fusion): '';
+		let species = Dex.species.get(id);
+
+		if (species.tags.includes("Infinite Fusion")) {
+			let fainted = ((pokemon as Pokemon | ServerPokemon)?.fainted ? `;opacity:.3;filter:grayscale(100%) brightness(.5)` : ``);
+			return `${fusion.length ? 'animation: rainbowshadow ' + ((Math.random() * 2) + 2) + 's infinite;' : ''}background:transparent url(sprites/fangame-sprites/infinitefusion/iconsprites/${id}.png) no-repeat scroll ${fainted}`;
+		}
 
 		let top = Math.floor(num / 12) * 30;
 		let left = (num % 12) * 40;
