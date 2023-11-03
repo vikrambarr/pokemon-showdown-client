@@ -2681,7 +2681,7 @@ export class PokemonSprite extends Sprite {
 		let buf = '<div class="statbar' + (this.isFrontSprite ? ' lstatbar' : ' rstatbar') + this.getClassForPosition(pokemon.slot) + '" style="display: none">';
 		const ignoreNick = this.isFrontSprite && (this.scene.battle.ignoreOpponent || this.scene.battle.ignoreNicks);
 		buf += `<strong>${BattleLog.escapeHTML(ignoreNick ? pokemon.speciesForme : pokemon.name)}`;
-		if (pokemon.fusion) {
+		if (pokemon.fusion || pokemon.getSpecies().tags.includes('Infinite Fusion')) {
 			buf += ` <img src="./fx/fused.png" alt="Fused" style="vertical-align:text-bottom;" height="16" width="16" />`;
 		}
 		const gender = pokemon.gender;

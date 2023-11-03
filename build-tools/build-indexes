@@ -486,7 +486,7 @@ process.stdout.write("Building `data/teambuilder-tables.js`... ");
 				if (isFusions) {
 					let tier = Dex.mod('gen7infinitefusion').species.get(species.name).tier;
 					if (species.isMega ||
-						species.num <= 0 ||
+						species.num <= 10000 ||
 						species.isNonstandard === "Unobtainable") tier = 'Illegal';
 					return tier;
 				}

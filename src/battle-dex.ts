@@ -908,9 +908,9 @@ const Dex = new class implements ModdedDex {
 				fusionData.nickname = head_name + body_name;
 			}
 
-			if (head_species.num > 0 && body_species.num > 0) {
-				const head_num = head_species.num;
-				const body_num = body_species.num;
+			if (head_species.num > 10000 && body_species.num > 10000) {
+				const head_num = head_species.num - 10000;
+				const body_num = body_species.num - 10000;
 
 				let extension = head_num + '.' + body_num;
 				const FusionIndex = window.BattleFusionIndex;
