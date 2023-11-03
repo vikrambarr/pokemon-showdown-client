@@ -3762,11 +3762,7 @@
 				this.curSet.altsprite = '';
 			}
 			this.close();
-			if (this.room.curSet) {
-				this.room.updatePokemonSprite();
-			} else {
-				this.room.update();
-			}
+			this.room.update();
 			this.room.$('input[name=pokemon]').eq(this.chartIndex).val(this.curSet.species);
 			this.room.curTeam.team = Storage.packTeam(this.room.curSetList);
 			Storage.saveTeam(this.room.curTeam);

@@ -917,18 +917,16 @@ const Dex = new class implements ModdedDex {
 				if (head_num.toString() in FusionIndex && FusionIndex[head_num].includes(body_num.toString())) {
 					let altspriteCount = 0;
 					for (let sprite of FusionIndex[head_num]) {
-						if (sprite !== body_num.toString() &&
-						sprite.includes(body_num.toString()) &&
-						alphabet.includes(sprite.slice(-1)) &&
+						if (alphabet.includes(sprite.slice(-1)) &&
+						sprite.slice(0, -1) === body_num.toString() &&
 						!fusionData.alts.includes(sprite.slice(-1))) fusionData.alts += sprite.slice(-1); 
 					}
 					fusionData.extension = extension;
 					if (pokemon.altsprite && FusionIndex[head_num].includes(body_num.toString() + pokemon.altsprite)) fusionData.extension += pokemon.altsprite;
-					if (extension in window.FusionCredit) fusionData.credit = window.FusionCredit[extension];
+					if (fusionData.extension in window.FusionCredit) fusionData.credit = window.FusionCredit[fusionData.extension];
 				}
 			}
 		}
-
 		return fusionData;
 	}
 };
