@@ -37,6 +37,15 @@
 	}
 	.optgroup {
 		display: inline-block;
+		line-height: 22px;
+		font-size: 10pt;
+	}
+	.optgroup .button {
+		height: 25px;
+	}
+	.optgroup button.button {
+		padding-left: 12px;
+		padding-right: 12px;
 	}
 	.button-first, .button-middle {
 		border-top-right-radius: 0;
@@ -47,6 +56,10 @@
 		border-bottom-left-radius: 0;
 		margin-left: -1px;
 	}
+	.button-first:hover, .button-middle:hover {
+		/* puts the right-border over the left border of the button to the right of it */
+		position: relative;
+	}
 	.linklist {
 		list-style: none;
 		margin: 0.5em 0;
@@ -54,6 +67,67 @@
 	}
 	.linklist li {
 		padding: 2px 0;
+	}
+	.sidebar {
+		float: left;
+		width: 320px;
+	}
+	.bar-wrapper {
+		max-width: 1100px;
+		margin: 0 auto;
+	}
+	.bar-wrapper.has-sidebar {
+		max-width: 1430px;
+	}
+	.mainbar {
+		margin: 0;
+		padding-right: 1px;
+	}
+	.mainbar.has-sidebar {
+		margin-left: 330px;
+	}
+	@media (min-width: 1511px) {
+		.sidebar {
+			width: 400px;
+		}
+		.bar-wrapper.has-sidebar {
+			max-width: 1510px;
+		}
+		.mainbar.has-sidebar {
+			margin-left: 410px;
+		}
+	}
+	.section.first-section {
+		margin-top: 9px;
+	}
+	.blocklink small {
+		white-space: normal;
+	}
+	.button {
+		vertical-align: middle;
+	}
+	.replay-controls {
+		padding-top: 10px;
+	}
+	.replay-controls h1 {
+		font-size: 16pt;
+		font-weight: normal;
+		color: #CCC;
+	}
+	.pagelink {
+		text-align: center;
+	}
+	.pagelink a {
+		width: 150px;
+	}
+	.textbox, .button {
+		font-size: 11pt;
+		vertical-align: middle;
+	}
+	@media (max-width: 450px) {
+		.button {
+			font-size: 9pt;
+		}
 	}
 </style>
 
@@ -98,4 +172,5 @@
 <script defer src="//play.pokemonshowdown.com/js/battle.js?a7"></script>
 
 <script defer src="js/utils.js?"></script>
+<script defer src="js/replays-battle.js?"></script>
 <script defer src="js/replays.js?"></script>
