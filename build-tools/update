@@ -182,7 +182,7 @@ function updateFiles() {
 	let crossprotocolContents = fs.readFileSync('crossprotocol.template.html', {encoding: 'utf8'});
 	crossprotocolContents = crossprotocolContents.replace(URL_REGEX, updateURL);
 	let replayEmbedContents = fs.readFileSync('js/replay-embed.template.js', {encoding: 'utf8'});
-	replayEmbedContents = replayEmbedContents.replace(/play\.pokemonshowdown\.com/g, 'play.pokeathlon.com');
+	replayEmbedContents = replayEmbedContents.replace(/https\:\/\/play\.pokemonshowdown\.com/g, 'http://play.pokeathlon.com');
 
 	// add news, only if it's actually likely to exist
 	if (__dirname.endsWith('play.pokemonshowdown.com/build-tools')) {
