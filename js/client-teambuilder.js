@@ -1206,12 +1206,12 @@
 				}
 				for (i = 0; i < this.curSetList.length; i++) {
 					if (this.curSetList.length < this.curTeam.capacity && this.deletedSet && i === this.deletedSetLoc) {
-						buf += '<li><button name="undeleteSet"><i class="fa fa-undo"></i> Undo Delete</button></li>';
+						buf += '<li><button name="undeleteSet" class="button"><i class="fa fa-undo"></i> Undo Delete</button></li>';
 					}
 					buf += this.renderSet(this.curSetList[i], i);
 				}
 				if (this.deletedSet && i === this.deletedSetLoc) {
-					buf += '<li><button name="undeleteSet"><i class="fa fa-undo"></i> Undo Delete</button></li>';
+					buf += '<li><button name="undeleteSet" class="button"><i class="fa fa-undo"></i> Undo Delete</button></li>';
 				}
 				if (i === 0) {
 					buf += '<li><button name="import" class="button big"><i class="fa fa-upload"></i> Import from text or URL</button></li>';
@@ -1249,7 +1249,7 @@
 			var buf = '<li value="' + i + '">';
 			if (!set.species) {
 				if (this.deletedSet) {
-					buf += '<div class="setmenu setmenu-left"><button name="undeleteSet"><i class="fa fa-undo"></i> Undo Delete</button></div>';
+					buf += '<div class="setmenu setmenu-left"><button name="undeleteSet" class="button"><i class="fa fa-undo"></i> Undo Delete</button></div>';
 				}
 				buf += '<div class="setmenu"><button name="importSet"><i class="fa fa-upload"></i>Import</button></div>';
 				buf += '<div class="setchart" style="background-image:url(' + Dex.resourcePrefix + 'sprites/gen5/0.png);"><div class="setcol setcol-icon"><div class="setcell-sprite"></div><div class="setcell setcell-pokemon"><label>Pok&eacute;mon</label><input type="text" name="pokemon" class="textbox chartinput" value="" autocomplete="off" /></div></div></div>';
@@ -1650,9 +1650,9 @@
 			buf += '<div class="teambuilder-clipboard-data" tabindex="-1">' + this.clipboardInnerHTML() + '</div>';
 			buf += '<div class="teambuilder-clipboard-buttons">';
 			if (this.curTeam && this.curSetList.length < this.curTeam.capacity) {
-				buf += '<button name="pastePokemon" class="teambuilder-clipboard-button-left"><i class="fa fa-clipboard"></i> Paste!</button>';
+				buf += '<button name="pastePokemon" class="teambuilder-clipboard-button-left button"><i class="fa fa-clipboard"></i> Paste!</button>';
 			}
-			buf += '<button name="clipboardRemoveAll" class="teambuilder-clipboard-button-right"><i class="fa fa-trash"></i> Clear clipboard</button>';
+			buf += '<button name="clipboardRemoveAll" class="teambuilder-clipboard-button-right button"><i class="fa fa-trash"></i> Clear clipboard</button>';
 			buf += '</div>';
 			buf += '</div>';
 
@@ -1871,7 +1871,7 @@
 
 			$setDiv.text('Sample sets: ');
 			for (var set in sets) {
-				$setDiv.append('<button name="importSmogonSet">' + BattleLog.escapeHTML(set) + '</button>');
+				$setDiv.append('<button name="importSmogonSet" class="button">' + BattleLog.escapeHTML(set) + '</button>');
 			}
 			$setDiv.append(' <small>(<a target="_blank" href="' + this.smogdexLink(species) + '">Smogon&nbsp;analysis</a>)</small>');
 		},
@@ -3038,7 +3038,10 @@
 		},
 		chartClick: function (e) {
 			if (this.search.addFilter(e.currentTarget)) {
-				this.$('input[name=' + this.curChartName + ']').val('').select();
+				var curChart = this.$('input[name=' + this.curChartName + ']');
+				// if we were searching for the filter, remove it
+				if (this.search.q) curChart.val('');
+				curChart.select();
 				this.search.find('');
 				return;
 			}
@@ -3047,23 +3050,23 @@
 			if (this.curChartType === 'move' && e.currentTarget.className === 'cur') {
 				// clicked a move, remove it if we already have it
 				var moves = [];
-				for (var i = 1; i <= 4; i++) {
-					var $inputEl = this.$('input[name=move' + i + ']');
-					var curVal = $inputEl.val();
+				for (var i = 0; i < this.curSet.moves.length; i++) {
+					var curVal = this.curSet.moves[i];
 					if (curVal === val) {
 						this.unChooseMove(curVal);
-						$inputEl.val('');
 						delete this.search.cur[toID(val)];
 					} else if (curVal) {
 						moves.push(curVal);
 					}
 				}
-				if (moves.length < 4) {
+				if (moves.length < this.curSet.moves.length) {
 					this.$('input[name=move1]').val(moves[0] || '');
 					this.$('input[name=move2]').val(moves[1] || '');
 					this.$('input[name=move3]').val(moves[2] || '');
 					this.$('input[name=move4]').val(moves[3] || '');
-					this.$('input[name=move' + (1 + moves.length) + ']').focus();
+					this.$('input[name=move' + Math.min(moves.length + 1, 4) + ']').focus();
+					this.curSet.moves = moves;
+					this.search.find('');
 					return;
 				}
 			}
