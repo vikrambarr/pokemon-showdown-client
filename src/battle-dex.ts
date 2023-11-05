@@ -548,7 +548,7 @@ const Dex = new class implements ModdedDex {
 		const fusionData = this.getFusionData(pokemon_info);
 
 		if (fusionData.extension !== '') {
-			spriteData.url = 'sprites/fusion-sprites/CustomBattlers/' + fusionData.extension + '.png';
+			spriteData.url = 'http://play.pokeathlon.com/sprites/fusion-sprites/CustomBattlers/' + fusionData.extension + '.png';
 			spriteData.pixelated = true;
 			spriteData.gen = 5;
 			if (!spriteData.isFrontSprite) spriteData.flip = true;
@@ -556,7 +556,7 @@ const Dex = new class implements ModdedDex {
 		}
 
 		if (species.tags.includes("Infinite Fusion")) {
-			spriteData.url = 'sprites/fangame-sprites/infinitefusion/' + species.id + '.png';
+			spriteData.url = 'http://play.pokeathlon.com/sprites/fangame-sprites/infinitefusion/' + species.id + '.png';
 			spriteData.pixelated = true;
 			spriteData.gen = 5;
 			if (!spriteData.isFrontSprite) spriteData.flip = true;
@@ -758,7 +758,7 @@ const Dex = new class implements ModdedDex {
 
 		if (species.tags.includes("Infinite Fusion")) {
 			let fainted = ((pokemon as Pokemon | ServerPokemon)?.fainted ? `;opacity:.3;filter:grayscale(100%) brightness(.5)` : ``);
-			return `${fusion.length ? 'animation: rainbowshadow ' + ((Math.random() * 2) + 2) + 's infinite;' : ''}background:transparent url(sprites/fangame-sprites/infinitefusion/iconsprites/${id}.png) no-repeat scroll ${fainted}`;
+			return `${fusion.length ? 'animation: rainbowshadow ' + ((Math.random() * 2) + 2) + 's infinite;' : ''}background:transparent url(http://play.pokeathlon.com/sprites/fangame-sprites/infinitefusion/iconsprites/${id}.png) no-repeat scroll ${fainted}`;
 		}
 
 		let top = Math.floor(num / 12) * 30;
@@ -822,12 +822,12 @@ const Dex = new class implements ModdedDex {
 
 		const fusionData = this.getFusionData(pokemon);
 		if (fusionData.extension !== '') {
-			let url = 'sprites/fusion-sprites/CustomBattlers/' + fusionData.extension + '.png';
+			let url = 'http://play.pokeathlon.com/sprites/fusion-sprites/CustomBattlers/' + fusionData.extension + '.png';
 			return 'background-image:url(' + url + ');background-position:' + data.x + 'px ' + data.y + 'px;background-repeat:no-repeat;background-size:100px;image-rendering:pixelated';
 		}
 
 		if (Dex.species.get(pokemon.species).tags.includes("Infinite Fusion")) {
-			let url = 'sprites/fangame-sprites/infinitefusion/' + toID(pokemon.species) + '.png';
+			let url = 'http://play.pokeathlon.com/sprites/fangame-sprites/infinitefusion/' + toID(pokemon.species) + '.png';
 			return 'background-image:url(' + url + ');background-position:' + data.x + 'px ' + data.y + 'px;background-repeat:no-repeat;background-size:100px;image-rendering:pixelated';
 		}
 
