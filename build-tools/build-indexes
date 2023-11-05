@@ -480,7 +480,7 @@ process.stdout.write("Building `data/teambuilder-tables.js`... ");
 				}
 				if (isNatDexFusions) {
 					let tier = species.natDexTier;
-					if (species.isMega) tier = 'Uber';
+					if (species.isMega) tier = 'Illegal';
 					return tier;
 				}
 				if (isFusions) {

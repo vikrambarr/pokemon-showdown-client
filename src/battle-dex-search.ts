@@ -630,8 +630,7 @@ abstract class BattleTypedSearch<T extends SearchType> {
 				this.dex = Dex.mod('gen7infinitefusion' as ID);
 			} else if (format.includes('natdex')) {
 				format = format.slice(20) as ID;
-				if (format === 'doubles') format = 'ag';
-				if (!format) format = 'ou';
+				if (format === 'doubles') format = 'ag' as ID;
 				this.dex = Dex.mod('gen9infinitefusion' as ID);
 			}
 		}
