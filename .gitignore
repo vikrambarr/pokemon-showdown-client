@@ -1,6 +1,7 @@
 /sprites/
 /audio/
-/config/
+/config/*
+!/config/testclient-key.js
 /index.php
 /index.html
 /preactalpha.html
