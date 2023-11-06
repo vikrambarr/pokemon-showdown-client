@@ -793,7 +793,7 @@ class BattleTooltips {
 			name += ' <small>(' + BattleLog.escapeHTML(pokemon.speciesForme) + ')</small>';
 		}
 
-		let fuseBuf = pokemon.fusion ? ` <small>Fusion: ${pokemon.fusion}</small><br />`: ``;
+		let fuseBuf = pokemon.fusion ? ` <small><b>Fusion: </b>${pokemon.fusion}</small><br />`: ``;
 		let fusionData = Dex.getFusionData(pokemon);
 		let creditBuf = '';
 		if (fusionData.extension !== '') {
