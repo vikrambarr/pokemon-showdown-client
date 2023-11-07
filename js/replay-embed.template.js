@@ -111,9 +111,7 @@ var Replays = {
 		} else {
 			$chooser = type;
 			type = '';
-			if ($chooser.hasClass('colorchooser')) {
-				type = 'color';
-			} else if ($chooser.hasClass('soundchooser')) {
+			if ($chooser.hasClass('soundchooser')) {
 				type = 'sound';
 			} else if ($chooser.hasClass('speedchooser')) {
 				type = 'speed';
@@ -202,12 +200,3 @@ var Replays = {
 window.onload = function () {
 	Replays.init();
 };
-
-if (window.matchMedia) {
-	if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-		document.body.className = 'dark';
-	}
-	window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (event) {
-		document.body.className = event.matches ? "dark" : "";
-	});
-}
