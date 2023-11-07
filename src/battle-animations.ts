@@ -3137,10 +3137,9 @@ const BattleEffects: {[k: string]: SpriteData} = {
 	},
 };
 (() => {
-	if (!window.Dex || !Dex.resourcePrefix) return;
 	for (const id in BattleEffects) {
 		if (!BattleEffects[id].url) continue;
-		BattleEffects[id].url = Dex.fxPrefix + BattleEffects[id].url;
+		BattleEffects[id].url = 'http://play.pokeathlon.com/fx/' + BattleEffects[id].url;
 	}
 })();
 const BattleBackdropsThree = [
