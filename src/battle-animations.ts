@@ -2682,7 +2682,7 @@ export class PokemonSprite extends Sprite {
 		const ignoreNick = this.isFrontSprite && (this.scene.battle.ignoreOpponent || this.scene.battle.ignoreNicks);
 		buf += `<strong>${BattleLog.escapeHTML(ignoreNick ? pokemon.speciesForme : pokemon.name)}`;
 		if (pokemon.fusion || pokemon.getSpecies().tags.includes('Infinite Fusion')) {
-			buf += ` <img src="http://play.pokeathlon.com/fx/fused.png" alt="Fused" style="vertical-align:text-bottom;" height="16" width="16" />`;
+			buf += ` <img src="https://play.pokeathlon.com/fx/fused.png" alt="Fused" style="vertical-align:text-bottom;" height="16" width="16" />`;
 		}
 		const gender = pokemon.gender;
 		if (gender === 'M' || gender === 'F') {
@@ -3139,7 +3139,7 @@ const BattleEffects: {[k: string]: SpriteData} = {
 (() => {
 	for (const id in BattleEffects) {
 		if (!BattleEffects[id].url) continue;
-		BattleEffects[id].url = 'http://play.pokeathlon.com/fx/' + BattleEffects[id].url;
+		BattleEffects[id].url = 'https://play.pokeathlon.com/fx/' + BattleEffects[id].url;
 	}
 })();
 const BattleBackdropsThree = [
