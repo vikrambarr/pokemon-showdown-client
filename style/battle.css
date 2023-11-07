@@ -22,6 +22,23 @@ License: GPLv2
 	font-family: Verdana, sans-serif;
 	font-size: 10pt;
 }
+
+.battle .replay{
+	position: absolute;
+	text-align: left;
+	top: 0px;
+	left: -1px;
+	border: 1px solid #AAAAAA;
+	background: #CFD5DA;
+	color: black;
+	width: 640px;
+	height: 360px;
+	overflow: hidden;
+
+	font-family: Verdana, sans-serif;
+	font-size: 10pt;
+}
+
 .backdrop {
 	width: 700px;
 	height: 500px;
@@ -62,6 +79,26 @@ License: GPLv2
 	background: #EEF2F5;
 	color: black;
 	top: 9px;
+	left: 640px;
+	right: -1px;
+	height: 360px;
+
+	font-family: Verdana, sans-serif;
+	font-size: 10pt;
+
+	overflow: auto;
+	overflow-y: scroll;
+	-webkit-overflow-scrolling: touch;
+	overflow-scrolling: touch;
+	word-wrap: break-word;
+}
+.battle-log .replay {
+	position: absolute;
+	text-align: left;
+	border: 1px solid #AAAAAA;
+	background: #EEF2F5;
+	color: black;
+	top: 0px;
 	left: 640px;
 	right: -1px;
 	height: 360px;
