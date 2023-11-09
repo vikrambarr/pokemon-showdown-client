@@ -175,8 +175,8 @@ function writeFiles(indexContents, preactIndexContents, crossprotocolContents, r
 
 function updateFiles() {
 	// add hashes to js and css files and rewrite URLs
-	let indexContents = fs.readFileSync('index.template.html', {encoding: 'utf8'});
-	indexContents = indexContents.replace(URL_REGEX, updateURL);
+	let indexContents = fs.readFileSync('testclient.template.html', {encoding: 'utf8'});
+	indexContents = indexContents.replace(/\?\?/g, `?${Math.random()}`);
 	let preactIndexContents = fs.readFileSync('preactalpha.template.html', {encoding: 'utf8'});
 	preactIndexContents = preactIndexContents.replace(URL_REGEX, updateURL);
 	let crossprotocolContents = fs.readFileSync('crossprotocol.template.html', {encoding: 'utf8'});

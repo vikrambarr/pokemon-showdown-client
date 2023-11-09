@@ -1266,10 +1266,10 @@
 
 			// icon
 			buf += '<div class="setcol setcol-icon">';
-			if (species.cosmeticFormes) {
-				buf += '<div class="setcell-sprite changeform"><i class="fa fa-caret-down"></i></div>';
-			} else if (fusionData.alts.length) {
+			if (fusionData.alts.length) {
 				buf += '<div class="setcell-sprite changesprite"><i class="fa fa-caret-down"></i></div>';
+			} else if (species.cosmeticFormes) {
+				buf += '<div class="setcell-sprite changeform"><i class="fa fa-caret-down"></i></div>';
 			} else {
 				buf += '<div class="setcell-sprite"></div>';
 			}
