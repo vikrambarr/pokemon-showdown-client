@@ -30,7 +30,7 @@
 				if (this.curTeam.format.includes('bdsp')) {
 					this.curTeam.dex = Dex.mod('gen8bdsp');
 				}
-				if (this.curTeam.format.includes('infinitefusiondex')) {
+				if (this.curTeam.format.includes('ifdex')) {
 					this.curTeam.dex = Dex.mod('gen7infinitefusion');
 				}
 				Storage.activeSetList = this.curSetList;
@@ -1244,7 +1244,14 @@
 			var isLetsGo = this.curTeam.format.includes('letsgo');
 			var isBDSP = this.curTeam.format.includes('bdsp');
 			var isNatDex = this.curTeam.format.includes('nationaldex') || this.curTeam.format.includes('natdex');
-			var isFusion = (this.curTeam.format.includes('infinitefusion') && !species.tags.includes("Infinite Fusion"));
+			var isFusion = (
+				((this.curTeam.format).includes('infinitefusion') ||
+				(this.curTeam.format).includes('ifdex') ||
+				(this.curTeam.format).includes('ifnatdex') ||
+				(this.curTeam.format).includes('iffreeforall')) &&
+				!species.tags.includes("Infinite Fusion")
+			);
+			
 			let fusionData = Dex.getFusionData(set);
 			var buf = '<li value="' + i + '">';
 			if (!set.species) {
@@ -2795,7 +2802,6 @@
 			var isNatDex = this.curTeam.format.includes('nationaldex') || this.curTeam.format.includes('natdex');
 			var isHackmons = this.curTeam.format.includes('hackmons') || this.curTeam.format.endsWith('bh');
 			var species = this.curTeam.dex.species.get(set.species);
-			var isFusion = (this.curTeam.format.includes('infinitefusion') && !species.tags.includes("Infinite Fusion"));
 			if (!set) return;
 			buf += '<div class="resultheader"><h3>Details</h3></div>';
 			buf += '<form class="detailsform">';
@@ -2900,7 +2906,6 @@
 			var isLetsGo = this.curTeam.format.includes('letsgo');
 			var isBDSP = this.curTeam.format.includes('bdsp');
 			var isNatDex = this.curTeam.format.includes('nationaldex') || this.curTeam.format.includes('natdex');
-			var isFusion = (this.curTeam.format.includes('infinitefusion') && !species.tags.includes("Infinite Fusion"));
 
 			// level
 			var level = parseInt(this.$chart.find('input[name=level]').val(), 10);

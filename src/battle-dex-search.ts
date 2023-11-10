@@ -623,16 +623,16 @@ abstract class BattleTypedSearch<T extends SearchType> {
 			this.formatType = 'letsgo';
 			this.dex = Dex.mod('gen7letsgo' as ID);
 		}
-		if (format.includes('infinitefusion')) {
+		if (format.includes('iffreeforall') || format.includes('ifdex') || format.includes('ifnatdex')) {
 			this.formatType = 'natdex';
-			if (format.includes('infinitefusiondex')) {
+			if (format.includes('ifdex')) {
 				format = format.endsWith('ou') ? 'ou' as ID : 'ubers' as ID;
 				this.dex = Dex.mod('gen7infinitefusion' as ID);
 			} else if (format.includes('natdex')) {
-				format = format.slice(20) as ID;
+				format = format.slice(8) as ID;
 				if (format === 'doubles') format = 'ag' as ID;
 				this.dex = Dex.mod('gen9infinitefusion' as ID);
-			} else if (format.includes('ffa')) {
+			} else if (format.includes('freeforall')) {
 				format = 'ag' as ID;
 				this.dex = Dex.mod('gen9infinitefusion' as ID);
 			}
