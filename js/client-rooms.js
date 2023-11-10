@@ -170,6 +170,9 @@
 				(otherRooms.length ? otherRooms.sort(this.compareRooms).map(this.renderRoomBtn).join("") : '') +
 				(hiddenRooms.length && this.showMoreRooms ? hiddenRooms.sort(this.compareRooms).map(this.renderRoomBtn).join("") : '')
 			);
+			this.$('.roomlist').last().html(
+				`<div><a href="https://discord.com/invite/vsEN6mzuNj" target="_blank" class="blocklink"><small style="float:right">(150+ users)</small><strong><i class="fa fa-comments-o"></i> Discord<br></strong><small>The Pok&eacute;athlon Discord.</small></a></div>`
+			);
 		},
 		roomlist: function () {
 			app.joinRoom('battles');
