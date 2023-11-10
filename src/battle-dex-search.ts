@@ -632,6 +632,9 @@ abstract class BattleTypedSearch<T extends SearchType> {
 				format = format.slice(20) as ID;
 				if (format === 'doubles') format = 'ag' as ID;
 				this.dex = Dex.mod('gen9infinitefusion' as ID);
+			} else if (format.includes('ffa')) {
+				format = 'ag' as ID;
+				this.dex = Dex.mod('gen9infinitefusion' as ID);
 			}
 		}
 		if (format.includes('nationaldex') || format.startsWith('nd') || format.includes('natdex')) {

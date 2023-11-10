@@ -1238,7 +1238,7 @@
 				// avoiding that decision for now because it requires either an ugly hack
 				// or an overhaul of BattleFormats.
 				this.open = Storage.prefs('openformats') || {
-					"Infinite Fusion: Regional Dex": true, "Infinite Fusion: National Dex": true,
+					"Infinite Fusion: Regional Dex": true, "Infinite Fusion: National Dex": true, "Infinite Fusion: Extra": true,
 				};
 			}
 			if (!this.starred) this.starred = Storage.prefs('starredformats') || {};
