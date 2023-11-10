@@ -1146,7 +1146,10 @@ class BattleAbilitySearch extends BattleTypedSearch<'ability'> {
 			abilitySet.push(['header', "Hidden Abilities"]);
 			abilitySet.push(['ability', toID(species.abilities['H'])]);
 		}
-		if (isFusion && fusionSpecies.abilities['H'] && !Object.values(species.abilities).includes(fusionSpecies.abilities['H'])) abilitySet.push(['ability', toID(fusionSpecies.abilities['H'])]);
+		if (isFusion && fusionSpecies.abilities['H'] && !Object.values(species.abilities).includes(fusionSpecies.abilities['H'])) {
+			if (!abilitySet.includes(['header', "Hidden Abilities"])) abilitySet.push(['header', "Hidden Abilities"]);
+			abilitySet.push(['ability', toID(fusionSpecies.abilities['H'])]);
+		}
 		if (species.abilities['S']) {
 			abilitySet.push(['header', "Special Event Abilities"]);
 			abilitySet.push(['ability', toID(species.abilities['S'])]);
