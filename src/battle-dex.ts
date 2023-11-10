@@ -543,7 +543,11 @@ const Dex = new class implements ModdedDex {
 		//     (eg. Darmanitan in graphicsGen 2) then we go up gens until it exists.
 		//
 
-		const fusionData = this.getFusionData(pokemon_info);
+		let fusionData = this.getFusionData(pokemon_info);
+
+		if (pokemon_info?.volatiles.formechange && pokemon_info.volatiles.transform) {
+			fusionData = this.getFusionData({species: pokemon_info.volatiles.formechange[1], fusion: pokemon_info.volatiles.transform[5]});
+		}
 
 		if (fusionData.extension !== '') {
 			spriteData.url = 'https://play.pokeathlon.com/sprites/fusion-sprites/CustomBattlers/' + fusionData.extension + '.png';

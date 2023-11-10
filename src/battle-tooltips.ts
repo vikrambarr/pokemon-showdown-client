@@ -794,18 +794,23 @@ class BattleTooltips {
 		}
 
 		let fuseBuf = pokemon.fusion ? ` <small><b>Fusion: </b>${pokemon.fusion}</small><br />`: ``;
+		
 		let fusionData = Dex.getFusionData(pokemon);
+		if (clientPokemon?.volatiles.formechange && clientPokemon.volatiles.transform) {
+			fusionData = Dex.getFusionData({species: clientPokemon.volatiles.formechange[1], fusion: clientPokemon.volatiles.transform[5]});
+		}
 		let creditBuf = '';
 		if (fusionData.extension !== '') {
 			creditBuf = fusionData.credit !== '' ? ` <small>Sprite by ${fusionData.credit}</small><br />`: ``;
 		}
+
 		let levelBuf = (pokemon.level !== 100 ? ` <small>L${pokemon.level}</small>` : ``);
 		if (!illusionIndex || illusionIndex === 1) {
 			text += `<h2>${name}${genderBuf}${illusionIndex ? '' : levelBuf}<br />${fuseBuf}${creditBuf}`;
 
 			if (clientPokemon?.volatiles.formechange) {
 				if (clientPokemon.volatiles.transform) {
-					text += `<small>(Transformed into ${clientPokemon.volatiles.formechange[1]})</small><br />`;
+					text += `<small>(Transformed into ${clientPokemon.volatiles.formechange[1]}${clientPokemon.volatiles.transform[5] ? '/' + clientPokemon.volatiles.transform[5] : ''})</small><br />`;
 				} else {
 					text += `<small>(Changed forme: ${clientPokemon.volatiles.formechange[1]})</small><br />`;
 				}

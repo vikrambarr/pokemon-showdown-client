@@ -2510,7 +2510,8 @@ export class Battle {
 			const shiny = tpoke.shiny;
 			const gender = tpoke.gender;
 			const level = tpoke.level;
-			poke.addVolatile('transform' as ID, pokemon, shiny, gender, level);
+			const fusion = tpoke.fusion;
+			poke.addVolatile('transform' as ID, pokemon, shiny, gender, level, fusion);
 			poke.addVolatile('formechange' as ID, speciesForme);
 			for (const trackedMove of tpoke.moveTrack) {
 				poke.rememberMove(trackedMove[0], 0);
