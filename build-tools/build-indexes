@@ -14,7 +14,7 @@ if (!fs.existsSync('data/pokemon-showdown')) {
 	});
 }
 
-process.stdout.write("Syncing data from Git repository... \n");
+process.stdout.write("Syncing data from Git repository... ");
 child_process.execSync('git pull', {cwd: 'data/pokemon-showdown'});
 child_process.execSync('npm run build', {cwd: 'data/pokemon-showdown'});
 console.log("DONE");
@@ -22,12 +22,10 @@ console.log("DONE");
 if (!fs.existsSync('sprites/fusion-sprites')) {
 	child_process.execSync('git clone https://gitlab.com/pokemoninfinitefusion/customsprites.git fusion-sprites', {
 		cwd: 'sprites',
-	}); child_process.execSync('rm -rf Other', {
-		cwd: 'sprites/fusion-sprites',
 	});
 }
 
-process.stdout.write("Syncing IF sprites from Gitlab repository... \n");
+process.stdout.write("Syncing IF sprites from Gitlab repository... ");
 child_process.execSync('git pull', {cwd: 'sprites/fusion-sprites'});
 console.log("DONE");
 
@@ -37,13 +35,13 @@ if (!fs.existsSync('sprites/fangame-sprites')) {
 	});
 }
 
-process.stdout.write("Syncing fangame sprites... \n");
+process.stdout.write("Syncing fangame sprites... ");
 child_process.execSync('git pull', {cwd: 'sprites/fangame-sprites'});
 console.log("DONE");
 
 const Dex = require('../data/pokemon-showdown/dist/sim/dex').Dex;
 const toID = Dex.toID;
-process.stdout.write("Loading all dex data... \n");
+process.stdout.write("Loading all dex data... ");
 Dex.includeData();
 
 for (const mod in Dex.dexes) {

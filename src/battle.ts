@@ -2465,15 +2465,14 @@ export class Battle {
 			poke.removeVolatile('typeadd' as ID);
 			poke.removeVolatile('typechange' as ID);
 
-			let newSpeciesForme = args[2];
-			let commaIndex = newSpeciesForme.indexOf(',');
-			if (commaIndex !== -1) {
-				let level = newSpeciesForme.substr(commaIndex + 1).trim();
-				if (level.charAt(0) === 'L') {
-					poke.level = parseInt(level.substr(1), 10);
-				}
-				newSpeciesForme = args[2].substr(0, commaIndex);
-			}
+			let details = this.parseDetails(poke.name, args[1], args[2]);
+
+			let newSpeciesForme = details.speciesForme;
+			poke.level = details.level;
+			poke.fusion = details.fusion;
+			poke.speciesForme = newSpeciesForme;
+			poke.details = args[2];
+
 			let species = this.dex.species.get(newSpeciesForme);
 			if (nextArgs) {
 				if (nextArgs[0] === '-mega') {
@@ -2484,13 +2483,6 @@ export class Battle {
 				}
 			}
 
-			poke.speciesForme = newSpeciesForme;
-			poke.fusion = this.parseDetails(poke.name, args[1], args[2]).fusion;
-			if (!poke.fusion) {
-				poke.ability = poke.baseAbility = (species.abilities ? species.abilities['0'] : '');
-			}
-
-			poke.details = args[2];
 			poke.searchid = args[1].substr(0, 2) + args[1].substr(3) + '|' + args[2];
 
 			let isCustomAnim = species.id !== 'palafinhero';
