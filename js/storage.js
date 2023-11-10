@@ -581,6 +581,7 @@ Storage.compareTeams = function (serverTeam, localTeam) {
 		for (var j = 0; j < otherMons.length; j++) {
 			if (toID(otherMons[j].species) === toID(mons[i])) {
 				matches++;
+				break;
 			}
 		}
 	}
@@ -646,7 +647,7 @@ Storage.loadPackedTeams = function (buffer) {
 		Storage.whenAppLoaded(function (app) {
 			app.addPopup(Popup, {
 				type: 'modal',
-				htmlMessage: "Your teams are corrupt and could not be loaded. :( We may be able to recover a team from this data:<br /><textarea rows=\"10\" cols=\"60\">" + BattleLog.escapeHTML(buffer) + "</textarea>"
+				htmlMessage: "Your teams are corrupt and could not be loaded. :( Staff may be able to recover it from your data. This is your data; you should save it somewhere:<br /><textarea rows=\"10\" cols=\"60\">" + BattleLog.escapeHTML(buffer) + "</textarea>"
 			});
 		});
 	}

@@ -1,10 +1,105 @@
-<!DOCTYPE html>
+<?php
+
+/**
+ * index.php
+ *
+ * Grabs some data to prepopulate a Replay page.
+ *
+ * `src/repays-battle.tsx` can also grab this data from our APIs, but
+ * doing it here makes it load faster, and also tells Google, Discord's
+ * link preview, and other bots which replays actually exist, and what
+ * their titles/descriptions are.
+ *
+ * @author Guangcong Luo <guangcongluo@gmail.com>
+ * @license MIT
+ */
+
+error_reporting(E_ALL);
+ini_set('display_errors', TRUE);
+ini_set('display_startup_errors', TRUE);
+
+$manage = false;
+
+require_once 'replays.lib.php';
+
+$replay = null;
+$id = $_REQUEST['name'] ?? '';
+$password = '';
+
+$fullid = $id;
+if (substr($id, -2) === 'pw') {
+	$dashpos = strrpos($id, '-');
+	$password = substr($id, $dashpos + 1, -2);
+	$id = substr($id, 0, $dashpos);
+	// die($id . ' ' . $password);
+}
+
+// $forcecache = isset($_REQUEST['forcecache8723']);
+$forcecache = false;
+if ($id) {
+	if (file_exists('caches/' . $id . '.inc.php')) {
+		include 'caches/' . $id . '.inc.php';
+		$replay['formatid'] = '';
+		$cached = true;
+		$replay['log'] = str_replace("\r","",$replay['log']);
+		$matchSuccess = preg_match('/\\n\\|tier\\|([^|]*)\\n/', $replay['log'], $matches);
+		if ($matchSuccess) $replay['format'] = $matches[1];
+		if (@$replay['date']) {
+			$replay['uploadtime'] = $replay['date'];
+			unset($replay['date']);
+		}
+	} else {
+		require_once 'replays.lib.php';
+		if (!$Replays->db && !$forcecache) {
+			header('HTTP/1.1 503 Service Unavailable');
+			die();
+		}
+		$replay = $Replays->get($id, $forcecache);
+	}
+	if (!$replay) {
+		header('HTTP/1.1 404 Not Found');
+		include '404.html';
+		die();
+	}
+	if ($replay['password'] ?? null) {
+		if ($password !== $replay['password']) {
+			header('HTTP/1.1 404 Not Found');
+			include '404.html';
+			die();
+		}
+	}
+}
+
+$title = '';
+if ($replay) {
+	$title = htmlspecialchars($replay['format'].': '.$replay['p1'].' vs. '.$replay['p2'].' - ');
+}
+
+?><!DOCTYPE html>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width" />
 
-<title>Replays - Pok&eacute;mon Showdown!</title>
+<title><?= $title ?>Replays - Pok&eacute;mon Showdown!</title>
 
-<link rel="stylesheet" href="/style/global.css?" />
+<?php
+if ($replay) echo '<meta name="description" content="Watch a replay of a Pok&eacute;mon battle between '.htmlspecialchars($replay['p1']).' and '.htmlspecialchars($replay['p2']).'! Format: '.htmlspecialchars($replay['format']).'; Date: '.date("M j, Y", @$replay['uploadtime']).'" />';
+?>
+
+<!--
+
+Hey, you! Looking in the source for the replay log?
+
+You can find them in JSON format, just add `.json` at the end of a replay URL.
+
+https://replay.pokemonshowdown.com/gen7randomdoublesbattle-865046831.json
+
+Or, if you only need the log itself, add `.log` instead:
+
+https://replay.pokemonshowdown.com/gen7randomdoublesbattle-865046831.log
+
+-->
+
+<link rel="stylesheet" href="//pokemonshowdown.com/style/global.css?" />
 <link rel="stylesheet" href="//play.pokemonshowdown.com/style/font-awesome.css?" />
 <link rel="stylesheet" href="//play.pokemonshowdown.com/style/battle.css?a7" />
 <link rel="stylesheet" href="//play.pokemonshowdown.com/style/utilichart.css?a7" />
@@ -42,6 +137,8 @@
 	}
 	.optgroup .button {
 		height: 25px;
+		padding-top: 0;
+		padding-bottom: 0;
 	}
 	.optgroup button.button {
 		padding-left: 12px;
@@ -122,11 +219,11 @@
 
 	<header>
 		<div class="nav-wrapper"><ul class="nav">
-			<li><a class="button nav-first" href="/"><img src="/images/pokemonshowdownbeta.png" srcset="/images/pokemonshowdownbeta.png 1x, /images/pokemonshowdownbeta@2x.png 2x" alt="Pok&eacute;mon Showdown" width="146" height="44" /> Home</a></li>
-			<li><a class="button" href="/dex/">Pok&eacute;dex</a></li>
-			<li><a class="button cur" href="/replays/">Replays</a></li>
-			<li><a class="button" href="/ladder/">Ladder</a></li>
-			<li><a class="button nav-last" href="/forums/">Forum</a></li>
+			<li><a class="button nav-first" href="//pokemonshowdown.com/"><img src="//pokemonshowdown.com/images/pokemonshowdownbeta.png" srcset="//pokemonshowdown.com/images/pokemonshowdownbeta.png 1x, //pokemonshowdown.com/images/pokemonshowdownbeta@2x.png 2x" alt="Pok&eacute;mon Showdown" width="146" height="44" /> Home</a></li>
+			<li><a class="button" href="//pokemonshowdown.com/dex/">Pok&eacute;dex</a></li>
+			<li><a class="button cur" href="/">Replays</a></li>
+			<li><a class="button" href="//pokemonshowdown.com/ladder/">Ladder</a></li>
+			<li><a class="button nav-last" href="//pokemonshowdown.com/forums/">Forum</a></li>
 			<li><a class="button greenbutton nav-first nav-last" href="//play.pokemonshowdown.com/">Play</a></li>
 		</ul></div>
 	</header>
@@ -160,4 +257,19 @@
 
 <script defer src="js/utils.js?"></script>
 <script defer src="js/replays-battle.js?"></script>
+
+<?php
+
+if ($replay) {
+	// `src/repays-battle.tsx` can also grab this data from our APIs, but
+	// doing it here increases page load speed
+	echo "<!-- don't scrape this data! just add .json after the URL!\nFull API docs: https://github.com/smogon/pokemon-showdown-client/blob/master/WEB-API.md -->\n";
+	echo '<script type="text/plain" class="log" id="replaydata-'.$fullid.'">';
+	unset($replay['inputlog']);
+	echo json_encode($replay);
+	echo '</script>';
+}
+
+?>
+
 <script defer src="js/replays.js?"></script>

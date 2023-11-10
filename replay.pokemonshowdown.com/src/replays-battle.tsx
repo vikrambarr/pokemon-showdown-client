@@ -2,10 +2,10 @@
 import preact from 'preact';
 import $ from 'jquery';
 import {Net} from './utils';
-import {PSRouter} from './replays';
-import {Battle} from '../../../src/battle';
-import {BattleLog} from '../../../src/battle-log';
-import {BattleSound} from '../../../src/battle-sound';
+import {PSRouter, PSReplays} from './replays';
+import {Battle} from '../../src/battle';
+import {BattleLog} from '../../src/battle-log';
+import {BattleSound} from '../../src/battle-sound';
 declare function toID(input: string): string;
 
 function showAd(id: string) {
@@ -71,7 +71,6 @@ export class BattlePanel extends preact.Component<{id: string}> {
     password: string;
   } | null | undefined = undefined;
   battle: Battle | null;
-  speed = 'normal';
   /** debug purposes */
   lastUsedKeyCode = '0';
   turnView: boolean | string = false;
@@ -94,7 +93,20 @@ export class BattlePanel extends preact.Component<{id: string}> {
     this.battle = null;
     this.result = undefined;
 
-    Net(`https://replay.pokemonshowdown.com/${this.stripQuery(id)}.json`).get().then(result => {
+    const elem = document.getElementById(`replaydata-${id}`);
+    if (elem) {
+      this.loadResult(elem.innerText, id);
+      return;
+    }
+
+    Net(`/${this.stripQuery(id)}.json`).get().then(result => {
+      this.loadResult(result, id);
+    }).catch(_ => {
+      this.loadResult('', id);
+    });
+  }
+  loadResult(result: string, id: string) {
+    try {
       const replay: NonNullable<BattlePanel['result']> = JSON.parse(result);
       this.result = replay;
       const $base = $(this.base!);
@@ -119,11 +131,10 @@ export class BattlePanel extends preact.Component<{id: string}> {
       if (query.turn || query.t) {
         this.battle.seekTurn(parseInt(query.turn || query.t, 10));
       }
-      this.forceUpdate();
-    }).catch(_ => {
+    } catch {
       this.result = null;
-      this.forceUpdate();
-    });
+    }
+    this.forceUpdate();
   }
   override componentWillUnmount(): void {
     this.battle?.destroy();
@@ -270,8 +281,21 @@ export class BattlePanel extends preact.Component<{id: string}> {
 
 		e.stopPropagation();
 	};
+  getSpeed() {
+    if (!this.battle) return 'normal';
+    if (this.battle.messageFadeTime <= 40) {
+      return 'hyperfast';
+    } else if (this.battle.messageFadeTime <= 50) {
+      return 'fast';
+    } else if (this.battle.messageFadeTime >= 500) {
+      return 'slow';
+    } else if (this.battle.messageFadeTime >= 1000) {
+      return 'reallyslow';
+    }
+    return 'normal';
+  }
   changeSpeed = (e: Event | {target: HTMLSelectElement}) => {
-    this.speed = (e.target as HTMLSelectElement).value;
+    const speed = (e.target as HTMLSelectElement).value;
     const fadeTable = {
       hyperfast: 40,
       fast: 50,
@@ -287,8 +311,8 @@ export class BattlePanel extends preact.Component<{id: string}> {
       reallyslow: 3000
     };
     if (!this.battle) return;
-    this.battle.messageShownTime = delayTable[this.speed];
-    this.battle.messageFadeTime = fadeTable[this.speed];
+    this.battle.messageShownTime = delayTable[speed];
+    this.battle.messageFadeTime = fadeTable[speed];
     this.battle.scene.updateAcceleration();
   };
   stepSpeed(delta: number) {
@@ -308,6 +332,15 @@ export class BattlePanel extends preact.Component<{id: string}> {
   changeSound = (e: Event) => {
     const muted = (e.target as HTMLSelectElement).value;
     this.battle?.setMute(muted === 'off');
+    // Wolfram Alpha says that default volume is 100 e^(-(2 log^2(2))/log(10)) which is around 65.881
+    BattleSound.setBgmVolume(muted === 'musicoff' ? 0 : 65.881258001265573);
+    this.forceUpdate();
+  };
+  changeDarkMode = (e: Event) => {
+    const darkmode = (e.target as HTMLSelectElement).value as 'dark';
+    PSReplays.darkMode = darkmode;
+    PSReplays.updateDarkMode();
+    this.forceUpdate();
   };
   openTurn = (e: Event) => {
     this.turnView = `${this.battle?.turn}` || true;
@@ -409,7 +442,7 @@ export class BattlePanel extends preact.Component<{id: string}> {
       <p>
         <label class="optgroup">
           Speed:<br />
-          <select name="speed" class="button" onChange={this.changeSpeed} value={this.speed}>
+          <select name="speed" class="button" onChange={this.changeSpeed} value={this.getSpeed()}>
             <option value="hyperfast">Hyperfast</option>
             <option value="fast">Fast</option>
             <option value="normal">Normal</option>
@@ -419,14 +452,23 @@ export class BattlePanel extends preact.Component<{id: string}> {
         </label> {}
         <label class="optgroup">
           Sound:<br />
-          <select name="speed" class="button" onChange={this.changeSound} value={BattleSound.muted ? 'off' : 'on'}>
+          <select name="sound" class="button" onChange={this.changeSound} value={BattleSound.muted ? 'off' : BattleSound.bgmVolume ? 'on' : 'musicoff'}>
             <option value="on">On</option>
+            <option value="musicoff">Music Off</option>
             <option value="off">Muted</option>
           </select>
         </label> {}
         <label class="optgroup">
+          Dark mode:<br />
+          <select name="darkmode" class="button" onChange={this.changeDarkMode} value={PSReplays.darkMode}>
+            <option value="auto">Automatic</option>
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+          </select>
+        </label> {}
+        <label class="optgroup">
           Viewpoint:<br />
-          <button onClick={this.switchViewpoint} class={this.battle ? 'button' : 'button disabled'}>
+          <button onClick={this.switchViewpoint} name="viewpoint" class={this.battle ? 'button' : 'button disabled'}>
             {(this.battle?.viewpointSwitched ? this.result?.p2 : this.result?.p1 || "Player")} {}
             <i class="fa fa-random" aria-label="Switch viewpoint"></i>
           </button>

@@ -1,21 +1,21 @@
 <?php
 
+/**
+ * replay.log.php
+ *
+ * Serves `[replay].log` and `[replay].json` APIs. The latter is used by
+ * replay.pokemonshowdown.com and also the sim's built-in replay viewer;
+ * the former is purely an external API.
+ *
+ * @author Guangcong Luo <guangcongluo@gmail.com>
+ * @license MIT
+ */
+
 error_reporting(E_ALL);
 ini_set('display_errors', TRUE);
 ini_set('display_startup_errors', TRUE);
 
 $manage = false;
-
-// if (@$_REQUEST['name'] === 'smogtours-ou-509') {
-// 	header('Content-type: text/plain');
-// 	readfile('js/smogtours-ou-509.log');
-// 	die();
-// }
-// if (@$_REQUEST['name'] === 'ou-305002749') {
-// 	header('Content-type: text/plain');
-// 	readfile('js/ou-305002749.log');
-// 	die();
-// }
 
 require_once 'replays.lib.php';
 
@@ -31,8 +31,28 @@ if (substr($id, -2) === 'pw') {
 	// die($id . ' ' . $password);
 }
 
+// $forcecache = isset($_REQUEST['forcecache8723']);
+$forcecache = false;
 if ($id) {
-	$replay = $Replays->get($id);
+	if (file_exists('caches/' . $id . '.inc.php')) {
+		include 'caches/' . $id . '.inc.php';
+		$replay['formatid'] = '';
+		$cached = true;
+		$replay['log'] = str_replace("\r","",$replay['log']);
+		$matchSuccess = preg_match('/\\n\\|tier\\|([^|]*)\\n/', $replay['log'], $matches);
+		if ($matchSuccess) $replay['format'] = $matches[1];
+		if (@$replay['date']) {
+			$replay['uploadtime'] = $replay['date'];
+			unset($replay['date']);
+		}
+	} else {
+		require_once 'replays.lib.php';
+		if (!$Replays->db && !$forcecache) {
+			header('HTTP/1.1 503 Service Unavailable');
+			die();
+		}
+		$replay = $Replays->get($id, $forcecache);
+	}
 }
 if (!$replay) {
 	header('HTTP/1.1 404 Not Found');
@@ -45,9 +65,7 @@ if ($replay['password'] ?? null) {
 	}
 }
 
-$replay['log'] = str_replace("\r","",$replay['log']);
-
-if ($replay['inputlog']) {
+if (@$replay['inputlog']) {
 	if (substr($replay['formatid'], -12) === 'randombattle' || substr($replay['formatid'], -19) === 'randomdoublesbattle' || $replay['formatid'] === 'gen7challengecup' || $replay['formatid'] === 'gen7challengecup1v1' || $replay['formatid'] === 'gen7battlefactory' || $replay['formatid'] === 'gen7bssfactory' || $replay['formatid'] === 'gen7hackmonscup' || $manage) {
 		// ok
 	} else {
@@ -63,6 +81,12 @@ if (isset($_REQUEST['json'])) {
 	header('Access-Control-Allow-Origin: *');
 	die(json_encode($replay));
 	die();
+}
+
+if (isset($_REQUEST['inputlog'])) {
+	header('Content-Type: text/plain');
+	header('Access-Control-Allow-Origin: *');
+	die($replay['inputlog'] ?? '');
 }
 
 header('Content-Type: text/plain');

@@ -63,6 +63,24 @@ class Replays {
 			$res->execute([$id]);
 		// }
 
+		$replay['log'] = str_replace("\r","",$replay['log']);
+		$matchSuccess = preg_match('/\\n\\|tier\\|([^|]*)\\n/', $replay['log'], $matches);
+		if ($matchSuccess) $replay['format'] = $matches[1];
+		return $replay;
+	}
+	function exists($id, $forcecache = false) {
+		if ($forcecache) return null;
+
+		if (!$this->db) {
+			$this->init();
+		}
+
+		$res = $this->db->prepare("SELECT id, password FROM ps_replays WHERE id = ? LIMIT 1");
+		$res->execute([$id]);
+		if (!$res) return null;
+		$replay = $res->fetch();
+		if (!$replay) return null;
+
 		return $replay;
 	}
 	function edit(&$replay) {
