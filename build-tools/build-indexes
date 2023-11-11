@@ -671,7 +671,7 @@ process.stdout.write("Building `data/teambuilder-tables.js`... ");
 			if (item.gen > genNum) {
 				continue;
 			}
-			if (item.isNonstandard && !isMetBattle) {
+			if ((item.isNonstandard || !item.exists) && !isMetBattle) {
 				if (isNatDex || isNatDexFusions) {
 					if (item.isNonstandard !== "Past") continue;
 					if (!item.itemUser && !item.zMove) continue;
@@ -682,6 +682,9 @@ process.stdout.write("Building `data/teambuilder-tables.js`... ");
 			if (isMetBattle) {
 				const banlist = Dex.formats.getRuleTable(Dex.formats.get(gen + 'metronomebattle'));
 				if (banlist.isBanned('item:' + item.id)) continue;
+			}
+			if (isFusions) {
+				if (item.megaStone || item.zMove || item.onMemory) continue;
 			}
 			switch (id) {
 			case 'leftovers':
