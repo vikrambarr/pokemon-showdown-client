@@ -1147,14 +1147,17 @@ class BattleAbilitySearch extends BattleTypedSearch<'ability'> {
 			abilitySet.push(['ability', toID(species.abilities['H'])]);
 		}
 		if (isFusion && fusionSpecies.abilities['H'] && !Object.values(species.abilities).includes(fusionSpecies.abilities['H'])) {
-			if (!abilitySet.includes(['header', "Hidden Abilities"])) abilitySet.push(['header', "Hidden Abilities"]);
+			if (!species.abilities['H']) abilitySet.push(['header', "Hidden Abilities"]);
 			abilitySet.push(['ability', toID(fusionSpecies.abilities['H'])]);
 		}
 		if (species.abilities['S']) {
 			abilitySet.push(['header', "Special Event Abilities"]);
 			abilitySet.push(['ability', toID(species.abilities['S'])]);
 		}
-		if (isFusion && fusionSpecies.abilities['S'] && !Object.values(species.abilities).includes(fusionSpecies.abilities['S'])) abilitySet.push(['ability', toID(fusionSpecies.abilities['S'])]);
+		if (isFusion && fusionSpecies.abilities['S'] && !Object.values(species.abilities).includes(fusionSpecies.abilities['S'])) {
+			if (!species.abilities['S']) abilitySet.push(['header', "Special Event Abilities"]);
+			abilitySet.push(['ability', toID(fusionSpecies.abilities['S'])]);
+		}
 		if (isAAA || format.includes('metronomebattle') || isHackmons) {
 			let abilities: ID[] = [];
 			for (let i in this.getTable()) {

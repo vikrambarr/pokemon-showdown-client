@@ -1310,7 +1310,11 @@ process.stdout.write("Building `data/moves,items,abilities,typechart,learnsets.j
  *********************************************************/
 
 {
-	const Formats = requireNoCache('../data/pokemon-showdown/dist/config/formats.js').Formats;
+	let Formats = {};
+	const RawFormats = Dex.formats.all();
+	for (let format of RawFormats) {
+		Formats[format.id] = format;
+	}
 	const buf = 'exports.Formats = ' + es3stringify(Formats) + ';';
 	fs.writeFileSync('data/formats.js', buf);
 }

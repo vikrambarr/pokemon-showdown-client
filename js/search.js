@@ -31,6 +31,7 @@
 		this.$inputEl = null;
 		this.gen = 9;
 		this.mod = null;
+		this.format = null;
 
 		this.engine = new DexSearch();
 		window.search = this;
@@ -171,6 +172,7 @@
 		this.filters = this.engine.filters;
 		this.sortCol = this.engine.sortCol;
 		this.cur = cur || {};
+		this.format = format;
 		var firstElem;
 		for (var id in cur) {
 			firstElem = id;
@@ -467,7 +469,19 @@
 		if (!item) return '<li class="result">Unrecognized item</li>';
 		var id = toID(item.name);
 		if (Search.urlRoot) attrs += ' href="' + Search.urlRoot + 'items/' + id + '" data-target="push"';
-		var buf = '<li class="result"><a' + attrs + ' data-entry="item|' + BattleLog.escapeHTML(item.name) + '">';
+		
+		let banned = false;
+		if (this.format && this.format in window.Formats) {
+			let format = window.Formats[this.format];
+			if (format.banlist.includes(item.name)) banned = true;
+			if (((!this.format.startsWith('gen9') && format.ruleset.includes('Standard')) ||
+			format.ruleset.includes('Evasion Clause') ||
+			format.ruleset.includes('Evasion Abilities Clause')) &&
+			['Bright Powder', 'Lax Incense'].includes(item.name)) banned = true;
+			if (format.ruleset.includes('Z-Move Clause') && item.zMove) banned = true;
+		}
+		
+		var buf = '<li class="' + (banned ? 'banned' : 'result') + '"><a' + attrs + ' data-entry="item|' + BattleLog.escapeHTML(item.name) + '">';
 
 		// icon
 		buf += '<span class="col itemiconcol">';
@@ -499,7 +513,18 @@
 		if (!ability) return '<li class="result">Unrecognized ability</li>';
 		var id = toID(ability.name);
 		if (Search.urlRoot) attrs += ' href="' + Search.urlRoot + 'abilities/' + id + '" data-target="push"';
-		var buf = '<li class="result"><a' + attrs + ' data-entry="ability|' + BattleLog.escapeHTML(ability.name) + '">';
+
+		let banned = false;
+		if (this.format && this.format in window.Formats) {
+			let format = window.Formats[this.format];
+			if (format.banlist.includes(ability.name)) banned = true;
+			if (((!this.format.startsWith('gen9') && format.ruleset.includes('Standard')) ||
+			format.ruleset.includes('Evasion Clause') ||
+			format.ruleset.includes('Evasion Abilities Clause')) &&
+			['Sand Veil', 'Snow Cloak'].includes(ability.name)) banned = true;
+		}
+		
+		var buf = '<li class="' + (banned ? 'banned' : 'result') + '"><a' + attrs + ' data-entry="ability|' + BattleLog.escapeHTML(ability.name) + '">';
 
 		// name
 		var name = ability.name;
@@ -525,7 +550,19 @@
 		if (!move) return '<li class="result">Unrecognized move</li>';
 		var id = toID(move.name);
 		if (Search.urlRoot) attrs += ' href="' + Search.urlRoot + 'moves/' + id + '" data-target="push"';
-		var buf = '<li class="result"><a' + attrs + ' data-entry="move|' + BattleLog.escapeHTML(move.name) + '">';
+
+		let banned = false;
+		if (this.format && this.format in window.Formats) {
+			let format = window.Formats[this.format];
+			if (format.banlist.includes(move.name)) banned = true;
+			if (format.ruleset.includes('OHKO Clause') && move.ohko) banned = true;
+			if (((!this.format.startsWith('gen9') && format.ruleset.includes('Standard')) ||
+			format.ruleset.includes('Evasion Clause') ||
+			format.ruleset.includes('Evasion Moves Clause')) &&
+			['Double Team', 'Minimize'].includes(move.name)) banned = true;
+		}
+
+		var buf = '<li class="' + (banned ? 'banned' : 'result') + '"><a' + attrs + ' data-entry="move|' + BattleLog.escapeHTML(move.name) + '">';
 
 		// name
 		var name = move.name;
