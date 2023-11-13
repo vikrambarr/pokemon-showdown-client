@@ -482,34 +482,14 @@ export class Pokemon implements PokemonDetails, PokemonHealth {
 		let types: ReadonlyArray<TypeName>;
 		if (this.fusion) {
 
-			const typeChanges: {[key: string]: string[]} = {
-				"magnemite":  ["Steel", "Electric"],
-				"magneton":   ["Steel", "Electric"],
-				"magnezone":  ["Steel", "Electric"],
-				"dewgong":    ["Ice", "Water"],
-				"omanyte":    ["Water", "Rock"],
-				"omastar":    ["Water", "Rock"],
-				"scizor":     ["Steel", "Bug"],
-				"empoleon":   ["Steel", "Water"],
-				"spiritomb":  ["Dark", "Ghost"],
-				"ferrothorn": ["Steel", "Grass"],
-				"celebi":     ["Grass", "Psychic"],
-				"bulbasaur":  ["Grass"],    "ivysaur":   ["Grass"],
-				"venusaur":   ["Grass"],    "charizard": ["Fire"],
-				"geodude":    ["Rock"],     "graveler":  ["Rock"],
-				"golem":      ["Rock"],     "gastly":    ["Ghost"],
-				"haunter":    ["Ghost"],    "gengar":    ["Ghost"],
-				"onix":       ["Rock"],     "scyther":   ["Bug"],
-				"gyarados":   ["Water"],    "articuno":  ["Ice"],
-				"zapdos":     ["Electric"], "moltres":   ["Fire"],
-				"dragonite":  ["Dragon"],   "steelix":   ["Steel",]
-			};
-
 			const fusionSpecies = Dex.species.get(this.fusion);
 			const species = Dex.species.get(this.speciesForme);
 
-			const speciesTypes = species.id in typeChanges ? typeChanges[species.id] : species.types;
-			const fusionTypes = fusionSpecies.id in typeChanges ? typeChanges[fusionSpecies.id] : fusionSpecies.types;
+			let speciesTypes = species.types;
+			let fusionTypes = fusionSpecies.types;
+
+			if (speciesTypes.length === 2 && speciesTypes.includes('Flying') && speciesTypes.includes('Normal')) speciesTypes = ['Flying'];
+			if (fusionTypes.length === 2 && fusionTypes.includes('Flying') && fusionTypes.includes('Normal')) fusionTypes = ['Flying'];
 
 			const typesSet = new Set([speciesTypes[0] as TypeName]);
 			const bonusType = fusionTypes[fusionTypes.length - 1];

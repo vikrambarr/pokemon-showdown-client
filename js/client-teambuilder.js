@@ -1344,32 +1344,13 @@
 
 			if (isFusion && set.fusion && this.curTeam.dex.species.get(set.fusion).exists) {
 
-				const typeChanges = {
-					"magnemite":  ["Steel", "Electric"],
-					"magneton":   ["Steel", "Electric"],
-					"magnezone":  ["Steel", "Electric"],
-					"dewgong":    ["Ice", "Water"],
-					"omanyte":    ["Water", "Rock"],
-					"omastar":    ["Water", "Rock"],
-					"scizor":     ["Steel", "Bug"],
-					"empoleon":   ["Steel", "Water"],
-					"spiritomb":  ["Dark", "Ghost"],
-					"ferrothorn": ["Steel", "Grass"],
-					"celebi":     ["Grass", "Psychic"],
-					"bulbasaur":  ["Grass"],    "ivysaur":   ["Grass"],
-					"venusaur":   ["Grass"],    "charizard": ["Fire"],
-					"geodude":    ["Rock"],     "graveler":  ["Rock"],
-					"golem":      ["Rock"],     "gastly":    ["Ghost"],
-					"haunter":    ["Ghost"],    "gengar":    ["Ghost"],
-					"onix":       ["Rock"],     "scyther":   ["Bug"],
-					"gyarados":   ["Water"],    "articuno":  ["Ice"],
-					"zapdos":     ["Electric"], "moltres":   ["Fire"],
-					"dragonite":  ["Dragon"],   "steelix":   ["Steel",]
-				};
-
 				const fusionSpecies = this.curTeam.dex.species.get(set.fusion);
-				const speciesTypes = species.id in typeChanges ? typeChanges[species.id] : species.types;
-				const fusionTypes = fusionSpecies.id in typeChanges ? typeChanges[fusionSpecies.id] : fusionSpecies.types;
+				
+				let speciesTypes = types;
+				let fusionTypes = fusionSpecies.types;
+
+				if (speciesTypes.length === 2 && speciesTypes.includes('Flying') && speciesTypes.includes('Normal')) speciesTypes = ['Flying'];
+				if (fusionTypes.length === 2 && fusionTypes.includes('Flying') && fusionTypes.includes('Normal')) fusionTypes = ['Flying'];
 
 				const typesSet = new Set([speciesTypes[0]]);
 				const bonusType = fusionTypes[fusionTypes.length - 1];
