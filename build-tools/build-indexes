@@ -1314,6 +1314,7 @@ process.stdout.write("Building `data/moves,items,abilities,typechart,learnsets.j
 	const RawFormats = Dex.formats.all();
 	for (let format of RawFormats) {
 		Formats[format.id] = format;
+		Formats[format.id]['ruleTable'] = Array.from(Dex.formats.getRuleTable(format).keys());
 	}
 	const buf = 'exports.Formats = ' + es3stringify(Formats) + ';';
 	fs.writeFileSync('data/formats.js', buf);

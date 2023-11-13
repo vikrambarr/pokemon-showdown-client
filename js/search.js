@@ -473,12 +473,7 @@
 		let banned = false;
 		if (this.format && this.format in window.Formats) {
 			let format = window.Formats[this.format];
-			if (format.banlist.includes(item.name)) banned = true;
-			if (((!this.format.startsWith('gen9') && format.ruleset.includes('Standard')) ||
-			format.ruleset.includes('Evasion Clause') ||
-			format.ruleset.includes('Evasion Abilities Clause')) &&
-			['Bright Powder', 'Lax Incense'].includes(item.name)) banned = true;
-			if (format.ruleset.includes('Z-Move Clause') && item.zMove) banned = true;
+			if (format.ruleTable.includes('-item:' + item.id)) banned = true; 
 		}
 		
 		var buf = '<li class="' + (banned ? 'banned' : 'result') + '"><a' + attrs + ' data-entry="item|' + BattleLog.escapeHTML(item.name) + '">';
@@ -517,11 +512,7 @@
 		let banned = false;
 		if (this.format && this.format in window.Formats) {
 			let format = window.Formats[this.format];
-			if (format.banlist.includes(ability.name)) banned = true;
-			if (((!this.format.startsWith('gen9') && format.ruleset.includes('Standard')) ||
-			format.ruleset.includes('Evasion Clause') ||
-			format.ruleset.includes('Evasion Abilities Clause')) &&
-			['Sand Veil', 'Snow Cloak'].includes(ability.name)) banned = true;
+			if (format.ruleTable.includes('-ability:' + ability.id)) banned = true; 
 		}
 		
 		var buf = '<li class="' + (banned ? 'banned' : 'result') + '"><a' + attrs + ' data-entry="ability|' + BattleLog.escapeHTML(ability.name) + '">';
@@ -554,12 +545,7 @@
 		let banned = false;
 		if (this.format && this.format in window.Formats) {
 			let format = window.Formats[this.format];
-			if (format.banlist.includes(move.name)) banned = true;
-			if (format.ruleset.includes('OHKO Clause') && move.ohko) banned = true;
-			if (((!this.format.startsWith('gen9') && format.ruleset.includes('Standard')) ||
-			format.ruleset.includes('Evasion Clause') ||
-			format.ruleset.includes('Evasion Moves Clause')) &&
-			['Double Team', 'Minimize'].includes(move.name)) banned = true;
+			if (format.ruleTable.includes('-move:' + move.id)) banned = true;
 		}
 
 		var buf = '<li class="' + (banned ? 'banned' : 'result') + '"><a' + attrs + ' data-entry="move|' + BattleLog.escapeHTML(move.name) + '">';
