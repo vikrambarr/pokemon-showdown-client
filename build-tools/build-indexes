@@ -26,6 +26,7 @@ if (!fs.existsSync('sprites/fusion-sprites')) {
 
 process.stdout.write("Syncing IF sprites from Gitlab repository... \n");
 child_process.execSync('git pull', {cwd: 'sprites/fusion-sprites'});
+child_process.execSync('git reset --hard', {cwd: 'sprites/fusion-sprites'});
 
 if (!fs.existsSync('sprites/fangame-sprites')) {
 	child_process.execSync('git clone https://github.com/vikrambarr/fangame-sprites', {
