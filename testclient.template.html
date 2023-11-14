@@ -60,6 +60,7 @@
 							<h3><button class="closebutton" tabindex="-1" aria-label="Close"><i class="fa fa-times-circle"></i></button><button class="minimizebutton" tabindex="-1" aria-label="Minimize"><i class="fa fa-minus-circle"></i></button>Latest News</h3>
 							<div class="pm-log" style="max-height:none">
 								<div class="newsentry"><h4>Welcome to Pokéathlon!</h4><p>Have fun with the fusions, and make sure to join the <a target="_blank" href="https://discord.gg/vsEN6mzuNj">Pokéathlon Discord</a> for other fangames (coming soon) and custom Pokémon creation.</p><p>Make sure to join the <a target="_blank" href="https://discord.com/invite/infinitefusion">Infinite Fusion Discord</a> as well if you haven't already :)</p><p>—<strong><a target="_blank" href="https://vikrambarr.com">yoshifanfic</a></strong> <small class="date">on Nov 16, 2023</small></p></div>
+								<div class="newsentry" id="daily-fusion"></div>
 							</div>
 						</div>
 					</div>
@@ -140,6 +141,22 @@
 			window.onload = () => {
 				window.app = new App();
 			}
+
+			const day = Math.floor(Date.now() / 1000 / 60 / 60 / 24);
+
+			var psuedo = 1;
+			for (let num of day.toString().split('')) {
+				psuedo *= (parseInt(num) * day / 1000);
+			}
+			var available = Object.keys(FusionCredit);
+
+			var dailyKey = available[(Math.floor(psuedo) % (available.length - 500)) + 500];
+
+			var box = document.getElementById('daily-fusion');
+			box.innerHTML = `<h4>Fusion of the day...</h4>`;
+			box.innerHTML += `<img draggable="false" class="pixelated" src="sprites/fusion-sprites/CustomBattlers/${dailyKey}.png" width="270" height="270">`;
+			box.innerHTML += `<p>sprite by ${FusionCredit[dailyKey]}!!!</p>`;
+
 		</script>
 
 	</body>
