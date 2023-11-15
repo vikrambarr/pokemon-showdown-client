@@ -144,9 +144,9 @@
 
 			const day = Math.floor(Date.now() / 1000 / 60 / 60 / 24);
 
-			var psuedo = 1;
+			var psuedo = day / 1000;
 			for (let num of day.toString().split('')) {
-				psuedo *= (parseInt(num) * day / 1000);
+				psuedo *= parseInt(num);
 			}
 			var available = Object.keys(FusionCredit);
 
