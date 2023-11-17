@@ -3582,7 +3582,6 @@
 					if (stat === 'hp' || stat === 'spa' || stat === 'spd') baseStatsFusion[stat] = Math.floor((baseStats[stat] * 2/3) + (fusionSpecies.baseStats[stat] * 1/3));
 					if (stat === 'atk' || stat === 'def' || stat === 'spe') baseStatsFusion[stat] = Math.floor((baseStats[stat] * 1/3) + (fusionSpecies.baseStats[stat] * 2/3));
 				}
-				if (baseStats.hp === 1 || fusionSpecies.baseStats.hp === 1) baseStatsFusion['hp'] = 1;
 				return baseStatsFusion;
 			}
 			return baseStats;
