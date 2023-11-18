@@ -1259,7 +1259,7 @@
 					buf += '<div class="setmenu setmenu-left"><button name="undeleteSet" class="button"><i class="fa fa-undo"></i> Undo Delete</button></div>';
 				}
 				buf += '<div class="setmenu"><button name="importSet"><i class="fa fa-upload"></i>Import</button></div>';
-				buf += '<div class="setchart" style="background-image:url(' + Dex.resourcePrefix + 'sprites/gen5/0.png);"><div class="setcol setcol-icon"><div class="setcell-sprite"></div><div class="setcell setcell-pokemon"><label>Pok&eacute;mon</label><input type="text" name="pokemon" class="textbox chartinput" value="" autocomplete="off" /></div></div></div>';
+				buf += '<div class="setchart" style="background-image:url(' + Dex.resourcePrefix + 'sprites/gen5/0.png);"><div class="setcol setcol-icon"><div class="setcell-sprite"></div><div class="setcell setcell-pokemon"><label>Pok&eacute;mon' + (isFusion ? '/Head' : '') + '</label><input type="text" name="pokemon" class="textbox chartinput" value="" autocomplete="off" /></div></div></div>';
 				buf += '</li>';
 				return buf;
 			}
@@ -1280,11 +1280,11 @@
 			} else {
 				buf += '<div class="setcell-sprite"></div>';
 			}
-			buf += '<div class="setcell setcell-pokemon"><label>Pok&eacute;mon</label><input type="text" name="pokemon" class="textbox chartinput" value="' + BattleLog.escapeHTML(set.species) + '" autocomplete="off" /></div></div>';
+			buf += '<div class="setcell setcell-pokemon"><label>Pok&eacute;mon' + (isFusion ? '/Head' : '') + '</label><input type="text" name="pokemon" class="textbox chartinput" value="' + BattleLog.escapeHTML(set.species) + '" autocomplete="off" /></div></div>';
 
 			// IF search box
 			if (isFusion) {
-				buf += '<div class="setcell setcell-fusion"><label>Fusion</label><input type="text" name="fusion" class="textbox chartinput rainbow" value="' + BattleLog.escapeHTML(set.fusion) + '" autocomplete="off" />';
+				buf += '<div class="setcell setcell-fusion"><label>Fusion/Body</label><input type="text" name="fusion" class="textbox chartinput rainbow" value="' + BattleLog.escapeHTML(set.fusion) + '" autocomplete="off" />';
 				buf += '<button class="closebutton" name="deleteFusion" aria-label="Delete" style="position:absolute;top: -1px;right: 1px;"><i class="fa fa-times-circle"></i></button></div>';
 			} 
 			// details
