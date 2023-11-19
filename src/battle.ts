@@ -2770,8 +2770,10 @@ export class Battle {
 					break;
 				case 'illusion':
 					this.scene.resultAnim(poke, 'Illusion ended', 'bad');
-					const types = poke.getTypeList();
-					poke.addVolatile('typechange' as ID, types.join('/'));
+					if (poke.fusion) {
+						const types = poke.getTypeList();
+						poke.addVolatile('typechange' as ID, types.join('/'));
+					}
 					poke.rememberAbility('Illusion');
 					break;
 				case 'slowstart':

@@ -760,7 +760,7 @@ const Dex = new class implements ModdedDex {
 
 		if (species.tags.includes("Infinite Fusion")) {
 			let fainted = ((pokemon as Pokemon | ServerPokemon)?.fainted ? `;opacity:.3;filter:grayscale(100%) brightness(.5)` : ``);
-			return `${fusion.length ? 'animation: rainbowshadow ' + ((Math.random() * 2) + 2) + 's infinite;' : ''}background:transparent url(https://play.pokeathlon.com/sprites/fangame-sprites/infinitefusion/iconsprites/${id}.png) no-repeat scroll ${fainted}`;
+			return `animation: rainbowshadow ${((Math.random() * 2) + 2)}s infinite;background:transparent url(https://play.pokeathlon.com/sprites/fangame-sprites/infinitefusion/iconsprites/${id}.png) no-repeat scroll ${fainted}`;
 		}
 
 		let top = Math.floor(num / 12) * 30;
