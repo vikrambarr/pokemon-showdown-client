@@ -1193,12 +1193,8 @@ class BattleTooltips {
 					evoSpecies.isNonstandard === "Unobtainable";
 		});
 		if (item === 'eviolite' && (isNFE || isNFEFusion || this.battle.dex.species.get(serverPokemon.speciesForme).id === 'dipplin')) {
-			let boost = 1.5;
-			if (this.battle.dex.species.get(serverPokemon.fusion).exists) {
-				boost = 1 + (Number(isNFE !== undefined) + Number(isNFEFusion !== undefined)) / 4;
-			}
-			stats.def = Math.floor(stats.def * boost);
-			stats.spd = Math.floor(stats.spd * boost);
+			stats.def = Math.floor(stats.def * 1.5);
+			stats.spd = Math.floor(stats.spd * 1.5);
 		}
 		if (ability === 'grasspelt' && this.battle.hasPseudoWeather('Grassy Terrain')) {
 			stats.def = Math.floor(stats.def * 1.5);
