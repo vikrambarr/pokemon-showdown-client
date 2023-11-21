@@ -1638,38 +1638,60 @@ class BattleMoveSearch extends BattleTypedSearch<'move'> {
 			}
 
 			let fusionSpecies = dex.species.get(this.set?.fusion);
-			let speciesTypes = species.types;
-			let fusionTypes = fusionSpecies.types;
 
-			if (speciesTypes.length === 2 && speciesTypes.includes('Flying') && speciesTypes.includes('Normal')) speciesTypes = ['Flying'];
-			if (fusionTypes.length === 2 && fusionTypes.includes('Flying') && fusionTypes.includes('Normal')) fusionTypes = ['Flying'];
+			let allCombinations: string[][] = [];
+			let fusionLine: string[] = [fusionSpecies.name];
+			let speciesLine: string[] = [species.name];
 
-			const typesSet = new Set([speciesTypes[0]]);
-			const bonusType = this.dex.types.get(fusionTypes[fusionTypes.length - 1]);
-			if (bonusType.exists) typesSet.add(bonusType.name);
-			if (fusionTypes.length === 2 && typesSet.size === 1) typesSet.add(fusionTypes[0]);
+			if (fusionSpecies.prevo) fusionLine.push(fusionSpecies.prevo);
+			if (this.dex.species.get(fusionSpecies.prevo).prevo) fusionLine.push(this.dex.species.get(fusionSpecies.prevo).prevo);
+			
+			if (species.prevo) speciesLine.push(species.prevo);
+			if (this.dex.species.get(species.prevo).prevo) fusionLine.push(this.dex.species.get(species.prevo).prevo);
 
-			for (let id in fusionMoves) {
-				if (moves.includes(id)) continue;
-				let data = fusionMoves[id];
-				for (let possibleSource of data) {
-					let canLearn = true;
-					if ("fusion" in possibleSource) {
-						if (!possibleSource["fusion"].includes(species.id) && !possibleSource["fusion"].includes(fusionSpecies.id)) canLearn = false;
-					}
-					if ("type" in possibleSource) {
-						for (let type of possibleSource["type"]) {
-							if (!typesSet.has(type)) canLearn = false;
+			for (let head of fusionLine) {
+				for (let body of speciesLine) {
+					allCombinations.push(...[[head, body], [body, head]]);
+				}
+			}
+
+			for (const combination of allCombinations) {
+				const combination_head = dex.species.get(combination[0]);
+				const combination_body = dex.species.get(combination[1]);
+
+				let speciesTypes = combination_head.types;
+				let fusionTypes = combination_body.types;
+
+				if (speciesTypes.length === 2 && speciesTypes.includes('Flying') && speciesTypes.includes('Normal')) speciesTypes = ['Flying'];
+				if (fusionTypes.length === 2 && fusionTypes.includes('Flying') && fusionTypes.includes('Normal')) fusionTypes = ['Flying'];
+
+				const typesSet = new Set([speciesTypes[0]]);
+				const bonusType = this.dex.types.get(fusionTypes[fusionTypes.length - 1]);
+				if (bonusType.exists) typesSet.add(bonusType.name);
+				if (fusionTypes.length === 2 && typesSet.size === 1) typesSet.add(fusionTypes[0]);
+
+				for (let id in fusionMoves) {
+					if (moves.includes(id) || expertMoves.includes(id)) continue;
+					let data = fusionMoves[id];
+					for (let possibleSource of data) {
+						let canLearn = true;
+						if ("fusion" in possibleSource) {
+							if (!possibleSource["fusion"].includes(combination_head.id) && !possibleSource["fusion"].includes(combination_body.id)) canLearn = false;
 						}
-					}
-					if ("learns" in possibleSource) {
-						let canLearnReqMove = false;
-						for (let reqMove of possibleSource["learns"]) {
-							if (this.canLearn(species.id, reqMove as ID) || this.canLearn(fusionSpecies.id, reqMove as ID)) canLearnReqMove = true;
+						if ("type" in possibleSource) {
+							for (let type of possibleSource["type"]) {
+								if (!typesSet.has(type)) canLearn = false;
+							}
 						}
-						if (!canLearnReqMove) canLearn = false;
+						if ("learns" in possibleSource) {
+							let canLearnReqMove = false;
+							for (let reqMove of possibleSource["learns"]) {
+								if (this.canLearn(combination_head.id, reqMove as ID) || this.canLearn(combination_body.id, reqMove as ID)) canLearnReqMove = true;
+							}
+							if (!canLearnReqMove) canLearn = false;
+						}
+						if (canLearn) expertMoves.push(id);
 					}
-					if (canLearn) expertMoves.push(id);
 				}
 			}
 		}
