@@ -546,7 +546,7 @@ const Dex = new class implements ModdedDex {
 		let fusionData = this.getFusionData(pokemon_info);
 
 		if (pokemon_info?.volatiles.formechange && pokemon_info.volatiles.transform) {
-			fusionData = this.getFusionData({species: pokemon_info.volatiles.formechange[1], fusion: pokemon_info.volatiles.transform[5]});
+			fusionData = this.getFusionData({species: pokemon_info.volatiles.formechange[1], fusion: pokemon_info.volatiles.transform[5], altsprite: pokemon_info.volatiles.transform[6]});
 		}
 
 		if (fusionData.extension !== '') {
