@@ -37,7 +37,7 @@ if (!fs.existsSync('sprites/fangame-sprites')) {
 process.stdout.write("Syncing fangame sprites... \n");
 child_process.execSync('git pull', {cwd: 'sprites/fangame-sprites'});
 
-const Dex = require('../data/pokemon-showdown/dist/sim/dex').Dex;
+const Dex = require('../play.pokemonshowdown.com/data/pokemon-showdown/dist/sim/dex').Dex;
 const toID = Dex.toID;
 process.stdout.write("Loading all dex data... ");
 Dex.includeData();
