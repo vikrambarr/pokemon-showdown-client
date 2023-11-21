@@ -1671,7 +1671,6 @@ class BattleMoveSearch extends BattleTypedSearch<'move'> {
 				if (fusionTypes.length === 2 && typesSet.size === 1) typesSet.add(fusionTypes[0]);
 
 				for (let id in fusionMoves) {
-					if (moves.includes(id) || expertMoves.includes(id)) continue;
 					let data = fusionMoves[id];
 					for (let possibleSource of data) {
 						let canLearn = true;
@@ -1690,7 +1689,7 @@ class BattleMoveSearch extends BattleTypedSearch<'move'> {
 							}
 							if (!canLearnReqMove) canLearn = false;
 						}
-						if (canLearn) expertMoves.push(id);
+						if (canLearn && !moves.includes(id) && !expertMoves.includes(id)) expertMoves.push(id);
 					}
 				}
 			}
