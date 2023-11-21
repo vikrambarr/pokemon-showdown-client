@@ -760,13 +760,13 @@ const Dex = new class implements ModdedDex {
 
 		if (species.tags.includes("Infinite Fusion")) {
 			let fainted = ((pokemon as Pokemon | ServerPokemon)?.fainted ? `;opacity:.3;filter:grayscale(100%) brightness(.5)` : ``);
-			return `animation: rainbowshadow ${((Math.random() * 2) + 2)}s infinite;background:transparent url(https://play.pokeathlon.com/sprites/fangame-sprites/infinitefusion/iconsprites/${id}.png) no-repeat scroll ${fainted}`;
+			return `image-rendering:pixelated;animation: rainbowshadow ${((Math.random() * 2) + 2)}s infinite;background:transparent url(https://play.pokeathlon.com/sprites/fangame-sprites/infinitefusion/iconsprites/${id}.png) no-repeat scroll ${fainted}`;
 		}
 
 		let top = Math.floor(num / 12) * 30;
 		let left = (num % 12) * 40;
 		let fainted = ((pokemon as Pokemon | ServerPokemon)?.fainted ? `;opacity:.3;filter:grayscale(100%) brightness(.5)` : ``);
-		return `${fusion.length ? 'animation: rainbowshadow ' + ((Math.random() * 2) + 2) + 's infinite;' : ''}background:transparent url(${Dex.resourcePrefix}sprites/pokemonicons-sheet.png?v14) no-repeat scroll -${left}px -${top}px${fainted}`;
+		return `image-rendering:pixelated;${fusion.length ? 'animation: rainbowshadow ' + ((Math.random() * 2) + 2) + 's infinite;' : ''}background:transparent url(${Dex.resourcePrefix}sprites/pokemonicons-sheet.png?v14) no-repeat scroll -${left}px -${top}px${fainted}`;
 	}
 
 	getTeambuilderSpriteData(pokemon: any, gen: number = 0): TeambuilderSpriteData {
