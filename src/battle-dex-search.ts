@@ -1545,6 +1545,7 @@ class BattleMoveSearch extends BattleTypedSearch<'move'> {
 		let learnsetid = this.firstLearnsetid(species.id);
 		let moves: string[] = [];
 		let sketchMoves: string[] = [];
+		let expertMoves: string[] = [];
 		let sketch = false;
 		let gen = '' + dex.gen;
 		let lsetTable = BattleTeambuilderTable;
@@ -1668,7 +1669,7 @@ class BattleMoveSearch extends BattleTypedSearch<'move'> {
 						}
 						if (!canLearnReqMove) canLearn = false;
 					}
-					if (canLearn) moves.push(id);
+					if (canLearn) expertMoves.push(id);
 				}
 			}
 		}
@@ -1743,9 +1744,17 @@ class BattleMoveSearch extends BattleTypedSearch<'move'> {
 
 		moves.sort();
 		sketchMoves.sort();
+		expertMoves.sort();
 
+		let expertFusionMoves: SearchRow[] = [];
 		let usableMoves: SearchRow[] = [];
 		let uselessMoves: SearchRow[] = [];
+		if (expertMoves.length) {
+			expertFusionMoves.push(['header', "(Fusion Only) Expert Moves"]);
+			for (const id of expertMoves) {
+				expertFusionMoves.push(['move', id as ID]);
+			}
+		}
 		for (const id of moves) {
 			const isUsable = this.moveIsNotUseless(id as ID, species, moves, this.set);
 			if (isUsable) {
@@ -1768,7 +1777,7 @@ class BattleMoveSearch extends BattleTypedSearch<'move'> {
 				uselessMoves.push(['move', id as ID]);
 			}
 		}
-		return [...usableMoves, ...uselessMoves];
+		return [...expertFusionMoves, ...usableMoves, ...uselessMoves];
 	}
 	filter(row: SearchRow, filters: string[][]) {
 		if (!filters) return true;
