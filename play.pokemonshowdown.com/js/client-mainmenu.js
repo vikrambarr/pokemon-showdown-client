@@ -1248,7 +1248,7 @@
 			this.selectType = data.selectType;
 			if (!this.selectType) this.selectType = (this.sourceEl.closest('form').data('search') ? 'search' : 'challenge');
 
-			var html = '<p><ul class="popupmenu"><li><input name="search" placeholder="Search formats" value="' + this.search + '" class="textbox" />';
+			var html = '<p><ul class="popupmenu"><li><input name="search" placeholder="Search formats" value="' + this.search + '" class="textbox autofocus" autocomplete="off" />';
 			html += '</li></ul></p><span name="formats">';
 			html += this.renderFormats();
 			html += '</span><div style="clear:left"></div><p></p>';
@@ -1319,7 +1319,7 @@
 				);
 			}
 			var html = '';
-			if (!bufs.length) {
+			if (bufs.every(function (buf) { return !buf; })) {
 				html = '<ul class="popupmenu"><em>No formats found</em></ul>';
 			} else {
 				for (var i = 1, l = bufs.length; i < l; i++) {
@@ -1448,7 +1448,7 @@
 						if ((!teams[i].format && !teamFormat) || teams[i].format === teamFormat) {
 							var selected = (i === curTeam);
 							if (!this.folderToggleOn) {
-								bufs[curBuf] += '<li><button name="selectTeam" value="' + i + '" class="option' + (selected ? 'sel' : '') + '">' + BattleLog.escapeHTML(teams[i].name) + '</button></li>';
+								bufs[curBuf] += '<li><button name="selectTeam" value="' + i + '" class="option' + (selected ? ' cur' : '') + '">' + BattleLog.escapeHTML(teams[i].name) + '</button></li>';
 								count++;
 								if (count % bufBoundary === 0 && curBuf < 4) curBuf++;
 							} else {
