@@ -1442,7 +1442,7 @@ process.stdout.write("Building fusion data...");
 {
 	let FusionCredit = {};
 	let rawCredit = fs.readFileSync('play.pokemonshowdown.com/sprites/fusion-sprites/Sprite Credits.csv').toString();
-	
+
 	for (let line of rawCredit.split('\n')) {
 		const parts = line.split(',');
 		FusionCredit[parts[0]] = parts[1];
