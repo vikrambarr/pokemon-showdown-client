@@ -996,7 +996,7 @@ p.or:after {
 	position: absolute;
 	left: -30px;
 	bottom: -5px;
-	background: url(https://play.pokemonshowdown.com/sprites/gen5ani/victini.gif) center no-repeat;
+	background: url(https://play.pokemonshowdown.com/sprites/gen5ani/jirachi.gif) center no-repeat;
 }
 .roomcounters .battlecount {
 	display: block;
@@ -1005,7 +1005,7 @@ p.or:after {
 	position: absolute;
 	right: -30px;
 	bottom: -10px;
-	background: url(https://play.pokemonshowdown.com/sprites/gen5ani/jirachi.gif) center no-repeat;
+	background: url(https://play.pokemonshowdown.com/sprites/gen5ani/victini.gif) center no-repeat;
 }
 .roomlist {
 	max-width: 480px;
