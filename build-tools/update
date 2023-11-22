@@ -169,7 +169,7 @@ function addCachebuster(_, attr, url, urlQuery) {
 }
 
 // add hashes to js and css files and rewrite URLs
-let indexContents = fs.readFileSync('play.pokemonshowdown.com/testclient.template.html', {encoding: 'utf8'});
+let indexContents = fs.readFileSync('play.pokemonshowdown.com/testclient.html', {encoding: 'utf8'});
 indexContents = indexContents.replace(/\?\?/g, `?${Math.random()}`);
 let preactIndexContents = fs.readFileSync('play.pokemonshowdown.com/preactalpha.template.html', {encoding: 'utf8'});
 preactIndexContents = preactIndexContents.replace(URL_REGEX, addCachebuster);
