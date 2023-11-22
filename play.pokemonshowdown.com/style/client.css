@@ -2636,6 +2636,7 @@ a.ilink.yours {
 .teambuilder-clipboard-data:hover {
 	border: 1px solid #BBBBBB;
 }
+.teambuilder-clipboard-data .banned,
 .teambuilder-clipboard-data .result {
 	height: 32px;
 }
@@ -2752,18 +2753,36 @@ a.ilink.yours {
 .teamchartbox.individual .teamchart {
 	margin-top: -2px;
 }
+.teambuilder-results .banned a {
+	border-radius: 4px;
+	cursor: not-allowed;
+}
 .teambuilder-results .result a {
 	border-radius: 4px;
 	cursor: pointer;
+}
+.teambuilder-results .banned a.cur {
+	border-color: #550000;
+	background: rgba(248, 0, 0, 0.4);
 }
 .teambuilder-results .result a.cur {
 	border-color: #555555;
 	background: rgba(248, 248, 248, 0.4);
 }
+.teambuilder-results .banned a:hover,
+.teambuilder-results .banned a.hover {
+	border-color: #d80000;
+	background: rgb(247, 122, 122);
+}
 .teambuilder-results .result a:hover,
 .teambuilder-results .result a.hover {
 	border-color: #D8D8D8;
 	background: #F8F8F8;
+}
+.teambuilder-results .banned a.cur:hover,
+.teambuilder-results .banned a.cur.hover {
+	border-color: #550000;
+	background: #F80000;
 }
 .teambuilder-results .result a.cur:hover,
 .teambuilder-results .result a.cur.hover {
@@ -2873,6 +2892,7 @@ a.ilink.yours {
 	width: 110px;
 	text-align: right;
 }
+.changesprite i,
 .changeform i {
 	cursor: pointer;
 	display: block;
@@ -2887,6 +2907,7 @@ a.ilink.yours {
 	background: rgba(255,255,255,.5);
 	box-shadow: 0 1px 2px rgba(0,0,0,.2);
 }
+.changesprite i:hover,
 .changeform i:hover {
 	color: #DAE5F0;
 	background: #569;
@@ -3074,12 +3095,13 @@ a.ilink.yours {
 .dark .usergroup {
 	color: #BBB;
 }
-
+.dark .changesprite i,
 .dark .changeform i {
 	border-color: #bbb;
 	color: #bbb;
 	background: rgba(0,0,0,.5);
 }
+.dark .changesprite i:hover,
 .dark .changeform i:hover {
 	border-color: #EEE;
 	color: #EEE;
@@ -3227,12 +3249,23 @@ a.ilink.yours {
 		opacity: 1;
 }
 
+.dark .teambuilder-results .banned a.hover,
+.dark .teambuilder-results .banned a:hover {
+	border-color: #770000;
+	background: rgba(100, 0, 0, 0.5);
+	color: #FFFFFF;
+}
 .dark .teambuilder-results .result a.hover,
 .dark .teambuilder-results .result a:hover,
 .dark .setmenu button:hover,
 .dark .teamlist button:hover {
 	border-color: #777777;
 	background: rgba(100, 100, 100, 0.5);
+	color: #FFFFFF;
+}
+.dark .teambuilder-results .banned a.cur:hover {
+	border-color: #BB0000;
+	background: rgba(100, 0, 0, 0.4);
 	color: #FFFFFF;
 }
 .dark .teambuilder-results .result a.cur {
