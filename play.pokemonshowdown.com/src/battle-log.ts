@@ -557,8 +557,7 @@ export class BattleLog {
 		if (this.colorCache[name]) return this.colorCache[name];
 		let hash;
 		if (Config.customcolors[name]) {
-			this.colorCache[name] = Config.customcolors[name];
-			return this.colorCache[name];
+			hash = MD5(Config.customcolors[name]);
 		} else {
 			hash = MD5(name);
 		}
