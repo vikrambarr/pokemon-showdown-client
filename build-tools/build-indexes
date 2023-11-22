@@ -35,9 +35,9 @@ if (!fs.existsSync('play.pokemonshowdown.com/sprites/fangame-sprites')) {
 }
 
 process.stdout.write("Syncing fangame sprites... \n");
-child_process.execSync('git pull', {cwd: 'sprites/fangame-sprites'});
+child_process.execSync('git pull', {cwd: 'play.pokemonshowdown.com/sprites/fangame-sprites'});
 
-const Dex = require('../play.pokemonshowdown.com/caches/pokemon-showdown/dist/sim/dex').Dex;
+const Dex = require('../caches/pokemon-showdown/dist/sim/dex').Dex;
 const toID = Dex.toID;
 process.stdout.write("Loading all dex data... ");
 Dex.includeData();
@@ -1407,7 +1407,7 @@ process.stdout.write("Building `data/moves,items,abilities,typechart,learnsets.j
 	for (const id in textData.Items) assignData(id, textData.Items[id]);
 
 	const buf = 'exports.BattleText = ' + es3stringify(Text) + ';';
-	fs.writeFileSync('data/text.js', buf);
+	fs.writeFileSync('play.pokemonshowdown.com/data/text.js', buf);
 }
 
 console.log("DONE")
@@ -1420,7 +1420,7 @@ process.stdout.write("Building fusion data...");
 
 {
 	let BattleFusionIndex = {};
-	let fusionFiles = fs.readdirSync('sprites/fusion-sprites/CustomBattlers/');
+	let fusionFiles = fs.readdirSync('play.pokemonshowdown.com/sprites/fusion-sprites/CustomBattlers/');
 
 	for (let file of fusionFiles) {
 		const parts = file.split('.');
@@ -1432,7 +1432,7 @@ process.stdout.write("Building fusion data...");
 		}
 	}
 	const buf = `exports.BattleFusionIndex = JSON.parse('${JSON.stringify(BattleFusionIndex).replace(/['\\]/g, "\\$&")}');\n\n`;
-	fs.writeFileSync('data/fusion-index.js', buf);
+	fs.writeFileSync('play.pokemonshowdown.com/data/fusion-index.js', buf);
 }
 
 /*********************************************************
@@ -1441,14 +1441,14 @@ process.stdout.write("Building fusion data...");
 
 {
 	let FusionCredit = {};
-	let rawCredit = fs.readFileSync('sprites/fusion-sprites/Sprite Credits.csv').toString();
+	let rawCredit = fs.readFileSync('play.pokemonshowdown.com/sprites/fusion-sprites/Sprite Credits.csv').toString();
 	
 	for (let line of rawCredit.split('\n')) {
 		const parts = line.split(',');
 		FusionCredit[parts[0]] = parts[1];
 	}
 	const buf = `exports.FusionCredit = JSON.parse('${JSON.stringify(FusionCredit).replace(/['\\]/g, "\\$&")}');\n\n`;
-	fs.writeFileSync('data/fusion-credits.js', buf);
+	fs.writeFileSync('play.pokemonshowdown.com/data/fusion-credits.js', buf);
 }
 
 console.log("DONE");
