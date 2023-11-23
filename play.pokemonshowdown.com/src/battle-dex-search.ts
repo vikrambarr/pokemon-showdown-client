@@ -1951,7 +1951,7 @@ const fusionMoves: {[key: string]: {[key: string]: string[]}[]} = {
 	"mistyterrain": [{"type": ["Fairy"]}],
 	"speedswap": [{"fusion": ["pikachu", "raichu", "abra", "kadabra", "alakazam", "porygon", "porygon2", "porygonz", "mewtwo", "mew", "joltik", "galvantula"]}],
 	"accelerock": [{"fusion": ["aerodactyl", "kabutops", "anorith", "armaldo"]}],
-	"anchorshot": [{"fusion": ["empoleon", "steelix", "beldum", "metang", "metagross", "klink", "klang", "klinklang", "aron", "lairon", "aggron"], "type": ["water"]}, {"fusion": ["lapras", "wailord", "kyogre"], "type": ["steel"]}],
+	"anchorshot": [{"fusion": ["empoleon", "steelix", "beldum", "metang", "metagross", "klink", "klang", "klinklang", "aron", "lairon", "aggron"], "type": ["Water"]}, {"fusion": ["lapras", "wailord", "kyogre"], "type": ["Steel"]}],
 	"sparklingaria": [{"fusion": ["jynx", "jigglypuff", "wigglytuff"], "type": ["Water"]}, {"fusion": ["lapras"]}],
 	"watershuriken": [{"fusion": ["ninjask", "lucario", "zoroark", "bisharp", "kingambit"], "type": ["Water"]}],
 	
