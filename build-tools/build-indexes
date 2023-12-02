@@ -1306,6 +1306,7 @@ process.stdout.write("Building `data/moves,items,abilities,typechart,learnsets.j
 	}
 	const buf = 'exports.BattleItems = ' + es3stringify(Items) + ';';
 	fs.writeFileSync('play.pokemonshowdown.com/data/items.js', buf);
+	fs.writeFileSync('play.pokemonshowdown.com/data/items.json', JSON.stringify(Items));
 }
 
 /*********************************************************
@@ -1321,6 +1322,7 @@ process.stdout.write("Building `data/moves,items,abilities,typechart,learnsets.j
 	}
 	const buf = 'exports.BattleAbilities = ' + es3stringify(Abilities) + ';';
 	fs.writeFileSync('play.pokemonshowdown.com/data/abilities.js', buf);
+	fs.writeFileSync('play.pokemonshowdown.com/data/abilities.json', JSON.stringify(Abilities));
 }
 
 /*********************************************************
