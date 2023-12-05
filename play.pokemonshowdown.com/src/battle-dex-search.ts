@@ -574,12 +574,29 @@ abstract class BattleTypedSearch<T extends SearchType> {
 		this.baseResults = null;
 		this.baseIllegalResults = null;
 
+		const formatName = format;
+		
 		if (format.slice(0, 3) === 'gen') {
 			const gen = (Number(format.charAt(3)) || 6);
 			format = (format.slice(4) || 'customgame') as ID;
 			this.dex = Dex.forGen(gen);
 		} else if (!format) {
 			this.dex = Dex;
+		}
+
+		if (formatName in window.Formats) {
+			let info = window.Formats[formatName];
+			if ('mod' in info) {
+				this.dex = Dex.mod(info.mod);
+				if (info.mod.includes('infinitefusion')) {
+					this.formatType = 'natdex';
+					format = 'ag' as ID;
+					if (info.banlist.includes('ND AG') || info.banlist.includes('AG')) format = 'ubers' as ID;
+					if (info.banlist.includes('ND Uber') || info.banlist.includes('Uber')) format = 'ou' as ID;
+					if (info.banlist.includes('ND OU') || info.banlist.includes('OU')) format = 'uu' as ID;
+					if (info.ruleset.includes('Little Cup')) format = 'lc' as ID;
+				}
+			}
 		}
 
 		if (format.startsWith('dlc1')) {
@@ -622,20 +639,6 @@ abstract class BattleTypedSearch<T extends SearchType> {
 		if (format.includes('letsgo')) {
 			this.formatType = 'letsgo';
 			this.dex = Dex.mod('gen7letsgo' as ID);
-		}
-		if (format.includes('iffreeforall') || format.includes('ifdex') || format.includes('ifnatdex')) {
-			this.formatType = 'natdex';
-			if (format.includes('ifdex')) {
-				format = format.endsWith('ou') ? 'ou' as ID : 'ubers' as ID;
-				this.dex = Dex.mod('gen7infinitefusion' as ID);
-			} else if (format.includes('natdex')) {
-				format = format.slice(8) as ID;
-				if (format === 'doubles') format = 'ag' as ID;
-				this.dex = Dex.mod('gen9infinitefusion' as ID);
-			} else if (format.includes('freeforall')) {
-				format = 'ag' as ID;
-				this.dex = Dex.mod('gen9infinitefusion' as ID);
-			}
 		}
 		if (format.includes('nationaldex') || format.startsWith('nd') || format.includes('natdex')) {
 			format = (format.startsWith('nd') ? format.slice(2) :
