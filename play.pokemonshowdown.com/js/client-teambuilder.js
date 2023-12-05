@@ -828,7 +828,7 @@
 					iconCache: ''
 				};
 			} else {
-				var format = this.curFolder || 'gen9';
+				var format = this.curFolder || 'gen7ifdexou';
 				var folder = '';
 				if (format && format.charAt(format.length - 1) === '/') {
 					folder = format.slice(0, -1);
@@ -1245,10 +1245,8 @@
 			var isBDSP = this.curTeam.format.includes('bdsp');
 			var isNatDex = this.curTeam.format.includes('nationaldex') || this.curTeam.format.includes('natdex');
 			var isFusion = (
-				((this.curTeam.format).includes('infinitefusion') ||
-				(this.curTeam.format).includes('ifdex') ||
-				(this.curTeam.format).includes('ifnatdex') ||
-				(this.curTeam.format).includes('iffreeforall')) &&
+				this.curTeam.format in window.Formats &&
+				window.Formats[this.curTeam.format].mod.includes('infinitefusion') &&
 				!species.tags.includes("Infinite Fusion")
 			);
 
