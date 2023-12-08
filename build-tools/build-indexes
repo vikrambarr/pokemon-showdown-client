@@ -358,7 +358,7 @@ process.stdout.write("Building `data/teambuilder-tables.js`... ");
 	const LC = GENS.map(num => num + 0.7);
 	const STADIUM = [2.04, 1.04];
 	const NATDEX = [9.1, 8.1];
-	const OTHER = [9.9, 9.8, 9.41, 9.4, 9.2, -9.4, 8.6, 8.4, 8.2, 8.1, -8.4, -8.6, 7.81, 7.1];
+	const OTHER = [9.9, 9.8, -9.8, 9.41, 9.4, 9.2, -9.4, 8.6, 8.4, 8.2, 8.1, -8.4, -8.6, 7.81, -7.81, 7.1];
 
 	// process.stdout.write("\n  ");
 	for (const genIdent of [...GENS, ...DOUBLES, ...VGC, ...NFE, ...STADIUM, ...OTHER, ...NATDEX, ...LC]) {
@@ -374,8 +374,8 @@ process.stdout.write("Building `data/teambuilder-tables.js`... ");
 		const isDoubles = (genIdent < 0);
 		const isVGC = ('' + genIdent).endsWith('.5');
 		const isGen9BH = genIdent === 9.9;
-		const isNatDexFusions = genIdent === 9.8;
-		const isFusions = genIdent === 7.81;
+		const isNatDexFusions = ('' + genIdent).endsWith('.8');
+		const isFusions = ('' + genIdent).endsWith('.81');
 		const genNum = Math.floor(isDoubles ? -genIdent : genIdent);
 		const gen = (() => {
 			let genStr = 'gen' + genNum;
@@ -475,12 +475,12 @@ process.stdout.write("Building `data/teambuilder-tables.js`... ");
 							species.nfe ? (species.prevo ? 'NFE' : 'LC') : 'Regular';
 				}
 				if (isNatDexFusions) {
-					let tier = species.natDexTier;
+					let tier = isDoubles ? species.doublesTier : species.natDexTier;
 					if (species.isMega) tier = 'Illegal';
 					return tier;
 				}
 				if (isFusions) {
-					let tier = Dex.mod('gen7infinitefusion').species.get(species.name).tier;
+					let tier = isDoubles ? species.doublesTier : species.tier;
 					if (species.isMega ||
 						species.num <= 0 ||
 						species.isNonstandard === "Unobtainable") tier = 'Illegal';

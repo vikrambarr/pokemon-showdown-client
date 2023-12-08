@@ -589,12 +589,18 @@ abstract class BattleTypedSearch<T extends SearchType> {
 			if ('mod' in info) {
 				this.dex = Dex.mod(info.mod);
 				if (info.mod.includes('infinitefusion')) {
-					this.formatType = 'natdex';
-					format = 'ag' as ID;
-					if (info.banlist.includes('ND AG') || info.banlist.includes('AG')) format = 'ubers' as ID;
-					if (info.banlist.includes('ND Uber') || info.banlist.includes('Uber')) format = 'ou' as ID;
-					if (info.banlist.includes('ND OU') || info.banlist.includes('OU')) format = 'uu' as ID;
-					if (info.ruleset.includes('Little Cup')) format = 'lc' as ID;
+					if (info.gameType === 'doubles') {
+						this.formatType = 'doubles';
+						format = 'doublesubers' as ID;
+						if (info.banlist.includes('DUber')) format = 'doublesou' as ID;
+					} else {
+						this.formatType = 'natdex';
+						format = 'ag' as ID;
+						if (info.banlist.includes('ND AG') || info.banlist.includes('AG')) format = 'ubers' as ID;
+						if (info.banlist.includes('ND Uber') || info.banlist.includes('Uber')) format = 'ou' as ID;
+						if (info.banlist.includes('ND OU') || info.banlist.includes('OU')) format = 'uu' as ID;
+						if (info.ruleset.includes('Little Cup')) format = 'lc' as ID;
+					}
 				}
 			}
 		}
@@ -826,7 +832,7 @@ abstract class BattleTypedSearch<T extends SearchType> {
 		}
 		let table = window.BattleTeambuilderTable;
 		const gen = this.dex.gen;
-		const tableKey = this.formatType === 'doubles' ? `gen${gen}doubles` :
+		const tableKey = this.formatType === 'doubles' && !this.dex.modid.includes('infinitefusion') ? `gen${gen}doubles` :
 			this.formatType === 'letsgo' ? 'gen7letsgo' :
 			this.formatType === 'bdsp' ? 'gen8bdsp' :
 			this.formatType === 'bdspdoubles' ? 'gen8bdspdoubles' :
@@ -837,7 +843,7 @@ abstract class BattleTypedSearch<T extends SearchType> {
 			this.formatType === 'predlc' ? 'gen9predlc' :
 			this.formatType === 'predlcdoubles' ? 'gen9predlcdoubles' :
 			this.formatType === 'predlcnatdex' ? 'gen9predlcnatdex' :
-			this.dex.modid.includes('infinitefusion') ? this.dex.modid :
+			this.dex.modid.includes('infinitefusion') ? this.dex.modid + (this.formatType === 'doubles' ? 'doubles' : ''):
 			this.formatType === 'natdex' ? `gen${gen}natdex` :
 			this.formatType === 'stadium' ? `gen${gen}stadium${gen > 1 ? gen : ''}` :
 			`gen${gen}`;
@@ -935,6 +941,7 @@ class BattlePokemonSearch extends BattleTypedSearch<'pokemon'> {
 			table['gen' + dex.gen + 'doubles'] && dex.gen > 4 &&
 			this.formatType !== 'letsgo' && this.formatType !== 'bdspdoubles' &&
 			this.formatType !== 'ssdlc1doubles' && this.formatType !== 'predlcdoubles' &&
+			!this.dex.modid.includes('infinitefusion') &&
 			(
 				format.includes('doubles') || format.includes('triples') ||
 				format === 'freeforall' || format.startsWith('ffa') ||
@@ -950,7 +957,7 @@ class BattlePokemonSearch extends BattleTypedSearch<'pokemon'> {
 		} else if (this.formatType === 'letsgo') {
 			table = table['gen7letsgo'];
 		} else if (this.dex.modid.includes('infinitefusion')) {
-			table = table[this.dex.modid];
+			table = table[this.dex.modid + (this.formatType === 'doubles' ? 'doubles' : '')];
 		} else if (this.formatType === 'natdex') {
 			table = table['gen' + dex.gen + 'natdex'];
 		} else if (this.formatType === 'metronome') {
