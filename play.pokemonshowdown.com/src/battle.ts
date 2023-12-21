@@ -1112,6 +1112,7 @@ export class Battle {
 	speciesClause = false;
 	tier = '';
 	gameType: 'singles' | 'doubles' | 'triples' | 'multi' | 'freeforall' = 'singles';
+	compatMode = true;
 	rated: string | boolean = false;
 	rules: {[ruleName: string]: 1 | 0} = {};
 	isBlitz = false;
@@ -3332,7 +3333,7 @@ export class Battle {
 		if (!isInactive && side.active[slot]) return side.active[slot];
 
 		for (const pokemon of side.pokemon) {
-			if (isInactive && side.active.includes(pokemon)) continue;
+			if (isInactive && !this.compatMode && side.active.includes(pokemon)) continue;
 			if (faintedOnly && pokemon.hp) continue;
 			if (pokemon.ident === pokemonid) { // name matched, good enough
 				if (slot >= 0) pokemon.slot = slot;
@@ -3414,6 +3415,7 @@ export class Battle {
 		}
 		case 'gametype': {
 			this.gameType = args[1] as any;
+			this.compatMode = false;
 			switch (args[1]) {
 			case 'multi':
 			case 'freeforall':

@@ -1480,6 +1480,9 @@ class BattleTooltips {
 		if (move.id === 'terablast' && pokemon.terastallized) {
 			moveType = pokemon.terastallized as TypeName;
 		}
+		if (move.id === 'terastarstorm' && pokemon.terastallized === 'Stellar') {
+			moveType = pokemon.terastallized as TypeName;
+		}
 
 		// Aura Wheel as Morpeko-Hangry changes the type to Dark
 		if (move.id === 'aurawheel' && [pokemon.getSpeciesForme(), pokemon.fusion].includes('Morpeko-Hangry')) {
@@ -1687,11 +1690,14 @@ class BattleTooltips {
 				value.modify(2, "Acrobatics + no item");
 			}
 		}
-		if (['crushgrip', 'wringout'].includes(move.id) && target) {
+		if (['crushgrip', 'hardpress', 'wringout'].includes(move.id) && target) {
 			value.set(
 				Math.floor(Math.floor((120 * (100 * Math.floor(target.hp * 4096 / target.maxhp)) + 2048 - 1) / 4096) / 100) || 1,
 				'approximate'
 			);
+		}
+		if (['terablast'].includes(move.id) && pokemon.terastallized === 'Stellar') {
+			value.set(100, 'Tera Stellar boost');
 		}
 		if (move.id === 'brine' && target && target.hp * 2 <= target.maxhp) {
 			value.modify(2, 'Brine + target below half HP');
@@ -2021,8 +2027,10 @@ class BattleTooltips {
 
 		// Terastal base power floor
 		if (
-			pokemon.terastallized && pokemon.terastallized === move.type && value.value < 60 && move.priority <= 0 &&
-			!move.multihit && !((move.basePower === 0 || move.basePower === 150) && (move as any).basePowerCallback)
+			pokemon.terastallized && (pokemon.terastallized === move.type || pokemon.terastallized === 'Stellar') &&
+			value.value < 60 && move.priority <= 0 && !move.multihit && !(
+				(move.basePower === 0 || move.basePower === 150) && move.basePowerCallback
+			)
 		) {
 			value.set(60, 'Tera type BP minimum');
 		}

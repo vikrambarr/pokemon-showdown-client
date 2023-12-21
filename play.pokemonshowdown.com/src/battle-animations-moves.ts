@@ -35887,8 +35887,13 @@ BattleMoveAnims['terablastpsychic'] = {anim: BattleMoveAnims['psychic'].anim};
 BattleMoveAnims['terablastrock'] = {anim: BattleMoveAnims['powergem'].anim};
 BattleMoveAnims['terablaststeel'] = {anim: BattleMoveAnims['flashcannon'].anim};
 BattleMoveAnims['terablastwater'] = {anim: BattleMoveAnims['hydropump'].anim};
+BattleMoveAnims['terablaststellar'] = {anim: BattleMoveAnims['dracometeor'].anim};
 BattleMoveAnims['tidyup'] = {anim: BattleMoveAnims['bulkup'].anim};
 BattleMoveAnims['trailblaze'] = {anim: BattleMoveAnims['powerwhip'].anim};
 BattleMoveAnims['tripledive'] = {anim: BattleMoveAnims['dive'].anim};
 BattleMoveAnims['hydrosteam'] = {anim: BattleMoveAnims['steameruption'].anim};
 BattleMoveAnims['psyblade'] = {anim: BattleMoveAnims['psychocut'].anim};
+BattleMoveAnims['electroshot'] = {
+	anim: BattleMoveAnims['zapcannon'].anim,
+	prepareAnim: BattleOtherAnims.lightstatus.anim,
+};
