@@ -1257,7 +1257,7 @@ class BattleItemSearch extends BattleTypedSearch<'item'> {
 		const speciesSpecific: SearchRow[] = [];
 		for (const row of results) {
 			if (row[0] !== 'item') continue;
-			if (this.dex.items.get(row[1]).itemUser?.includes(speciesName) || (['Light Ball', 'Thick Club', 'Deep Sea Tooth', 'Deep Sea Scale', 'Metal Powder', 'Quick Powder', 'Leek', 'Lucky Punch'].includes(this.dex.items.get(row[1]).name) && this.dex.items.get(row[1]).itemUser?.includes(this.set?.fusion))) {
+			if (this.dex.items.get(row[1]).itemUser?.includes(speciesName) || (['Light Ball', 'Thick Club', 'Deep Sea Tooth', 'Deep Sea Scale', 'Metal Powder', 'Quick Powder', 'Leek', 'Stick', 'Lucky Punch'].includes(this.dex.items.get(row[1]).name) && this.dex.items.get(row[1]).itemUser?.includes(this.set?.fusion))) {
 				speciesSpecific.push(row);
 			}
 		}
