@@ -1034,7 +1034,7 @@ class BattlePokemonSearch extends BattleTypedSearch<'pokemon'> {
 				tierSet = tierSet.slice(slices.Regular);
 			}
 		} else if (format === 'ou') tierSet = tierSet.slice(slices.OU);
-		else if (format === 'uu') tierSet = tierSet.slice(slices.UU);
+		else if (format === 'uu' || (format === 'ru' && dex.gen === 3)) tierSet = tierSet.slice(slices.UU);
 		else if (format === 'ru') tierSet = tierSet.slice(slices.RU || slices.UU);
 		else if (format === 'nu') tierSet = tierSet.slice(slices.NU || slices.RU || slices.UU);
 		else if (format === 'pu') tierSet = tierSet.slice(slices.PU || slices.NU);
@@ -1138,8 +1138,12 @@ class BattlePokemonSearch extends BattleTypedSearch<'pokemon'> {
 			return results.sort(([rowType1, id1], [rowType2, id2]) => {
 				const base1 = this.dex.species.get(id1).baseStats;
 				const base2 = this.dex.species.get(id2).baseStats;
-				const bst1 = base1.hp + base1.atk + base1.def + base1.spa + base1.spd + base1.spe;
-				const bst2 = base2.hp + base2.atk + base2.def + base2.spa + base2.spd + base2.spe;
+				let bst1 = base1.hp + base1.atk + base1.def + base1.spa + base1.spd + base1.spe;
+				let bst2 = base2.hp + base2.atk + base2.def + base2.spa + base2.spd + base2.spe;
+				if (this.dex.gen === 1) {
+					bst1 -= base1.spd;
+					bst2 -= base2.spd;
+				}
 				return (bst2 - bst1) * sortOrder;
 			});
 		} else if (sortCol === 'name') {
