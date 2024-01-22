@@ -1190,7 +1190,7 @@ class BattleTooltips {
 		const isNFEFusion = this.battle.dex.species.get(serverPokemon.fusion).evos?.some(evo => {
 			const evoSpecies = this.battle.dex.species.get(evo);
 			return !evoSpecies.isNonstandard ||
-					evoSpecies.isNonstandard === this.battle.dex.species.get(serverPokemon.speciesForme)?.isNonstandard ||
+					evoSpecies.isNonstandard === this.battle.dex.species.get(serverPokemon.fusion)?.isNonstandard ||
 					// Pokemon with Hisui evolutions
 					evoSpecies.isNonstandard === "Unobtainable";
 		});
@@ -2169,8 +2169,8 @@ class BattleTooltips {
 
 		if (pokemon.fusion) {
 
-			const fusionSpecies = Dex.species.get(pokemon.fusion);
-			const species = Dex.species.get(pokemon.speciesForme);
+			const fusionSpecies = Dex.mod('gen9infinitefusion').species.get(pokemon.fusion);
+			const species = Dex.mod('gen9infinitefusion').species.get(pokemon.speciesForme);
 
 			let speciesTypes = species.types;
 			let fusionTypes = fusionSpecies.types;
