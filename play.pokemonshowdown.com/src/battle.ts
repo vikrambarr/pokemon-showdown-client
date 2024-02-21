@@ -482,8 +482,8 @@ export class Pokemon implements PokemonDetails, PokemonHealth {
 		let types: ReadonlyArray<TypeName>;
 		if (this.fusion) {
 
-			const fusionSpecies = Dex.species.get(this.fusion);
-			const species = Dex.species.get(this.speciesForme);
+			const fusionSpecies = Dex.mod('gen9infinitefusion').species.get(this.fusion);
+			const species = Dex.mod('gen9infinitefusion').species.get(this.speciesForme);
 
 			let speciesTypes = species.types;
 			let fusionTypes = fusionSpecies.types;
