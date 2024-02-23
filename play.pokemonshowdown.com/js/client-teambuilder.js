@@ -1254,7 +1254,7 @@
 			var isNatDex = this.curTeam.format.includes('nationaldex') || this.curTeam.format.includes('natdex');
 			var isFusion = (
 				this.curTeam.format in window.Formats &&
-				window.Formats[this.curTeam.format].mod.includes('infinitefusion') &&
+				window.Formats[this.curTeam.format].ruleTable.includes('infinitefusionmod') &&
 				!species.tags.includes("Infinite Fusion")
 			);
 
