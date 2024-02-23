@@ -553,6 +553,8 @@ abstract class BattleTypedSearch<T extends SearchType> {
 	'ssdlc1' | 'ssdlc1doubles' | 'predlc' | 'predlcdoubles' | 'predlcnatdex' | 'svdlc1' | 'svdlc1doubles' |
 	'svdlc1natdex' | 'stadium' | 'lc' | null = null;
 
+	table: string | null = null;
+
 	/**
 	 * Cached copy of what the results list would be with only base filters
 	 * (i.e. with an empty `query` and `filters`)
@@ -588,18 +590,19 @@ abstract class BattleTypedSearch<T extends SearchType> {
 			let info = window.Formats[formatName];
 			if ('mod' in info) {
 				this.dex = Dex.mod(info.mod);
-				if (info.mod.includes('infinitefusion')) {
+				if (info.mod.includes('infinitefusion') || info.mod.includes('pokeathlon')) {
+					this.formatType = 'natdex';
 					if (info.gameType === 'doubles') {
-						this.formatType = 'doubles';
 						format = 'doublesubers' as ID;
 						if (info.banlist.includes('DUber')) format = 'doublesou' as ID;
+						this.table = info.mod + (info.mod.includes('pokeathlon') && info.ruleTable.includes('standardnatdex') ? 'natdex' : '') + 'doubles';
 					} else {
-						this.formatType = 'natdex';
 						format = 'ag' as ID;
 						if (info.banlist.includes('ND AG') || info.banlist.includes('AG')) format = 'ubers' as ID;
 						if (info.banlist.includes('ND Uber') || info.banlist.includes('Uber')) format = 'ou' as ID;
 						if (info.banlist.includes('ND OU') || info.banlist.includes('OU')) format = 'uu' as ID;
 						if (info.ruleset.includes('Little Cup')) format = 'lc' as ID;
+						this.table = info.mod + (info.mod.includes('pokeathlon') && info.ruleTable.includes('standardnatdex') ? 'natdex' : '');
 					}
 				}
 			}
@@ -846,7 +849,7 @@ abstract class BattleTypedSearch<T extends SearchType> {
 		}
 		let table = window.BattleTeambuilderTable;
 		const gen = this.dex.gen;
-		const tableKey = this.formatType === 'doubles' && !this.dex.modid.includes('infinitefusion') ? `gen${gen}doubles` :
+		const tableKey = this.formatType === 'doubles' ? `gen${gen}doubles` :
 			this.formatType === 'letsgo' ? 'gen7letsgo' :
 			this.formatType === 'bdsp' ? 'gen8bdsp' :
 			this.formatType === 'bdspdoubles' ? 'gen8bdspdoubles' :
@@ -860,7 +863,7 @@ abstract class BattleTypedSearch<T extends SearchType> {
 			this.formatType === 'svdlc1' ? 'gen9dlc1' :
 			this.formatType === 'svdlc1doubles' ? 'gen9dlc1doubles' :
 			this.formatType === 'svdlc1natdex' ? 'gen9dlc1natdex' :
-			this.dex.modid.includes('infinitefusion') ? this.dex.modid + (this.formatType === 'doubles' ? 'doubles' : ''):
+			this.table ? this.table:
 			this.formatType === 'natdex' ? `gen${gen}natdex` :
 			this.formatType === 'stadium' ? `gen${gen}stadium${gen > 1 ? gen : ''}` :
 			`gen${gen}`;
@@ -960,7 +963,6 @@ class BattlePokemonSearch extends BattleTypedSearch<'pokemon'> {
 			this.formatType !== 'letsgo' && this.formatType !== 'bdspdoubles' &&
 			this.formatType !== 'ssdlc1doubles' && this.formatType !== 'predlcdoubles' &&
 			this.formatType !== 'svdlc1doubles' && !this.formatType?.includes('natdex') &&
-			!this.dex.modid.includes('infinitefusion') &&
 			(
 				format.includes('doubles') || format.includes('triples') ||
 				format === 'freeforall' || format.startsWith('ffa') ||
@@ -975,8 +977,8 @@ class BattlePokemonSearch extends BattleTypedSearch<'pokemon'> {
 			table = table['gen8' + this.formatType];
 		} else if (this.formatType === 'letsgo') {
 			table = table['gen7letsgo'];
-		} else if (this.dex.modid.includes('infinitefusion')) {
-			table = table[this.dex.modid + (this.formatType === 'doubles' ? 'doubles' : '')];
+		} else if (this.table) {
+			table = table[this.table];
 		} else if (this.formatType === 'natdex') {
 			table = table['gen' + dex.gen + 'natdex'];
 		} else if (this.formatType === 'metronome') {
@@ -1268,8 +1270,8 @@ class BattleItemSearch extends BattleTypedSearch<'item'> {
 		let table = BattleTeambuilderTable;
 		if (this.formatType?.startsWith('bdsp')) {
 			table = table['gen8bdsp'];
-		} else if (this.dex.modid.includes('infinitefusion')) {
-			table = table[this.dex.modid];
+		} else if (this.table) {
+			table = table[this.table];
 		} else if (this.formatType === 'natdex') {
 			table = table['gen' + this.dex.gen + 'natdex'];
 		} else if (this.formatType === 'metronome') {

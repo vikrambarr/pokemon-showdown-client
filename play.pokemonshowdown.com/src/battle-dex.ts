@@ -565,6 +565,13 @@ const Dex = new class implements ModdedDex {
 			return spriteData;
 		}
 
+		if (species.tags.includes("Pokeathlon")) {
+			spriteData.url = 'https://play.pokeathlon.com/sprites/fangame-sprites/pokeathlon/' + (spriteData.isFrontSprite ? 'front': 'back') + (spriteData.shiny ? '-shiny': '') + '/' + species.id + '.png';
+			spriteData.pixelated = true;
+			spriteData.gen = 5;
+			return spriteData;
+		}
+
 		let graphicsGen = mechanicsGen;
 		if (Dex.prefs('nopastgens')) graphicsGen = 6;
 		if (Dex.prefs('bwgfx') && graphicsGen >= 6) graphicsGen = 5;
@@ -763,6 +770,11 @@ const Dex = new class implements ModdedDex {
 			return `image-rendering:pixelated;animation: rainbowshadow ${((Math.random() * 2) + 2)}s infinite;background:transparent url(https://play.pokeathlon.com/sprites/fangame-sprites/infinitefusion/iconsprites/${id}.png) no-repeat scroll ${fainted}`;
 		}
 
+		if (species.tags.includes("Pokeathlon")) {
+			let fainted = ((pokemon as Pokemon | ServerPokemon)?.fainted ? `;opacity:.3;filter:grayscale(100%) brightness(.5)` : ``);
+			return `image-rendering:pixelated;background:transparent url(https://play.pokeathlon.com/sprites/fangame-sprites/pokeathlon/iconsprites/${id}.png) no-repeat scroll ${fainted}`;
+		}
+
 		let top = Math.floor(num / 12) * 30;
 		let left = (num % 12) * 40;
 		let fainted = ((pokemon as Pokemon | ServerPokemon)?.fainted ? `;opacity:.3;filter:grayscale(100%) brightness(.5)` : ``);
@@ -839,6 +851,11 @@ const Dex = new class implements ModdedDex {
 
 		if (Dex.species.get(pokemon.species).tags.includes("Infinite Fusion")) {
 			let url = 'https://play.pokeathlon.com/sprites/fangame-sprites/infinitefusion/' + toID(pokemon.species) + '.png';
+			return 'background-image:url(' + url + ');background-position:' + data.x + 'px ' + data.y + 'px;background-repeat:no-repeat;background-size:100px;image-rendering:pixelated';
+		}
+
+		if (Dex.species.get(pokemon.species).tags.includes("Pokeathlon")) {
+			let url = 'https://play.pokeathlon.com/sprites/fangame-sprites/pokeathlon/front' + shiny + '/' + toID(pokemon.species) + '.png';
 			return 'background-image:url(' + url + ');background-position:' + data.x + 'px ' + data.y + 'px;background-repeat:no-repeat;background-size:100px;image-rendering:pixelated';
 		}
 
