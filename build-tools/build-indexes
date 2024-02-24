@@ -52,6 +52,11 @@ for (const mod in Dex.dexes) {
                     counter ++;
                     Dex.data[dataType][entry] = Dex.deepClone(modData.data[dataType][entry]);
                     if (dataType !== 'Learnsets') Dex.data[dataType][entry].isNonstandard = "Custom";
+					if (dataType === 'Pokedex') {
+						Dex.data[dataType][entry].tier = "Illegal";
+						Dex.data[dataType][entry].natDexTier = "Illegal";
+						Dex.data[dataType][entry].doublesTier = "Illegal";
+					}
                 }
             }
             if (counter > 0) console.log(dataType + ' received ' + counter + ' objects from ' + mod);
