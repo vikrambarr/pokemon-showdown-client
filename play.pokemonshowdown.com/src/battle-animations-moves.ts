@@ -36111,3 +36111,37 @@ BattleMoveAnims['trailblaze'] = {anim: BattleMoveAnims['powerwhip'].anim};
 BattleMoveAnims['tripledive'] = {anim: BattleMoveAnims['dive'].anim};
 BattleMoveAnims['hydrosteam'] = {anim: BattleMoveAnims['steameruption'].anim};
 BattleMoveAnims['psyblade'] = {anim: BattleMoveAnims['psychocut'].anim};
+
+BattleMoveAnims['boxin'] = BattleMoveAnims['block'];
+BattleMoveAnims['runtimeexception'] = BattleMoveAnims['shiftgear'];
+BattleMoveAnims['fibregraft'] = {
+	anim(scene, [attacker, defender]) {
+		BattleMoveAnims['focusenergy'].anim(scene, [attacker, attacker]);
+		BattleMoveAnims['wish'].anim(scene, [attacker, attacker]);
+	},
+};
+BattleMoveAnims['bloomsday'] = BattleMoveAnims['bloomdoom'];
+BattleMoveAnims['deserttempest'] = BattleMoveAnims['powergem'];
+BattleMoveAnims['bulwark'] = BattleMoveAnims['wideguard'];
+BattleMoveAnims['pixietrick'] = {
+	anim(scene, [attacker, defender]) {
+		BattleMoveAnims['wish'].anim(scene, [attacker, attacker]);
+		BattleMoveAnims['psychocut'].anim(scene, [attacker, attacker]);
+	},
+};
+BattleMoveAnims['mudslide'] = {
+	anim(scene, [attacker, defender]) {
+		BattleMoveAnims['earthquake'].anim(scene, [attacker, defender]);
+		BattleMoveAnims['earthquake'].anim(scene, [attacker, defender]);
+	},
+};
+BattleMoveAnims['packin'] = {
+	anim(scene, [attacker, defender]) {
+		BattleMoveAnims['recover'].anim(scene, [attacker, attacker]);
+		BattleMoveAnims['aquaring'].anim(scene, [attacker, attacker]);
+	},
+};
+BattleMoveAnims['heal'] = BattleMoveAnims['healpulse'];
+BattleMoveAnims['hyperheal'] = BattleMoveAnims['healpulse'];
+BattleMoveAnims['fullheal'] = BattleMoveAnims['healpulse'];
+BattleMoveAnims['foulstrike'] = BattleMoveAnims['behemothblade'];
