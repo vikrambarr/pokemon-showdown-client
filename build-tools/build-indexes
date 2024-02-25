@@ -973,50 +973,52 @@ process.stdout.write("Building `data/teambuilder-tables.js`... ");
 			}
 		}
 	}
-	const iflearnsets = {};
-	BattleTeambuilderTable['gen7infinitefusion'].learnsets = iflearnsets;
-	for (const id in Dex.mod('gen7infinitefusion').data.Learnsets) {
-		const learnset = Dex.mod('gen7infinitefusion').data.Learnsets[id].learnset;
-		if (!learnset) continue;
-		iflearnsets[id] = {};
-		for (const moveid in learnset) {
-			const gens = learnset[moveid].map(x => Number(x[0]));
-			const minGen = Math.min(...gens);
+	for (let learnsetmod of ['gen7infinitefusion', 'gen9pokeathlon']) {
+		let modlearnsets = {};
+		BattleTeambuilderTable[learnsetmod].learnsets = modlearnsets;
+		for (const id in Dex.mod(learnsetmod).data.Learnsets) {
+			const learnset = Dex.mod(learnsetmod).data.Learnsets[id].learnset;
+			if (!learnset) continue;
+			modlearnsets[id] = {};
+			for (const moveid in learnset) {
+				const gens = learnset[moveid].map(x => Number(x[0]));
+				const minGen = Math.min(...gens);
 
-			if (minGen <= 4 && (gen3HMs.has(moveid) || gen4HMs.has(moveid))) {
-				let legalGens = '';
-				let available = false;
+				if (minGen <= 4 && (gen3HMs.has(moveid) || gen4HMs.has(moveid))) {
+					let legalGens = '';
+					let available = false;
 
-				if (minGen === 3) {
-					legalGens += '3';
-					available = true;
+					if (minGen === 3) {
+						legalGens += '3';
+						available = true;
+					}
+					if (available) available = !gen3HMs.has(moveid);
+
+					if (available || gens.includes(4)) {
+						legalGens += '4';
+						available = true;
+					}
+					if (available) available = !gen4HMs.has(moveid);
+
+					let minUpperGen = available ? 5 : Math.min(
+						...gens.filter(gen => gen > 4)
+					);
+					legalGens += '0123456789'.slice(minUpperGen);
+					modlearnsets[id][moveid] = legalGens;
+				} else {
+					modlearnsets[id][moveid] = '0123456789'.slice(minGen);
 				}
-				if (available) available = !gen3HMs.has(moveid);
 
-				if (available || gens.includes(4)) {
-					legalGens += '4';
-					available = true;
+				if (gens.indexOf(6) >= 0) modlearnsets[id][moveid] += 'p';
+				if (gens.indexOf(7) >= 0 && learnset[moveid].some(x => x[0] === '7' && x !== '7V')) {
+					modlearnsets[id][moveid] += 'q';
 				}
-				if (available) available = !gen4HMs.has(moveid);
-
-				let minUpperGen = available ? 5 : Math.min(
-					...gens.filter(gen => gen > 4)
-				);
-				legalGens += '0123456789'.slice(minUpperGen);
-				iflearnsets[id][moveid] = legalGens;
-			} else {
-				iflearnsets[id][moveid] = '0123456789'.slice(minGen);
-			}
-
-			if (gens.indexOf(6) >= 0) iflearnsets[id][moveid] += 'p';
-			if (gens.indexOf(7) >= 0 && learnset[moveid].some(x => x[0] === '7' && x !== '7V')) {
-				iflearnsets[id][moveid] += 'q';
-			}
-			if (gens.indexOf(8) >= 0 && learnset[moveid].some(x => x[0] === '8' && x !== '8V')) {
-				iflearnsets[id][moveid] += 'g';
-			}
-			if (gens.indexOf(9) >= 0 && learnset[moveid].some(x => x[0] === '9' && x !== '9V')) {
-				iflearnsets[id][moveid] += 'a';
+				if (gens.indexOf(8) >= 0 && learnset[moveid].some(x => x[0] === '8' && x !== '8V')) {
+					modlearnsets[id][moveid] += 'g';
+				}
+				if (gens.indexOf(9) >= 0 && learnset[moveid].some(x => x[0] === '9' && x !== '9V')) {
+					modlearnsets[id][moveid] += 'a';
+				}
 			}
 		}
 	}
