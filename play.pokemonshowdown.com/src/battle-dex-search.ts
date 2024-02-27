@@ -1273,7 +1273,7 @@ class BattleItemSearch extends BattleTypedSearch<'item'> {
 		if (this.formatType?.startsWith('bdsp')) {
 			table = table['gen8bdsp'];
 		} else if (this.table) {
-			table = table[this.table];
+			table = table[this.table.includes('doubles') ? this.table.replace('doubles', '') : this.table];
 		} else if (this.formatType === 'natdex') {
 			table = table['gen' + this.dex.gen + 'natdex'];
 		} else if (this.formatType === 'metronome') {
