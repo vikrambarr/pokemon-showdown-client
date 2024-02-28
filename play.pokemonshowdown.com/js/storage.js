@@ -85,7 +85,8 @@ Storage.bg = {
 				hues = ["200,35%", "210,35%", "220,35%", "230,35%", "240,35%", "250,35%"];
 				break;
 			case 'waterfall':
-				hues = ["120,38%", "125,38%", "130,38%", "135,38%", "140,38%", "145,38%"];
+				hues = ["0,0%", "0,0%", "0,0%", "0,0%", "0,0%", "0,0%"];
+				attrib = '<a href="https://www.instagram.com/idol_is_propaganda" target="_blank" class="subtle">"POA Mons" <small>background by Ruoska! (ru_was_here on Discord)</small></a>';
 				break;
 			case 'shaymin':
 				hues = ["0,0%", "0,0%", "0,0%", "0,0%", "0,0%", "0,0%"];

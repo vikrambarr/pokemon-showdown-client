@@ -36126,7 +36126,7 @@ BattleMoveAnims['bulwark'] = BattleMoveAnims['wideguard'];
 BattleMoveAnims['pixietrick'] = {
 	anim(scene, [attacker, defender]) {
 		BattleMoveAnims['wish'].anim(scene, [attacker, attacker]);
-		BattleMoveAnims['psychocut'].anim(scene, [attacker, attacker]);
+		BattleMoveAnims['psychocut'].anim(scene, [attacker, defender]);
 	},
 };
 BattleMoveAnims['mudslide'] = {
