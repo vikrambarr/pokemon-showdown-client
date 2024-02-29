@@ -1726,7 +1726,7 @@ class BattleTooltips {
 		if (move.id === 'brine' && target && target.hp * 2 <= target.maxhp) {
 			value.modify(2, 'Brine + target below half HP');
 		}
-		if (move.id === 'eruption' || move.id === 'waterspout' || move.id === 'dragonenergy') {
+		if (move.id === 'eruption' || move.id === 'waterspout' || move.id === 'dragonenergy' || move.id === 'bloomsday') {
 			value.set(Math.floor(150 * pokemon.hp / pokemon.maxhp) || 1);
 		}
 		if (move.id === 'facade' && !['', 'slp', 'frz'].includes(pokemon.status)) {
@@ -1863,6 +1863,9 @@ class BattleTooltips {
 			}
 			if (move.id === 'naturalgift') {
 				value.itemModify(item.naturalGift.basePower);
+			}
+			if (move.id === 'deserttempest' && item.id === 'smoothrock') {
+				value.itemModify(1.2, 'Smooth Rock');
 			}
 		}
 		// Moves which have base power changed according to weight
