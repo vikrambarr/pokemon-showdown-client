@@ -2241,6 +2241,8 @@ class BattleTooltips {
 		const abilityData: {ability: string, baseAbility: string, possibilities: string[]} = {
 			ability: '', baseAbility: '', possibilities: [],
 		};
+		let dex = this.battle.dex;
+		if (toID(this.battle.tier) in window.Formats && window.Formats[toID(this.battle.tier)].mod) dex = Dex.mod(window.Formats[toID(this.battle.tier)].mod);
 		if (clientPokemon) {
 			if (clientPokemon.ability) {
 				abilityData.ability = clientPokemon.ability || clientPokemon.baseAbility;
@@ -2249,14 +2251,21 @@ class BattleTooltips {
 				}
 			} else {
 				const speciesForme = clientPokemon.getSpeciesForme() || serverPokemon?.speciesForme || '';
-				const species = this.battle.dex.species.get(speciesForme);
+				const species = dex.species.get(speciesForme);
 				if (species.exists && species.abilities) {
 					abilityData.possibilities = [species.abilities['0']];
 					if (species.abilities['1']) abilityData.possibilities.push(species.abilities['1']);
 					if (species.abilities['H']) abilityData.possibilities.push(species.abilities['H']);
 					if (species.abilities['S']) abilityData.possibilities.push(species.abilities['S']);
 					if (this.battle.rules['Frantic Fusions Mod']) {
-						const fusionSpecies = this.battle.dex.species.get(clientPokemon.name);
+						const fusionSpecies = dex.species.get(clientPokemon.name);
+						if (fusionSpecies.exists && fusionSpecies.name !== species.name) {
+							abilityData.possibilities = Array.from(
+								new Set(abilityData.possibilities.concat(Object.values(fusionSpecies.abilities)))
+							);
+						}
+					} else if (this.battle.rules['Infinite Fusion Mod'] && clientPokemon.fusion) {
+						const fusionSpecies = dex.species.get(clientPokemon.fusion);
 						if (fusionSpecies.exists && fusionSpecies.name !== species.name) {
 							abilityData.possibilities = Array.from(
 								new Set(abilityData.possibilities.concat(Object.values(fusionSpecies.abilities)))
@@ -2299,14 +2308,6 @@ class BattleTooltips {
 			!(tier.includes('Almost Any Ability') || tier.includes('Hackmons') ||
 				tier.includes('Inheritance') || tier.includes('Metronome'))) {
 			text = '<small>Possible abilities:</small> ' + abilityData.possibilities.join(', ');
-			if (clientPokemon && clientPokemon.fusion) {
-				let fuseAbilityData = Object.keys(Dex.species.get(clientPokemon.fusion).abilities).map(key => Dex.species.get(clientPokemon.fusion).abilities[key]);
-				let fuseBuf = [];
-				for (let fuseAbility of fuseAbilityData) {
-					if (!text.includes(fuseAbility)) fuseBuf.push(fuseAbility);
-				}
-				if (fuseBuf.length) text += ', ' + fuseBuf.join(', ');
-			}
 		}
 		return text;
 	}
