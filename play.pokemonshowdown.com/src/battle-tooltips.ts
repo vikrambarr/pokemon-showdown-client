@@ -1119,6 +1119,10 @@ class BattleTooltips {
 			if (this.pokemonHasType(pokemon, 'Ice') && weather === 'snow') {
 				stats.def = Math.floor(stats.def * 1.5);
 			}
+			if (ability === 'sandydefense' && weather === 'sandstorm') {
+				stats.spd = Math.floor(stats.spd * 1.5);
+				stats.def = Math.floor(stats.def * 1.5);
+			}
 			if (ability === 'sandrush' && weather === 'sandstorm') {
 				speedModifiers.push(2);
 			}
