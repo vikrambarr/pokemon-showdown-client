@@ -68,8 +68,6 @@ includeHeader();
 
 			<ul>
 				<li><p><a href="http://meltsner.com/" target="_blank" class="subtle"><strong>Bill Meltsner</strong> [bmelts]</a> <small>&ndash; Development, Sysadmin</small></p></li>
-				<li><p>[<strong>bumbadadabum</strong>] <small>&ndash; Development</small></p></li>
-				<li><p><a href="https://cathyjf.com/" target="_blank" class="subtle"><strong>Cathy J. Fitzpatrick</strong> [cathyjf]</a> <small>&ndash; Development, Sysadmin</small></p></li>
 				<li><p><strong>Hugh Gordon</strong> [V4, DanUgore] <small>&ndash; Research (game mechanics), Development</small></p></li>
 				<li><p><strong>Juanma Serrano</strong> [Joim] <small>&ndash; Development, Sysadmin</small></p></li>
 				<li><p><strong>Leonardo Julca</strong> [Slayer95] <small>&ndash; Development</small></p></li>
@@ -102,7 +100,7 @@ includeHeader();
 				<li><p><a href="http://sailorwanda.deviantart.com/" target="_blank" class="subtle"><strong>Catherine D.</strong> [SailorCosmos, Matryoshkat]</a> <small>&ndash; Art (battle animations)</small></p></li>
 				<li><p><strong>Cody Thompson</strong> [Rising_Dusk] <small>&ndash; Development</small></p></li>
 				<li><p>[<strong>Enigami</strong>] <small>&ndash; Development</small></p></li>
-				<li><p>[<strong>Hisuian Zoroark</strong>] <small>&ndash; Development (Staff Bros format)</small></p></li>
+				<li><p>[<strong>Hisuian Zoroark, HiZo</strong>] <small>&ndash; Development</small></p></li>
 				<li><p>[<strong>Honko</strong>] <small>&ndash; Development (damage calculator)</small></p></li>
 				<li><p><strong>Ian Clail</strong> [Layell] <small>&ndash; Art (battle graphics, sprites)</small></p></li>
 				<li><p><strong>Jacob McLemore</strong> <small>&ndash; Development</small></p></li>
