@@ -145,13 +145,10 @@
 
 			const day = Math.floor(Date.now() / 1000 / 60 / 60 / 24);
 
-			var psuedo = day / 1000;
-			for (let num of day.toString().split('')) {
-				psuedo *= parseInt(num);
-			}
+			var psuedo = day * 300;
 			var available = Object.keys(FusionCredit);
 
-			var dailyKey = available[(Math.floor(psuedo) % (available.length - 500)) + 500];
+			var dailyKey = available[(psuedo % (available.length - 500)) + 500];
 
 			var box = document.getElementById('daily-fusion');
 			box.innerHTML = `<h4>Fusion of the day...</h4>`;

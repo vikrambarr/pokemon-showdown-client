@@ -495,8 +495,7 @@ process.stdout.write("Building `data/teambuilder-tables.js`... ");
 				}
 				if (isFusions) {
 					let tier = isDoubles ? species.doublesTier : species.tier;
-					if (species.isMega ||
-						species.num <= 0 ||
+					if (species.isMega || species.num <= 0 ||
 						species.isNonstandard === "Unobtainable") tier = 'Illegal';
 					return tier;
 				}
