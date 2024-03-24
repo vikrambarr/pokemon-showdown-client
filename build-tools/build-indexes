@@ -363,7 +363,7 @@ process.stdout.write("Building `data/teambuilder-tables.js`... ");
 	const LC = GENS.map(num => num + 0.7);
 	const STADIUM = [2.04, 1.04];
 	const NATDEX = [9.1, 8.1];
-	const OTHER = [9.9, 9.81, -9.81, 9.82, -9.82, 9.822, -9.822, 9.83, 9.411, 9.41, 9.401, 9.4, 9.2, -9.4, -9.401, 8.6, 8.4, 8.2, 8.1, -8.4, -8.6, 7.811, -7.811, 7.1];
+	const OTHER = [9.9, 9.81, -9.81, 9.82, -9.82, 9.822, -9.822, 9.83, 9.411, 9.41, 9.401, 9.4, 9.2, -9.4, -9.401, 8.6, 8.4, 8.2, 8.1, -8.4, -8.6, 7.811, -7.811, 7.1, 6.833];
 
 	// process.stdout.write("\n  ");
 	for (const genIdent of [...GENS, ...DOUBLES, ...VGC, ...NFE, ...STADIUM, ...OTHER, ...NATDEX, ...LC]) {
@@ -385,12 +385,13 @@ process.stdout.write("Building `data/teambuilder-tables.js`... ");
 		const isNatDexPOA = ('' + genIdent).endsWith('.82');
 		const isPOA = ('' + genIdent).endsWith('.822');
 		const isNatDexInsg = ('' + genIdent).endsWith('.83');
+		const isInsg = ('' + genIdent).endsWith('.833');
 		const genNum = Math.floor(isDoubles ? -genIdent : genIdent);
 		const gen = (() => {
 			let genStr = 'gen' + genNum;
 			if (isNatDexFusions || isFusions) genStr += 'infinitefusion';
 			if (isNatDexPOA || isPOA) genStr += 'pokeathlon';
-			if (isNatDexInsg) genStr += 'insurgence';
+			if (isNatDexInsg || isInsg) genStr += 'insurgence';
 			if (isSSDLC1) genStr += 'dlc1';
 			if (isLetsGo) genStr += 'letsgo';
 			if (isBDSP) genStr += 'bdsp';
@@ -513,6 +514,11 @@ process.stdout.write("Building `data/teambuilder-tables.js`... ");
 					let tier = isDoubles ? species.doublesTier : species.natDexTier;
 					return tier;
 				}
+				if (isInsg) {
+					let tier = isDoubles ? species.doublesTier : species.tier;
+					if (species.num <= 0 || species.isNonstandard === "Unobtainable") tier = 'Illegal';
+					return tier;
+				}
 				if (species.tier === 'CAP' || species.tier === 'CAP NFE' || species.tier === 'CAP LC') {
 					return species.tier;
 				}
@@ -625,7 +631,7 @@ process.stdout.write("Building `data/teambuilder-tables.js`... ");
 			BattleTeambuilderTable['bh'].tiers = tiers;
 			BattleTeambuilderTable['bh'].overrideTier = overrideTier;
 			BattleTeambuilderTable['bh'].formatSlices = formatSlices;
-		} else if (isFusions || isNatDexFusions) {
+		} else if (isFusions || isNatDexFusions || isInsg || isNatDexInsg) {
 			BattleTeambuilderTable[gen] = {};
 			BattleTeambuilderTable[gen].learnsets = {};
 			BattleTeambuilderTable[gen].tiers = tiers;
@@ -979,7 +985,7 @@ process.stdout.write("Building `data/teambuilder-tables.js`... ");
 			}
 		}
 	}
-	for (let learnsetmod of ['gen7infinitefusion', 'gen9pokeathlon', 'gen9insurgence']) {
+	for (let learnsetmod of ['gen7infinitefusion', 'gen9pokeathlon', 'gen9insurgence', 'gen6insurgence']) {
 		let modlearnsets = {};
 		BattleTeambuilderTable[learnsetmod].learnsets = modlearnsets;
 		for (const id in Dex.mod(learnsetmod).data.Learnsets) {
@@ -1289,7 +1295,7 @@ process.stdout.write("Building `data/teambuilder-tables.js`... ");
 	// Mods
 	//
 
-	for (const mod of ['gen7letsgo', 'gen8bdsp', 'gen9infinitefusion', 'gen7infinitefusion', 'gen9pokeathlon', 'gen9insurgence']) {
+	for (const mod of ['gen7letsgo', 'gen8bdsp', 'gen9infinitefusion', 'gen7infinitefusion', 'gen9pokeathlon', 'gen9insurgence', 'gen6insurgence']) {
 		const modDex = Dex.mod(mod);
 		const modData = modDex.data;
 		const parentDex = Dex.forGen(modDex.gen);
