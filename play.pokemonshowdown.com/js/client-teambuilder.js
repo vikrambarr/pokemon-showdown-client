@@ -1312,7 +1312,7 @@
 			buf += '<div class="setcol setcol-icon">';
 			if (fusionData.alts.length) {
 				buf += '<div class="setcell-sprite changesprite"><i class="fa fa-caret-down"></i></div>';
-			} else if (species.cosmeticFormes) {
+			} else if (species.cosmeticFormes && !species.forme.split('-').includes('Mega')) {
 				buf += '<div class="setcell-sprite changeform"><i class="fa fa-caret-down"></i></div>';
 			} else {
 				buf += '<div class="setcell-sprite"></div>';
@@ -2909,7 +2909,7 @@
 			}
 
 			buf += '</form>';
-			if (species.cosmeticFormes) {
+			if (species.cosmeticFormes && !species.forme.split('-').includes('Mega')) {
 				buf += '<button class="altform button">Change sprite</button>';
 			}
 
@@ -3705,7 +3705,7 @@
 			this.chartIndex = data.index;
 			var species = this.room.curTeam.dex.species.get(this.curSet.species);
 			var baseid = toID(species.baseSpecies);
-			var forms = [baseid].concat(species.cosmeticFormes.map(toID));
+			var forms = [baseid].concat(species.cosmeticFormes);
 			var spriteDir = Dex.resourcePrefix + 'sprites/';
 			var spriteSize = 96;
 			var spriteDim = 'width: 96px; height: 96px;';
@@ -3726,10 +3726,14 @@
 
 			var formCount = forms.length;
 			for (var i = 0; i < formCount; i++) {
-				var formid = forms[i].substring(baseid.length);
-				var form = (formid ? formid[0].toUpperCase() + formid.slice(1) : '');
+				var formid = forms[i].substring(species.baseSpecies.length);
+				var form = (formid ? formid : '');
 				buf += '<button name="setForm" value="' + form + '" style="';
-				buf += 'background-image: url(' + spriteDir + '/' + baseid + (form ? '-' + formid : '') + '.png); ' + spriteDim + '" class="option';
+				if (species.tags.includes('Insurgence')) {
+					buf += 'background-image: url(https://play.pokeathlon.com/sprites/fangame-sprites/insurgence/front/' + baseid + toID(formid) + '.png); width: 120px; height: 120px; background-size: 120px;" class="option';
+				} else {
+					buf += 'background-image: url(' + spriteDir + '/' + baseid + (form ? '-' + toID(formid) : '') + '.png); ' + spriteDim + '" class="option';
+				}
 				buf += (form === (species.forme || '') ? ' cur' : '') + '"></button>';
 			}
 			buf += '<div style="clear:both"></div>';
