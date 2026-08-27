@@ -494,7 +494,8 @@
 				buf += '<p><input name="statustext" />';
 				buf += '<button class="button" name="editstatus"><i class="fa fa-pencil"></i></button></p>';
 			}
-			if (app.user.get('named')) {
+			// discordlogin accounts have no password, so neither button leads anywhere
+			if (app.user.get('named') && !Config.discordlogin) {
 				var registered = app.user.get('registered');
 				if (registered && (registered.userid === app.user.get('userid'))) {
 					buf += '<p><button class="button" name="changepassword">Password...</button></p>';
@@ -970,6 +971,16 @@
 				}
 			}
 
+			// with discordlogin there is no name to choose until you log in; after that
+			// the box below is the normal rename/nickname path
+			if (Config.discordlogin && !app.user.get('registered')) {
+				buf += '<p>Log in with Discord to play on this server.</p>';
+				buf += '<p class="buttonbar"><button type="button" name="discord" class="button"><strong>Log in with Discord</strong></button> <button type="button" name="close" class="button">Cancel</button></p>';
+				buf += '</form>';
+				this.$el.html(buf);
+				return;
+			}
+
 			var name = (data.name || '');
 			if (!name && app.user.get('named')) name = app.user.get('name');
 			buf += '<p><label class="label">Username: <small class="preview" style="' + BattleLog.hashColor(toUserid(name)) + '">(color)</small><input class="textbox autofocus" type="text" name="username" value="' + BattleLog.escapeHTML(name) + '" autocomplete="username"></label></p>';
@@ -989,6 +1000,10 @@
 			var preview = this.$('.preview');
 			var css = BattleLog.hashColor(toUserid(name)).slice(6, -1);
 			preview.css('color', css);
+		},
+		discord: function () {
+			this.close();
+			app.user.discordRename();
 		},
 		force: function () {
 			var sourceEl = this.sourceEl;
@@ -1119,6 +1134,8 @@
 				}
 			} else if (data.reason) {
 				buf += '<p>' + BattleLog.escapeHTML(data.reason) + '</p>';
+			} else if (data.special === '@discord') {
+				buf += '<p class="error">This name needs a Discord login.</p>';
 			} else {
 				buf += '<p class="error">The name you chose is registered.</p>';
 			}
@@ -1129,6 +1146,8 @@
 				buf += '<div id="g_id_onload" data-client_id="912270888098-jjnre816lsuhc5clj3vbcn4o2q7p4qvk.apps.googleusercontent.com" data-context="signin" data-ux_mode="popup" data-callback="gapiCallback" data-auto_prompt="false"></div>';
 				buf += '<div class="g_id_signin" data-type="standard" data-shape="pill" data-theme="filled_blue" data-text="continue_with" data-size="large" data-logo_alignment="left" data-auto_select="true" data-itp_support="true" style="width:fit-content;margin:0 auto">[loading Google log-in button]</div>';
 				buf += '<p class="buttonbar"><button name="close" class="button">Cancel</button></p>';
+			} else if (data.special === '@discord') {
+				buf += '<p class="buttonbar"><button type="button" name="discord" class="button"><strong>Log in with Discord</strong></button> <button type="button" name="close" class="button">Cancel</button></p>';
 			} else {
 				buf += '<p><label class="label">Password: <input class="textbox autofocus" type="password" name="password" autocomplete="current-password" style="width:173px"><button type="button" name="showPassword" aria-label="Show password" style="float:right;margin:-21px 0 10px;padding: 2px 6px" class="button"><i class="fa fa-eye"></i></button></label></p>';
 				buf += '<p class="buttonbar"><button type="submit" class="button"><strong>Log in</strong></button> <button type="button" name="close" class="button">Cancel</button></p>';
@@ -1153,6 +1172,10 @@
 				script.src = 'https://accounts.google.com/gsi/client';
 				document.getElementsByTagName('head')[0].appendChild(script);
 			}
+		},
+		discord: function () {
+			this.close();
+			app.user.discordRename();
 		},
 		login: function () {
 			this.close();

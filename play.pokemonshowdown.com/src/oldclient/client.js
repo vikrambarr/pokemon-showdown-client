@@ -254,6 +254,8 @@ function toId() {
 				this.trigger('login:authrequired', name);
 			} else if (assertion === ';;@gmail') {
 				this.trigger('login:authrequired', name, '@gmail');
+			} else if (assertion === ';;@discord') {
+				this.trigger('login:authrequired', name, '@discord');
 			} else if (assertion.substr(0, 2) === ';;') {
 				this.trigger('login:invalidname', name, assertion.substr(2));
 			} else if (assertion.indexOf('\n') >= 0 || !assertion) {
@@ -325,6 +327,32 @@ function toId() {
 					});
 				}
 			}), 'text');
+		},
+		/** Same domain as getActionPHP above, for the cookies and the origin check below. */
+		getDiscordOrigin: function () {
+			return Config.testclient ? 'https://' + Config.routes.client : location.origin;
+		},
+		/** Log in with Discord, in place of a password. The popup postMessages the assertion back. */
+		discordRename: function () {
+			var self = this;
+			var origin = this.getDiscordOrigin();
+			var listener = function (event) {
+				if (event.origin !== origin) return;
+				if (!event.data || event.data.type !== 'discord-login') return;
+				window.removeEventListener('message', listener);
+				self.set('registered', {
+					username: event.data.username,
+					userid: toUserid(event.data.username)
+				});
+				self.finishRename(event.data.username, event.data.assertion);
+			};
+			window.addEventListener('message', listener);
+			// serverid, because the loginserver names the sim server in the assertion from it
+			window.open(
+				origin + '/api/discord/login?challstr=' + encodeURIComponent(this.challstr) +
+				'&serverid=' + encodeURIComponent(Config.server.id),
+				'ps-discord-login', 'popup=1,width=500,height=750'
+			);
 		},
 		challstr: '',
 		receiveChallstr: function (challstr) {

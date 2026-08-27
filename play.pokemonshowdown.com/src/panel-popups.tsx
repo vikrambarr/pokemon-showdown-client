@@ -697,7 +697,8 @@ class OptionsPanel extends PSRoomPanel {
 				<button class="button" data-href="avatars">Avatar...</button>
 			</p>
 
-			{PS.user.named && (PS.user.registered?.userid === PS.user.userid ?
+			{/* discordlogin accounts have no password, so neither button leads anywhere */}
+			{PS.user.named && !Config.discordlogin && (PS.user.registered?.userid === PS.user.userid ?
 				<button className="button" data-href="changepassword">Password...</button> :
 				<button className="button" data-href="register">Register</button>)}
 
@@ -933,9 +934,28 @@ class LoginPanel extends PSRoomPanel {
 		ev.stopImmediatePropagation();
 		this.setState({ passwordShown: !this.state.passwordShown });
 	};
+	handleDiscord = (ev: Event) => {
+		ev.preventDefault();
+		PS.user.loginWithDiscord();
+	};
 	override render() {
 		const room = this.props.room;
 		const loginState = room.args as PSLoginState;
+		// with discordlogin there is no name to choose until you log in; after that
+		// the form below is the normal rename/nickname path
+		if (Config.discordlogin && !PS.user.registered) {
+			return <PSPanelWrapper room={room} width={280}><div class="pad">
+				<h3>Log in</h3>
+				{loginState?.error && <p class="error">{loginState.error}</p>}
+				<p>Log in with Discord to play on this server.</p>
+				<p class="buttonbar">
+					<button type="button" onClick={this.handleDiscord} class="button">
+						<strong>Log in with Discord</strong>
+					</button> {}
+					<button type="button" name="closeRoom" class="button">Cancel</button>
+				</p>
+			</div></PSPanelWrapper>;
+		}
 		return <PSPanelWrapper room={room} width={280}><div class="pad">
 			<h3>Log in</h3>
 			<form onSubmit={this.handleSubmit}>
@@ -969,6 +989,12 @@ class LoginPanel extends PSRoomPanel {
 					<p><i class="fa fa-level-up fa-rotate-90" aria-hidden></i> <strong>if you registered this name:</strong></p>
 					<p><GooglePasswordBox name={this.getUsername()} /></p>
 				</>}
+				{loginState?.needsDiscord && <>
+					<p><i class="fa fa-level-up fa-rotate-90" aria-hidden></i> <strong>this name needs a Discord login:</strong></p>
+					<p class="buttonbar"><button type="button" onClick={this.handleDiscord} class="button">
+						<strong>Log in with Discord</strong>
+					</button></p>
+				</>}
 				<p class="buttonbar">
 					{PS.user.loggingIn ? (
 						<button disabled class="cur">Logging in...</button>
@@ -977,7 +1003,7 @@ class LoginPanel extends PSRoomPanel {
 							<button type="submit" class="button"><strong>Log in</strong></button> {}
 							<button type="button" onClick={this.reset} class="button">Cancel</button>
 						</>
-					) : loginState?.needsGoogle ? (
+					) : (loginState?.needsGoogle || loginState?.needsDiscord) ? (
 						<button type="button" onClick={this.reset} class="button">Cancel</button>
 					) : (
 						<>

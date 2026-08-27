@@ -57,6 +57,8 @@ export interface PSConfig {
 	customcolors: Record<string, string>;
 	whitelist?: string[];
 	testclient?: boolean;
+	/** log in with Discord instead of a password */
+	discordlogin?: boolean;
 }
 export declare const Config: PSConfig;
 
@@ -634,7 +636,9 @@ class PSTeams extends PSStreamModel<'team' | 'format'> {
  * User
  *********************************************************************/
 
-export type PSLoginState = { error?: string, success?: true, name?: string, needsPassword?: true, needsGoogle?: true };
+export type PSLoginState = {
+	error?: string, success?: true, name?: string, needsPassword?: true, needsGoogle?: true, needsDiscord?: true,
+};
 class PSUser extends PSStreamModel<PSLoginState | null> {
 	name = "";
 	group = '';
@@ -749,6 +753,26 @@ class PSUser extends PSStreamModel<PSLoginState | null> {
 			}
 		});
 	}
+	/** Log in with Discord, in place of a password. The popup postMessages the assertion back. */
+	loginWithDiscord() {
+		// same domain as PSLoginServer.rawQuery, for the cookies and the origin check below
+		const origin = Config.testclient ? `https://${Config.routes.client}` : location.origin;
+		const listener = (event: MessageEvent) => {
+			if (event.origin !== origin) return;
+			if (event.data?.type !== 'discord-login') return;
+			window.removeEventListener('message', listener);
+			const { username, assertion } = event.data;
+			this.registered = { name: username, userid: toID(username) };
+			this.handleAssertion(username, assertion);
+		};
+		window.addEventListener('message', listener);
+		// serverid, because the loginserver names the sim server in the assertion from it
+		window.open(
+			`${origin}/api/discord/login?challstr=${encodeURIComponent(this.challstr)}` +
+			`&serverid=${encodeURIComponent(PS.server.id)}`,
+			'ps-discord-login', 'popup=1,width=500,height=750'
+		);
+	}
 	updateLogin(update: PSLoginState) {
 		this.update(update);
 		if (!PS.rooms['login']) {
@@ -776,6 +800,8 @@ class PSUser extends PSStreamModel<PSLoginState | null> {
 			this.updateLogin({ name, needsPassword: true });
 		} else if (assertion === ';;@gmail') {
 			this.updateLogin({ name, needsGoogle: true });
+		} else if (assertion === ';;@discord') {
+			this.updateLogin({ name, needsDiscord: true });
 		} else if (assertion.startsWith(';;')) {
 			this.updateLogin({ error: assertion.slice(2) });
 		} else if (assertion.includes('\n') || !assertion) {
