@@ -769,7 +769,18 @@ class PSUser extends PSStreamModel<PSLoginState | null> {
 			'ps-discord-login', 'popup=1,width=500,height=750'
 		);
 	}
+	/**
+	 * Ends the initial auto-login attempt, so the header stops saying "Connecting...".
+	 * Must notify subscribers: `PSHeader` only rerenders when `PS.user` updates.
+	 */
+	finishInitializing() {
+		if (!this.initializing) return;
+		this.initializing = false;
+		this.update(null);
+	}
 	updateLogin(update: PSLoginState) {
+		// the auto-login attempt is over; we need a name from the user now
+		this.initializing = false;
 		this.update(update);
 		if (!PS.rooms['login']) {
 			PS.join('login' as RoomID, { args: update });
@@ -777,6 +788,7 @@ class PSUser extends PSStreamModel<PSLoginState | null> {
 	}
 	handleAssertion(name: string, assertion?: string | null) {
 		if (!assertion) {
+			this.finishInitializing();
 			PS.alert("Error logging in.");
 			return;
 		}
@@ -789,6 +801,7 @@ class PSUser extends PSStreamModel<PSLoginState | null> {
 		if (assertion.startsWith('\r')) assertion = assertion.slice(1);
 		if (assertion.startsWith('\n')) assertion = assertion.slice(1);
 		if (assertion.includes('<')) {
+			this.finishInitializing();
 			PS.alert("Something is interfering with our connection to the login server. Most likely, your internet provider needs you to re-log-in, or your internet provider is blocking Pokémon Showdown.");
 			return;
 		}
@@ -801,6 +814,7 @@ class PSUser extends PSStreamModel<PSLoginState | null> {
 		} else if (assertion.startsWith(';;')) {
 			this.updateLogin({ error: assertion.slice(2) });
 		} else if (assertion.includes('\n') || !assertion) {
+			this.finishInitializing();
 			PS.alert("Something is interfering with our connection to the login server.");
 		} else {
 			PS.send(`/trn ${name},0,${assertion}`);

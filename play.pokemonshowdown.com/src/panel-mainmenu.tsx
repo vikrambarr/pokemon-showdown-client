@@ -130,7 +130,7 @@ export class MainMenuRoom extends PSRoom {
 				'upkeep', { challstr }
 			).then(res => {
 				if (!res?.username) {
-					PS.user.initializing = false;
+					PS.user.finishInitializing();
 					return;
 				}
 				// | , ; are not valid characters in names

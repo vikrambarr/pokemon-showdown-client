@@ -604,6 +604,10 @@ class OptionsPanel extends PSRoomPanel {
 		this.subscribeTo(PS.user);
 		PS.mainmenu.makeQuery('userdetails', PS.user.userid).then(() => this.forceUpdate());
 	}
+	handleDiscordLogin = (ev: Event) => {
+		ev.preventDefault();
+		PS.user.loginWithDiscord();
+	};
 	setTheme = (e: Event) => {
 		const theme = (e.currentTarget as HTMLSelectElement).value as 'light' | 'dark' | 'system';
 		PS.prefs.set('theme', theme);
@@ -842,7 +846,13 @@ class OptionsPanel extends PSRoomPanel {
 				<button class="button" data-href="login"><i class="fa fa-pencil" aria-hidden></i> Change name</button> {}
 				<button class="button" data-cmd="/logout"><i class="fa fa-power-off" aria-hidden></i> Log out</button>
 			</p> : <p class="buttonbar" style="text-align: right">
-				<button class="button" data-href="login"><i class="fa fa-pencil" aria-hidden></i> Choose name</button>
+				{Config.discordlogin ? (
+					<button class="button" onClick={this.handleDiscordLogin}>
+						<strong>Log in with Discord</strong>
+					</button>
+				) : (
+					<button class="button" data-href="login"><i class="fa fa-pencil" aria-hidden></i> Choose name</button>
+				)}
 			</p> }
 		</div></PSPanelWrapper>;
 	}
