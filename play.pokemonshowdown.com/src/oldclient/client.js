@@ -238,7 +238,7 @@ function toId() {
 		 *   `login:noresponse`
 		 *     triggered if the login server did not return a response
 		 */
-		finishRename: function (name, assertion) {
+		finishRename: function (name, assertion, registered) {
 			if (assertion.slice(0, 14).toLowerCase() === '<!doctype html') {
 				// some sort of MitM proxy; ignore it
 				var endIndex = assertion.indexOf('>');
@@ -261,6 +261,7 @@ function toId() {
 			} else if (assertion.indexOf('\n') >= 0 || !assertion) {
 				app.addPopupMessage("Something is interfering with our connection to the login server.");
 			} else {
+				if (registered) this.set('registered', registered);
 				app.trigger('loggedin');
 				app.send('/trn ' + name + ',0,' + assertion);
 			}
@@ -329,20 +330,21 @@ function toId() {
 			}), 'text');
 		},
 		/** The popup postMessages an assertion back, in place of a password. */
+		discordListening: false,
 		discordRename: function () {
 			var self = this;
 			var origin = Config.testclient ? 'https://' + Config.routes.client : location.origin;
-			var listener = function (event) {
-				if (event.origin !== origin) return;
-				if (!event.data || event.data.type !== 'discord-login') return;
-				window.removeEventListener('message', listener);
-				self.set('registered', {
-					username: event.data.username,
-					userid: toUserid(event.data.username)
+			if (!this.discordListening) {
+				this.discordListening = true;
+				window.addEventListener('message', function (event) {
+					if (event.origin !== origin) return;
+					if (!event.data || event.data.type !== 'discord-login') return;
+					self.finishRename(event.data.username, event.data.assertion, {
+						username: event.data.username,
+						userid: toUserid(event.data.username)
+					});
 				});
-				self.finishRename(event.data.username, event.data.assertion);
-			};
-			window.addEventListener('message', listener);
+			}
 			window.open(
 				origin + '/api/discord/login?challstr=' + encodeURIComponent(this.challstr) +
 				'&serverid=' + encodeURIComponent(Config.server.id),

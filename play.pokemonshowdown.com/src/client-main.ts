@@ -752,17 +752,18 @@ class PSUser extends PSStreamModel<PSLoginState | null> {
 			}
 		});
 	}
+	discordListening = false;
 	/** The popup postMessages an assertion back, in place of a password. */
 	loginWithDiscord() {
 		const origin = Config.testclient ? `https://${Config.routes.client}` : location.origin;
-		const listener = (event: MessageEvent) => {
-			if (event.origin !== origin || event.data?.type !== 'discord-login') return;
-			window.removeEventListener('message', listener);
-			const { username, assertion } = event.data;
-			this.registered = { name: username, userid: toID(username) };
-			this.handleAssertion(username, assertion);
-		};
-		window.addEventListener('message', listener);
+		if (!this.discordListening) {
+			this.discordListening = true;
+			window.addEventListener('message', event => {
+				if (event.origin !== origin || event.data?.type !== 'discord-login') return;
+				const { username, assertion } = event.data;
+				this.handleAssertion(username, assertion, { name: username, userid: toID(username) });
+			});
+		}
 		window.open(
 			`${origin}/api/discord/login?challstr=${encodeURIComponent(this.challstr)}` +
 			`&serverid=${encodeURIComponent(PS.server.id)}`,
@@ -786,7 +787,7 @@ class PSUser extends PSStreamModel<PSLoginState | null> {
 			PS.join('login' as RoomID, { args: update });
 		}
 	}
-	handleAssertion(name: string, assertion?: string | null) {
+	handleAssertion(name: string, assertion?: string | null, registered?: { name: string, userid: ID }) {
 		if (!assertion) {
 			this.finishInitializing();
 			PS.alert("Error logging in.");
@@ -817,6 +818,7 @@ class PSUser extends PSStreamModel<PSLoginState | null> {
 			this.finishInitializing();
 			PS.alert("Something is interfering with our connection to the login server.");
 		} else {
+			if (registered) this.registered = registered;
 			PS.send(`/trn ${name},0,${assertion}`);
 			this.update({ success: true });
 		}
@@ -1960,7 +1962,6 @@ export const PS = new class extends PSModel {
 		"game-*": "*",
 		"teamstorage-*": "*modal-popup",
 		"pbsprite-*": "*popup",
-		"pbrename-*": "*popup",
 		"viewteam-*": "*",
 	});
 	/** List of rooms on the left side of the top tabbar */

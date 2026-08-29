@@ -11,7 +11,7 @@ import {
 import { type BattleRoom } from "./panel-battle";
 import { ChatUserList, PSTextarea, type ChatRoom } from "./panel-chat";
 import { PSRoomPanel, PSPanelWrapper, PSView } from "./panels";
-import { PSHeader } from "./panel-topbar";
+import { DiscordLoginButton, PSHeader } from "./panel-topbar";
 
 const WARNING_SECONDS = 5;
 const BATTLE_LAYOUT_LABELS: Record<BattleLayoutPreference, string> = {
@@ -604,10 +604,6 @@ class OptionsPanel extends PSRoomPanel {
 		this.subscribeTo(PS.user);
 		PS.mainmenu.makeQuery('userdetails', PS.user.userid).then(() => this.forceUpdate());
 	}
-	handleDiscordLogin = (ev: Event) => {
-		ev.preventDefault();
-		PS.user.loginWithDiscord();
-	};
 	setTheme = (e: Event) => {
 		const theme = (e.currentTarget as HTMLSelectElement).value as 'light' | 'dark' | 'system';
 		PS.prefs.set('theme', theme);
@@ -846,11 +842,7 @@ class OptionsPanel extends PSRoomPanel {
 				<button class="button" data-href="login"><i class="fa fa-pencil" aria-hidden></i> Change name</button> {}
 				<button class="button" data-cmd="/logout"><i class="fa fa-power-off" aria-hidden></i> Log out</button>
 			</p> : <p class="buttonbar" style="text-align: right">
-				{Config.discordlogin ? (
-					<button class="button" onClick={this.handleDiscordLogin}>
-						<strong>Log in with Discord</strong>
-					</button>
-				) : (
+				{Config.discordlogin ? <DiscordLoginButton /> : (
 					<button class="button" data-href="login"><i class="fa fa-pencil" aria-hidden></i> Choose name</button>
 				)}
 			</p> }
@@ -943,10 +935,6 @@ class LoginPanel extends PSRoomPanel {
 		ev.stopImmediatePropagation();
 		this.setState({ passwordShown: !this.state.passwordShown });
 	};
-	handleDiscord = (ev: Event) => {
-		ev.preventDefault();
-		PS.user.loginWithDiscord();
-	};
 	override render() {
 		const room = this.props.room;
 		const loginState = room.args as PSLoginState;
@@ -956,9 +944,7 @@ class LoginPanel extends PSRoomPanel {
 				{loginState?.error && <p class="error">{loginState.error}</p>}
 				<p>Log in with Discord to play on this server.</p>
 				<p class="buttonbar">
-					<button type="button" onClick={this.handleDiscord} class="button">
-						<strong>Log in with Discord</strong>
-					</button> {}
+					<DiscordLoginButton /> {}
 					<button type="button" name="closeRoom" class="button">Cancel</button>
 				</p>
 			</div></PSPanelWrapper>;
@@ -998,9 +984,7 @@ class LoginPanel extends PSRoomPanel {
 				</>}
 				{loginState?.needsDiscord && <>
 					<p><i class="fa fa-level-up fa-rotate-90" aria-hidden></i> <strong>this name needs a Discord login:</strong></p>
-					<p class="buttonbar"><button type="button" onClick={this.handleDiscord} class="button">
-						<strong>Log in with Discord</strong>
-					</button></p>
+					<p class="buttonbar"><DiscordLoginButton /></p>
 				</>}
 				<p class="buttonbar">
 					{PS.user.loggingIn ? (

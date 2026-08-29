@@ -23,6 +23,16 @@ window.addEventListener('dragover', e => {
 	e.preventDefault();
 });
 
+const handleDiscordLogin = (ev: Event) => {
+	ev.preventDefault();
+	PS.user.loginWithDiscord();
+};
+export function DiscordLoginButton() {
+	return <button type="button" class="button" onClick={handleDiscordLogin}>
+		<strong>Log in with Discord</strong>
+	</button>;
+}
+
 export class PSHeader extends preact.Component {
 	faviconNotifying = false;
 	updateFavicon = () => {
@@ -210,10 +220,6 @@ export class PSHeader extends preact.Component {
 			overflow.style.display = 'none';
 		}
 	};
-	handleDiscordLogin = (ev: Event) => {
-		ev.preventDefault();
-		PS.user.loginWithDiscord();
-	};
 	override componentDidMount() {
 		PS.user.subscribe(() => {
 			this.forceUpdate();
@@ -235,11 +241,7 @@ export class PSHeader extends preact.Component {
 		}
 		if (!PS.user.named) {
 			// on Discord-only servers, skip the login popup - it has nothing but this button
-			if (Config.discordlogin) {
-				return <button class="button" onClick={this.handleDiscordLogin}>
-					<strong>Log in with Discord</strong>
-				</button>;
-			}
+			if (Config.discordlogin) return <DiscordLoginButton />;
 			return <a class="button" href="login">Choose name</a>;
 		}
 		const userColor = window.BattleLog && `color:${PS.user.away ? '#888' : BattleLog.usernameColor(PS.user.userid)}`;

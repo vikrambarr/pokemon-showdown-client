@@ -99,7 +99,7 @@ class TeamRoom extends PSRoom {
 }
 
 export type FormatResource = { url: string, resources: { resource_name: string, url: string }[] } | null;
-class TeamPanel extends PSRoomPanel<TeamRoom> {
+export class TeamPanel extends PSRoomPanel<TeamRoom> {
 	static readonly id = 'team';
 	static readonly routes = ['team-*'];
 	static readonly Model = TeamRoom;
@@ -269,11 +269,9 @@ class TeamPanel extends PSRoomPanel<TeamRoom> {
 		this.props.room.save();
 		this.forceUpdate();
 	};
-	renderResources() {
-		const { room } = this.props;
-		const team = room.team;
-		const info = TeamPanel.formatResources[team.format];
-		const formatName = BattleLog.formatName(team.format);
+	static renderResources(format: string) {
+		const info = this.formatResources[format];
+		const formatName = BattleLog.formatName(format);
 		return (info && (info.resources.length || info.url)) ? (
 			<details class="details" open>
 				<summary><strong>Teambuilding resources for {formatName}</strong></summary>
@@ -351,7 +349,8 @@ class TeamPanel extends PSRoomPanel<TeamRoom> {
 				</label>
 			</div>
 			<TeamEditor
-				team={team} onChange={this.save} readOnly={!!team.teamid && !team.uploadedPackedTeam} resources={this.renderResources()}
+				team={team} onChange={this.save} readOnly={!!team.teamid && !team.uploadedPackedTeam}
+				resources={TeamPanel.renderResources(team.format)}
 				narrow={room.width < 550}
 				editorRef={(editor: TeamEditorState) => { room.editor = editor; }}
 			>

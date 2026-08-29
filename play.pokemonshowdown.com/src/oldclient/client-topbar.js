@@ -926,6 +926,12 @@
 		}
 	});
 
+	var DISCORD_LOGIN_BUTTONBAR = '<p class="buttonbar"><button type="button" name="discord" class="button"><strong>Log in with Discord</strong></button> <button type="button" name="close" class="button">Cancel</button></p>';
+	var discordLogin = function () {
+		this.close();
+		app.user.discordRename();
+	};
+
 	var LoginPopup = this.LoginPopup = Popup.extend({
 		type: 'semimodal',
 		initialize: function (data) {
@@ -972,7 +978,7 @@
 
 			if (Config.discordlogin && !app.user.get('registered')) {
 				buf += '<p>Log in with Discord to play on this server.</p>';
-				buf += '<p class="buttonbar"><button type="button" name="discord" class="button"><strong>Log in with Discord</strong></button> <button type="button" name="close" class="button">Cancel</button></p>';
+				buf += DISCORD_LOGIN_BUTTONBAR;
 				buf += '</form>';
 				this.$el.html(buf);
 				return;
@@ -998,10 +1004,7 @@
 			var css = BattleLog.hashColor(toUserid(name)).slice(6, -1);
 			preview.css('color', css);
 		},
-		discord: function () {
-			this.close();
-			app.user.discordRename();
-		},
+		discord: discordLogin,
 		force: function () {
 			var sourceEl = this.sourceEl;
 			this.close();
@@ -1144,7 +1147,7 @@
 				buf += '<div class="g_id_signin" data-type="standard" data-shape="pill" data-theme="filled_blue" data-text="continue_with" data-size="large" data-logo_alignment="left" data-auto_select="true" data-itp_support="true" style="width:fit-content;margin:0 auto">[loading Google log-in button]</div>';
 				buf += '<p class="buttonbar"><button name="close" class="button">Cancel</button></p>';
 			} else if (data.special === '@discord') {
-				buf += '<p class="buttonbar"><button type="button" name="discord" class="button"><strong>Log in with Discord</strong></button> <button type="button" name="close" class="button">Cancel</button></p>';
+				buf += DISCORD_LOGIN_BUTTONBAR;
 			} else {
 				buf += '<p><label class="label">Password: <input class="textbox autofocus" type="password" name="password" autocomplete="current-password" style="width:173px"><button type="button" name="showPassword" aria-label="Show password" style="float:right;margin:-21px 0 10px;padding: 2px 6px" class="button"><i class="fa fa-eye"></i></button></label></p>';
 				buf += '<p class="buttonbar"><button type="submit" class="button"><strong>Log in</strong></button> <button type="button" name="close" class="button">Cancel</button></p>';
@@ -1170,10 +1173,7 @@
 				document.getElementsByTagName('head')[0].appendChild(script);
 			}
 		},
-		discord: function () {
-			this.close();
-			app.user.discordRename();
-		},
+		discord: discordLogin,
 		login: function () {
 			this.close();
 			app.addPopup(LoginPopup);

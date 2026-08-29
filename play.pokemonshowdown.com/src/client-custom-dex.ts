@@ -13,15 +13,19 @@ declare const BattleTeambuilderTable: any;
 
 export type CustomSpriteSet = { [kind: string]: string };
 
+type CustomDexWrite = { command: string, id: ID, json?: string, resolve?: (name: string | null) => void };
+
 export interface CustomDexOverlay {
 	Pokedex: { [id: string]: AnyObject };
 	Learnsets: { [id: string]: { learnset?: { [moveid: string]: string[] } } };
 	sprites: { [id: string]: CustomSpriteSet };
+	entries?: { name: string, inheritsFrom: string | null }[];
 }
 
 const ALL_SOURCE_CHARS = '123456789pqga';
-
-export type CustomDexStatus = 'loggedout' | 'loading' | 'ready' | 'error';
+const LOAD_TIMEOUT = 20000;
+const SAVE_DELAY = 2000;
+const REQUIRED_FIELDS = ['types', 'abilities', 'baseStats', 'eggGroups', 'weightkg'];
 
 export const CustomDex = new class extends PSModel {
 	overlay: CustomDexOverlay | null = null;
@@ -30,18 +34,22 @@ export const CustomDex = new class extends PSModel {
 	error: string | null = null;
 	sprites: { [id: string]: CustomSpriteSet } = {};
 	ids: ID[] = [];
+	baseOf: { [id: string]: ID } = {};
+	requestedFor: ID | null = null;
+	loadTimer: ReturnType<typeof setTimeout> | null = null;
+	saved: { [id: string]: string } = {};
+	queue: CustomDexWrite[] = [];
+	pending: CustomDexWrite | null = null;
+	saveTimer: ReturnType<typeof setTimeout> | null = null;
 
-	status(): CustomDexStatus {
-		if (!PS.user.named) return 'loggedout';
-		if (this.loading) return 'loading';
-		if (this.error) return 'error';
-		return this.loadedFor ? 'ready' : 'loading';
-	}
 	has(id: ID) {
 		return !!this.overlay?.Pokedex[id];
 	}
 	pokedex() {
 		return this.overlay?.Pokedex || {};
+	}
+	requires(id: ID, field: string) {
+		return !this.baseOf[id] && REQUIRED_FIELDS.includes(field);
 	}
 	load(force?: boolean) {
 		if (!PS.user.named) {
@@ -49,39 +57,70 @@ export const CustomDex = new class extends PSModel {
 			return;
 		}
 		const userid = PS.user.userid;
-		if (this.loading || (!force && this.loadedFor === userid)) return;
+		if (!force && (this.loading || this.loadedFor === userid)) return;
 
 		this.loading = true;
 		this.error = null;
-		PS.mainmenu.makeQuery('customdex').then((overlay: CustomDexOverlay | null) => {
-			this.loading = false;
-			if (!overlay?.Pokedex) {
-				this.error = `The server didn't send your custom Pokémon. Are you logged in?`;
-			} else {
-				this.apply(overlay);
-				this.loadedFor = userid;
-			}
-			this.update();
-		}).catch((err: Error) => {
-			this.loading = false;
-			this.error = err?.message || `Couldn't load your custom Pokémon.`;
-			this.update();
-		});
-	}
-	clear() {
-		this.overlay = null;
-		this.loadedFor = null;
-		this.sprites = {};
-		this.ids = [];
+		this.requestedFor = userid;
+		if (this.loadTimer) clearTimeout(this.loadTimer);
+		this.loadTimer = setTimeout(() => this.receive(null), LOAD_TIMEOUT);
+		PS.send(`/cmd customdex`);
 		this.update();
 	}
+	receive(overlay: CustomDexOverlay | null) {
+		if (this.loadTimer) clearTimeout(this.loadTimer);
+		this.loadTimer = null;
+		this.loading = false;
+		if (!overlay?.Pokedex) {
+			this.error = `The server didn't send your custom Pokémon. Are you logged in?`;
+		} else {
+			this.error = null;
+			this.apply(overlay);
+			this.loadedFor = this.requestedFor || PS.user.userid;
+		}
+		this.update();
+	}
+	clear() {
+		this.unapply(this.ids);
+		if (this.saveTimer) clearTimeout(this.saveTimer);
+		if (this.loadTimer) clearTimeout(this.loadTimer);
+		this.loadTimer = this.saveTimer = null;
+		this.loadedFor = this.requestedFor = null;
+		this.overlay = this.pending = null;
+		this.loading = false;
+		this.sprites = {};
+		this.baseOf = {};
+		this.saved = {};
+		this.ids = [];
+		this.queue = [];
+		this.update();
+	}
+	unapply(ids: ID[]) {
+		for (const id of ids) {
+			delete window.BattlePokedex[id];
+			delete BattleTeambuilderTable.learnsets[id];
+			delete this.saved[id];
+			for (const mod of Object.values(Dex.moddedDexes)) delete mod.cache.Species[id];
+		}
+	}
 	apply(overlay: CustomDexOverlay) {
+		this.unapply(this.ids.filter(id => !overlay.Pokedex[id]));
 		this.overlay = overlay;
 		this.sprites = overlay.sprites || {};
 
+		this.baseOf = {};
+		for (const entry of overlay.entries || []) {
+			if (entry.inheritsFrom) this.baseOf[toID(entry.name)] = toID(entry.inheritsFrom);
+		}
+
 		for (const id in overlay.Pokedex) {
 			const data = overlay.Pokedex[id];
-			window.BattlePokedex[id] = { ...data, tier: data.tier || 'Custom' };
+			const base = this.baseOf[id];
+			window.BattlePokedex[id] = {
+				...data,
+				tier: data.tier || 'Custom',
+				spriteid: data.spriteid || (base && Dex.species.get(base).spriteid) || undefined,
+			};
 			delete window.BattlePokedexAltForms?.[id];
 
 			const moves: { [moveid: string]: string } = {};
@@ -127,17 +166,66 @@ export const CustomDex = new class extends PSModel {
 		this.overlay.Learnsets[id] = { learnset };
 		BattleTeambuilderTable.learnsets[id] = table;
 	}
+	speciesJSON(id: ID) {
+		const data = this.overlay?.Pokedex[id];
+		if (!data) return null;
+		const out: AnyObject = { learnset: this.overlay!.Learnsets?.[id]?.learnset || {} };
+		for (const field of SPECIES_FIELDS) {
+			if (data[field] !== undefined) out[field] = data[field];
+		}
+		return JSON.stringify(out);
+	}
+	queueSave(id: ID) {
+		if (this.saveTimer) clearTimeout(this.saveTimer);
+		this.saveTimer = setTimeout(() => this.flush(id), SAVE_DELAY);
+	}
+	flush(id: ID) {
+		if (this.saveTimer) clearTimeout(this.saveTimer);
+		this.saveTimer = null;
+		const json = id && this.speciesJSON(id);
+		if (!json || this.saved[id] === json) return;
+		this.queue = this.queue.filter(job => job.id !== id || !job.json);
+		this.write({ command: `edit ${this.overlay!.Pokedex[id].name}, ${json}`, id, json });
+	}
+	rename(oldName: string, newName: string) {
+		return new Promise<string | null>(resolve => {
+			this.write({
+				command: `edit ${oldName}, ${JSON.stringify({ name: newName })}`, id: toID(oldName), resolve,
+			});
+		});
+	}
+	write(job: CustomDexWrite) {
+		this.queue.push(job);
+		this.pump();
+	}
+	pump() {
+		if (this.pending || !this.queue.length) return;
+		this.pending = this.queue.shift()!;
+		PS.send(`/cmd custompokemon ${this.pending.command}`);
+	}
+	receiveWrite(response: AnyObject | null) {
+		const job = this.pending;
+		this.pending = null;
+		if (!response || response.actionerror) {
+			PS.alert(response?.actionerror || `Couldn't save your custom Pokémon.`);
+			job?.resolve?.(null);
+		} else {
+			if (job?.json) this.saved[job.id] = job.json;
+			job?.resolve?.(response.name || null);
+		}
+		this.pump();
+		if (response?.overlay) this.receive(response.overlay as CustomDexOverlay);
+		else this.update();
+	}
 	baseResults(): SearchRow[] {
 		if (!this.ids.length) return [['header', this.emptyMessage()]];
 		return this.ids.map(id => ['pokemon', id] as SearchRow);
 	}
 	emptyMessage() {
-		switch (this.status()) {
-		case 'loggedout': return `Log in to see your custom Pokémon`;
-		case 'loading': return `Loading your custom Pokémon...`;
-		case 'error': return this.error || `Couldn't load your custom Pokémon`;
-		default: return `You haven't made any custom Pokémon yet`;
-		}
+		if (!PS.user.named) return `Log in to see your custom Pokémon`;
+		if (this.error && !this.loading) return this.error;
+		if (this.loading || !this.loadedFor) return `Loading your custom Pokémon...`;
+		return `You haven't made any custom Pokémon yet`;
 	}
 	nameMatches(query: ID): SearchRow[] {
 		if (!query) return [];
@@ -152,11 +240,11 @@ export const CustomDex = new class extends PSModel {
 	}
 }();
 
-const spriteIdOf = (pokemon: any): ID => {
-	if (!pokemon) return '' as ID;
-	if (typeof pokemon === 'string') return toID(pokemon);
-	return toID(pokemon.speciesForme || pokemon.species || pokemon);
-};
+PS.user.subscribe(() => {
+	CustomDex.load();
+});
+
+const spriteIdOf = (pokemon: any): ID => toID(pokemon?.speciesForme || pokemon?.species || pokemon);
 const customArt = (pokemon: any, kinds: string[]) => {
 	const set = CustomDex.sprites[spriteIdOf(pokemon)];
 	if (!set) return null;
@@ -168,17 +256,22 @@ const customArt = (pokemon: any, kinds: string[]) => {
 
 const dexGetPokemonIcon = Dex.getPokemonIcon.bind(Dex);
 Dex.getPokemonIcon = (pokemon: any, facingLeft?: boolean) => {
-	const url = customArt(pokemon, ['icon']);
+	const url = CustomDex.ids.length && customArt(pokemon, ['icon']);
 	if (!url) return dexGetPokemonIcon(pokemon, facingLeft);
 	return `background:transparent url(${url}) no-repeat scroll 0 0` +
 		(pokemon?.fainted ? `;opacity:.3;filter:grayscale(100%) brightness(.5)` : ``);
 };
 
+const dexGetPokemonIconNum = Dex.getPokemonIconNum.bind(Dex);
+Dex.getPokemonIconNum = (id: ID, isFemale?: boolean, facingLeft?: boolean) => (
+	dexGetPokemonIconNum(CustomDex.baseOf[id] || id, isFemale, facingLeft)
+);
+
 const dexGetTeambuilderSpriteData = Dex.getTeambuilderSpriteData.bind(Dex);
 Dex.getTeambuilderSpriteData = (pokemon: any, dex?: any) => {
-	const id = spriteIdOf(pokemon);
-	if (!CustomDex.sprites[id]) return dexGetTeambuilderSpriteData(pokemon, dex);
-	return { spriteid: id, spriteDir: 'sprites/custom', shiny: !!pokemon?.shiny, x: 8, y: 10, h: 96 };
+	const data = dexGetTeambuilderSpriteData(pokemon, dex);
+	if (CustomDex.ids.length && CustomDex.sprites[spriteIdOf(pokemon)]?.front) data.pixelated = true;
+	return data;
 };
 
 const tintCache: { [key: string]: string } = {};
@@ -201,7 +294,7 @@ function tintGradient(types: readonly string[]) {
 
 const dexGetTeambuilderSprite = Dex.getTeambuilderSprite.bind(Dex);
 Dex.getTeambuilderSprite = (pokemon: any, dex?: any, xOffset = 0, yOffset = 0) => {
-	const id = spriteIdOf(pokemon);
+	const id = CustomDex.ids.length ? spriteIdOf(pokemon) : '' as ID;
 	if (!CustomDex.has(id)) return dexGetTeambuilderSprite(pokemon, dex, xOffset, yOffset);
 	const gradient = tintGradient(Dex.species.get(id).types);
 	const url = customArt(pokemon, pokemon?.shiny ? ['front-shiny', 'front'] : ['front']);
@@ -261,9 +354,11 @@ function pinMoves(typedSearch: AnyObject, rows: SearchRow[]): SearchRow[] {
 	if (rest.length && rest[0][0] !== 'header') rest.unshift(['header', 'All']);
 	return [
 		...(sortRow ? [sortRow] : []),
-		['header', 'Selected: Moves'], ...useful,
-		['header', 'Selected: Usually Useless'], ...useless,
-		...rest,
+		...dropEmptyHeaders([
+			['header', 'Selected: Moves'], ...useful,
+			['header', 'Selected: Usually Useless'], ...useless,
+			...rest,
+		]),
 	];
 }
 
@@ -281,23 +376,30 @@ export const EVO_TYPES = [
 	'trade', 'useItem', 'levelMove', 'levelExtra', 'levelFriendship', 'levelHold', 'other',
 ];
 
-export function abilitySlots(count: number) {
+export function abilitySlots(count: number, existing?: readonly string[]) {
+	if (existing?.length === count) return existing.slice();
 	return count > 2 ? ['0', '1', 'H'] : count > 1 ? ['0', 'H'] : ['0'];
+}
+
+export function speciesAbilities(species: AnyObject | null | undefined): [string, string][] {
+	return Object.entries(species?.abilities || {})
+		.filter(([, name]) => name && name !== 'No Ability') as [string, string][];
 }
 
 function pinAbilities(typedSearch: AnyObject, rows: SearchRow[]): SearchRow[] {
 	const ids: ID[] = (typedSearch.set?.abilities || []).map(toID);
-	const slots = abilitySlots(ids.length);
+	const species = Dex.species.get(typedSearch.set?.species);
+	const slots = abilitySlots(ids.length, speciesAbilities(species).map(([slot]) => slot));
 	const regular: SearchRow[] = [];
 	const hidden: SearchRow[] = [];
 	for (let i = 0; i < ids.length; i++) {
 		(slots[i] === 'H' ? hidden : regular).push(['ability', ids[i]]);
 	}
-	return [
+	return dropEmptyHeaders([
 		['header', 'Selected: Abilities'], ...regular,
 		['header', 'Selected: Hidden Ability'], ...hidden,
 		...rows,
-	];
+	]);
 }
 
 export class PokebuilderDexSearch extends DexSearch {
@@ -309,13 +411,11 @@ export class PokebuilderDexSearch extends DexSearch {
 		const typedSearch = this.typedSearch as any;
 		if (typedSearch?.searchType === 'pokemon') {
 			typedSearch.getTable = () => CustomDex.pokedex();
-			typedSearch.getBaseResults = () => CustomDex.baseResults();
-			typedSearch.getDefaultResults = () => CustomDex.baseResults();
+			typedSearch.getBaseResults = typedSearch.getDefaultResults = () => CustomDex.baseResults();
 		} else if (typedSearch?.searchType === 'ability' || typedSearch?.searchType === 'move') {
 			const kind: 'ability' | 'move' = typedSearch.searchType;
 			typedSearch.getTable = () => allOf(kind).table;
-			typedSearch.getBaseResults = () => allOf(kind).rows;
-			typedSearch.getDefaultResults = () => allOf(kind).rows;
+			typedSearch.getBaseResults = typedSearch.getDefaultResults = () => allOf(kind).rows;
 			if (!typedSearch.unpinnedResults) {
 				typedSearch.unpinnedResults = typedSearch.getResults.bind(typedSearch);
 				typedSearch.getResults = (filters: AnyObject, sortCol: string, reverseSort: boolean) => {

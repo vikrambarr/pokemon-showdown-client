@@ -61,6 +61,8 @@
 	display: inline-flex;
 	align-items: center;
 	margin-right: 6px;
+	--typeicon-width: 65px;
+	--typeicon-height: 15px;
 }
 .pokebuilder .typecaret {
 	margin-left: 1px;
@@ -68,16 +70,16 @@
 }
 .pokebuilder .typeicon-blank {
 	display: inline-block;
-	width: 65px;
-	height: 15px;
+	width: var(--typeicon-width);
+	height: var(--typeicon-height);
 }
 .pokebuilder select.typearrow {
 	position: absolute;
 	left: 0;
 	top: 0;
 	display: block;
-	width: 65px;
-	height: 15px;
+	width: var(--typeicon-width);
+	height: var(--typeicon-height);
 	min-width: 0;
 	min-height: 0;
 	margin: 0;
@@ -89,8 +91,8 @@
 }
 .pokebuilder select.typearrow > button {
 	display: block;
-	width: 65px;
-	height: 15px;
+	width: var(--typeicon-width);
+	height: var(--typeicon-height);
 	margin: 0;
 	padding: 0;
 	border: 0;
@@ -111,7 +113,6 @@
 }
 .pokebuilder select.typearrow option {
 	padding: 0;
-	font-size: 9pt;
 	line-height: 15px;
 	color: inherit;
 }
@@ -203,13 +204,6 @@
 	background-image:
 		repeating-linear-gradient(to right, rgba(0, 0, 0, 0.4) 0 1px, transparent 1px 12px),
 		linear-gradient(to right, #4a72b8 0 var(--fill), #b86890 var(--fill) 100%);
-}
-.pokebuilder .ratiolabel {
-	font-size: 9pt;
-	color: #666666;
-}
-.dark .pokebuilder .ratiolabel {
-	color: #999999;
 }
 .pokebuilder .detailtable th {
 	text-align: right;

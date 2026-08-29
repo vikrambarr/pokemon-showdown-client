@@ -65,6 +65,7 @@ export class TeamEditorState extends PSModel {
 		otherSets: Dex.PokemonSet[] | null,
 		readonly: boolean,
 	} | null = null;
+	setEditor?: SetEditor;
 	team: Team;
 	sets: Dex.PokemonSet[] = [];
 	lastPackedTeam = '';
@@ -976,7 +977,6 @@ export class TeamEditor extends preact.Component<{
 	team: Team, narrow?: boolean, onChange?: () => void, readOnly?: boolean,
 	children?: preact.ComponentChildren, resources?: preact.ComponentChildren,
 	editorRef?: (editor: TeamEditorState) => void,
-	setEditor?: SetEditor,
 }> {
 	mode: TeamEditorMode = 'form';
 	spacious: boolean | null = null;
@@ -1172,10 +1172,7 @@ export class TeamEditor extends preact.Component<{
 			</ul>
 			{TeamEditorState.renderClipboard(this.cancelClipboard)}
 			{this.mode === 'form' ? (
-				<TeamEditorForm
-					editor={editor} onChange={this.props.onChange} onUpdate={this.update}
-					setEditor={this.props.setEditor}
-				/>
+				<TeamEditorForm editor={editor} onChange={this.props.onChange} onUpdate={this.update} />
 			) : (
 				<TeamTextbox editor={editor} onChange={this.props.onChange} onUpdate={this.update} />
 			)}
@@ -1984,7 +1981,6 @@ class TeamTextbox extends preact.Component<{
 
 class TeamEditorForm extends preact.Component<{
 	editor: TeamEditorState, onChange?: () => void, onUpdate: () => void,
-	setEditor?: SetEditor,
 }> {
 	focusAnimationStartLocation: {
 		rect: { left: number, top: number },
@@ -2237,7 +2233,7 @@ class TeamEditorForm extends preact.Component<{
 		return <div class="team-focus-editor" onKeyDown={editor.handleParentKeyDown}>
 			<div class={isSearchMode && (set?.moves.length || 0) > 5 ? 'team-focus-top' : ''}>
 				<ul class="tabbar">
-					<li class="home-li"><button class="button" onClick={this.props.setEditor?.back || this.closeInnerFocus}>
+					<li class="home-li"><button class="button" onClick={editor.setEditor?.back || this.closeInnerFocus}>
 						<i class="fa fa-chevron-left" aria-hidden></i> Back
 					</button></li>
 					{editor.sets.map((curSet, i) => <li><button
@@ -2266,10 +2262,10 @@ class TeamEditorForm extends preact.Component<{
 				</div>}
 			</div>
 			{type === 'stats' ? (
-				this.props.setEditor ? this.props.setEditor.renderStats(editor, setIndex) :
+				editor.setEditor ? editor.setEditor.renderStats(editor, setIndex) :
 				<StatForm editor={editor} set={set!} onChange={this.handleSetChange} />
 			) : type === 'details' ? (
-				this.props.setEditor ? this.props.setEditor.renderDetails(editor, setIndex) :
+				editor.setEditor ? editor.setEditor.renderDetails(editor, setIndex) :
 				<DetailsForm editor={editor} set={set!} onChange={this.handleSetChange} />
 			) : type === 'import' ? (
 				<SetImportForm
@@ -2856,8 +2852,8 @@ class TeamEditorForm extends preact.Component<{
 			this.forceUpdate();
 		} else if (type === 'move' && this.props.editor.innerFocus?.typeIndex === -1) {
 			this.setMoveResult(name, slot, reverse);
-		} else if (type === 'ability' && this.props.setEditor) {
-			this.props.setEditor.selectAbility(this.props.editor, this.props.editor.innerFocus!.setIndex, name);
+		} else if (type === 'ability' && this.props.editor.setEditor) {
+			this.props.editor.setEditor.selectAbility(this.props.editor, this.props.editor.innerFocus!.setIndex, name);
 			this.handleSetChange();
 		} else {
 			this.setFocusedValue(name);
@@ -2939,6 +2935,7 @@ class TeamEditorForm extends preact.Component<{
 	}
 	renderSet(set: Dex.PokemonSet | undefined, i: number) {
 		const { editor } = this.props;
+		const setEditor = editor.setEditor;
 		const sprite = Dex.getTeambuilderSprite(set, editor.dex);
 		const spriteClass = set && Dex.getTeambuilderSpriteData(set, editor.dex).pixelated ? ' pixelated' : '';
 		if (!set) {
@@ -3008,7 +3005,7 @@ class TeamEditorForm extends preact.Component<{
 					<td rowSpan={2} class="set-pokemon"><div class="border-collapse">
 						<span class="sprite-inner">
 							<label class="label">
-								<span>Pokemon</span> {this.props.setEditor?.renderRename(editor, i)}
+								<span>Pokemon</span> {setEditor?.renderRename(editor, i)}
 								{this.renderInput(i, 'pokemon', set.species)}
 							</label>
 						</span>
@@ -3021,7 +3018,7 @@ class TeamEditorForm extends preact.Component<{
 								onKeyDown={this.keyDownPanelButton} name="details"
 								value={`set-${i}-details`}
 							>
-								{this.props.setEditor ? this.props.setEditor.renderDetailCell(editor, i) : <>
+								{setEditor ? setEditor.renderDetailCell(editor, i) : <>
 									<span class="detailcell">
 										<label>Level</label> {}
 										{set.level || editor.defaultLevel}
@@ -3047,12 +3044,12 @@ class TeamEditorForm extends preact.Component<{
 								</>}
 							</button>
 						</label>
-						{this.props.setEditor ? this.props.setEditor.renderTypes(editor, i) : <div>
+						{setEditor ? setEditor.renderTypes(editor, i) : <div>
 							{species.types.map(type => <><PSIcon type={type} new={!editor.narrow} /> </>)}
 						</div>}
 					</div></td>
-					<td rowSpan={2} class={`set-moves${overfull}`}>{this.props.setEditor ?
-						this.props.setEditor.renderMoves(editor, i) : <div class="border-collapse">
+					<td rowSpan={2} class={`set-moves${overfull}`}>{setEditor ?
+						setEditor.renderMoves(editor, i) : <div class="border-collapse">
 							<label class={`label ${this.cur('move', i)}`}>
 								Moves <button
 									class={`button ${this.cur('move', i)}`} onClick={this.setFocus} value={`set-${i}-move`}
@@ -3070,14 +3067,14 @@ class TeamEditorForm extends preact.Component<{
 								onKeyDown={this.keyDownPanelButton} name="stats"
 								value={`set-${i}-stats`}
 							>
-								{this.props.setEditor ? this.props.setEditor.renderStatCell(editor, i) :
+								{setEditor ? setEditor.renderStatCell(editor, i) :
 								StatForm.renderStatGraph(set, this.props.editor, true)}
 							</button>
 						</label>
 					</td>
 				</tr>
 				<tr>
-					{this.props.setEditor ? this.props.setEditor.renderAbilities(editor, i) : <>
+					{setEditor ? setEditor.renderAbilities(editor, i) : <>
 						<td class="set-ability"><div class="border-collapse">
 							{editor.showAbility(set) && <label class="label">
 								Ability {}
@@ -3097,7 +3094,7 @@ class TeamEditorForm extends preact.Component<{
 				</tr>
 			</table>
 			<div class={`set-nickname${tintClass}`}>
-				{this.props.setEditor ? this.props.setEditor.renderNickname(editor, i) : <label class="label">
+				{setEditor ? setEditor.renderNickname(editor, i) : <label class="label">
 					<span>Nickname</span>
 					{this.renderNicknameInput(i)}
 				</label>}

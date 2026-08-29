@@ -11,9 +11,9 @@ import { Dex, toID, type ID } from "./battle-dex";
 import { BattleStatNames } from "./battle-dex-data";
 import { BattleLog } from "./battle-log";
 import { TeamEditor, type SetEditor, type TeamEditorState } from "./battle-team-editor";
-import { Net } from "./client-connection";
+import { TeamPanel } from "./panel-teambuilder-team";
 import {
-	abilitySlots, COLORS, CustomDex, EGG_GROUPS, EVO_TYPES, PokebuilderDexSearch, SPECIES_FIELDS,
+	abilitySlots, COLORS, CustomDex, EGG_GROUPS, EVO_TYPES, PokebuilderDexSearch, speciesAbilities,
 } from "./client-custom-dex";
 
 class PokebuilderRoom extends PSRoom {
@@ -48,35 +48,43 @@ class PokebuilderRoom extends PSRoom {
 	}
 }
 
+const INT_FIELDS = ['evoLevel', 'maxHP'];
+const NUMBER_FIELDS = ['weightkg', 'heightm', ...INT_FIELDS];
 const MAX_ABILITIES = 3;
 const MAX_BASE_STAT = 255;
-const SAVE_DELAY = 2000;
-const SPRITE_KINDS = ['front', 'back', 'front-shiny', 'back-shiny', 'icon'];
-const SPRITE_LABELS = ['F', 'B', 'F*', 'B*', 'I'];
-const SPRITE_SIZES: [number, number][] = [[96, 96], [96, 96], [96, 96], [96, 96], [40, 30]];
+const SPRITES = [
+	{ kind: 'front', label: 'F', width: 96, height: 96 },
+	{ kind: 'back', label: 'B', width: 96, height: 96 },
+	{ kind: 'front-shiny', label: 'F*', width: 96, height: 96 },
+	{ kind: 'back-shiny', label: 'B*', width: 96, height: 96 },
+	{ kind: 'icon', label: 'I', width: 40, height: 30 },
+];
 const STAT_BAR_WIDTH = 180;
 
-export type FormatResource = { url: string, resources: { resource_name: string, url: string }[] } | null;
+const setIndexOf = (ev: Event) => Number((ev.currentTarget as HTMLElement).getAttribute('data-set-index'));
+const popupSet = (room: PSRoom, setIndex: number) => (
+	(room.getParent() as PokebuilderRoom | null)?.editor?.sets[setIndex]
+);
+
 class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 	static readonly id = 'pokebuilder';
 	static readonly routes = ['pokebuilder'];
 	static readonly Model = PokebuilderRoom;
 	static readonly title = 'Pokébuilder';
 
-	focusInitialized = false;
 	editingId = '' as ID;
-	savedJSON: { [id: string]: string } = {};
-	saveTimer: ReturnType<typeof setTimeout> | null = null;
 
-	constructor(props?: { room: PokebuilderRoom }) {
-		super(props);
-		PokebuilderPanel.getFormatResources(this.props.room.team.format).then(() => {
+	loadResources() {
+		const format = this.props.room.team.format;
+		if (format.length <= 4) return;
+		TeamPanel.getFormatResources(format).then(() => {
 			this.forceUpdate();
 		});
 	}
 
 	override componentWillUnmount() {
-		this.flush(this.editingId);
+		CustomDex.flush(this.editingId);
+		this.props.room.editor = undefined;
 		super.componentWillUnmount();
 	}
 
@@ -87,33 +95,14 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 			if (search instanceof PokebuilderDexSearch) search.refresh();
 			this.forceUpdate();
 		});
-		this.subscribeTo(PS.user, () => {
-			CustomDex.load();
-		});
 		CustomDex.load();
-	}
-
-	static formatResources = {} as Record<string, FormatResource>;
-
-	static getFormatResources(format: string): Promise<FormatResource> {
-		if (format in this.formatResources) return Promise.resolve(this.formatResources[format]);
-		return Net('https://www.smogon.com/dex/api/formats/by-ps-name/' + format).get()
-			.then(result => {
-				this.formatResources[format] = JSON.parse(result);
-				return this.formatResources[format];
-			}).catch(err => {
-				this.formatResources[format] = null;
-				return this.formatResources[format];
-			});
+		this.loadResources();
 	}
 
 	initEditor = (editor: TeamEditorState) => {
 		this.props.room.editor = editor;
-		if (this.focusInitialized) return;
-		this.focusInitialized = true;
-
+		editor.setEditor = this.setEditor;
 		editor.search = new PokebuilderDexSearch();
-		window.search = editor.search;
 		editor.showItem = () => false;
 		editor.showAbility = () => false;
 		editor.getSearchMoves = () => [];
@@ -130,21 +119,26 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 			(editor.search as PokebuilderDexSearch).refresh();
 		};
 
-		this.openSpecies(editor.sets.length);
+		this.openPicker(editor.sets.length, 'pokemon');
 	};
 
-	openSpecies(setIndex: number) {
+	openPicker(setIndex: number, type: 'pokemon' | 'ability' | 'move') {
 		const editor = this.props.room.editor;
 		if (!editor) return;
-		editor.innerFocus = { setIndex, type: 'pokemon', typeIndex: -1 };
-		editor.setSearchType('pokemon', setIndex, '', -1);
+		editor.innerFocus = { setIndex, type, typeIndex: -1 };
+		editor.setSearchType(type, setIndex, '', -1);
 	}
 
+	abilityEntries(setIndex: number) {
+		return speciesAbilities(this.speciesFor(setIndex));
+	}
+	abilitySlotsFor(setIndex: number) {
+		return this.abilityEntries(setIndex).map(([slot]) => slot);
+	}
 	abilitiesFor(setIndex: number) {
 		const set = this.props.room.editor?.sets[setIndex];
 		if (!set) return [];
-		const abilities: string[] = Object.values(Dex.species.get(set.species).abilities)
-			.filter(name => name && name !== 'No Ability');
+		const abilities = this.abilityEntries(setIndex).map(([, name]) => name);
 		set.abilities = abilities;
 		return abilities;
 	}
@@ -154,13 +148,15 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		set.moves = CustomDex.learnset(toID(set.species));
 		return set.moves;
 	}
-	statsFor(setIndex: number) {
+	speciesFor(setIndex: number) {
 		const set = this.props.room.editor?.sets[setIndex];
-		return set ? Dex.species.get(set.species).baseStats : null;
+		return set ? Dex.species.get(set.species) : null;
+	}
+	statsFor(setIndex: number) {
+		return this.speciesFor(setIndex)?.baseStats || null;
 	}
 	typesFor(setIndex: number) {
-		const set = this.props.room.editor?.sets[setIndex];
-		return set ? Dex.species.get(set.species).types : [];
+		return this.speciesFor(setIndex)?.types || [];
 	}
 	speciesId(setIndex: number) {
 		return toID(this.props.room.editor?.sets[setIndex]?.species);
@@ -169,7 +165,7 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		const set = this.props.room.editor?.sets[setIndex];
 		if (!set) return;
 		const table: AnyObject = {};
-		const slots = abilitySlots(abilities.length);
+		const slots = abilitySlots(abilities.length, this.abilitySlotsFor(setIndex));
 		abilities.forEach((name, i) => (table[slots[i]] = name));
 		CustomDex.patch(this.speciesId(setIndex), { abilities: table });
 		this.save();
@@ -179,35 +175,25 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 	syncAbilitySearch(setIndex: number) {
 		const editor = this.props.room.editor;
 		this.abilitiesFor(setIndex);
-		if (editor?.innerFocus?.type !== 'ability') return;
-		editor.search.results = null;
-		editor.search.find(editor.search.query);
+		if (editor?.innerFocus?.type === 'ability') (editor.search as PokebuilderDexSearch).refresh();
 	}
 	openAbilities = (ev: Event) => {
-		const editor = this.props.room.editor;
-		if (!editor) return;
-		const setIndex = Number((ev.currentTarget as HTMLElement).getAttribute('data-set-index'));
-		editor.innerFocus = { setIndex, type: 'ability', typeIndex: -1 };
-		editor.setSearchType('ability', setIndex, '', -1);
+		const setIndex = setIndexOf(ev);
+		this.openPicker(setIndex, 'ability');
 		this.syncAbilitySearch(setIndex);
-		editor.update();
+		this.props.room.editor?.update();
 	};
 	removeAbility = (ev: Event) => {
 		ev.stopPropagation();
-		const target = ev.currentTarget as HTMLElement;
 		const editor = this.props.room.editor;
 		if (!editor) return;
-		const setIndex = Number(target.getAttribute('data-set-index'));
-		this.setEditor.selectAbility(editor, setIndex, target.getAttribute('data-ability')!);
+		const target = ev.currentTarget as HTMLElement;
+		this.setEditor.selectAbility(editor, setIndexOf(ev), target.getAttribute('data-ability')!);
 		editor.update();
 	};
 	openMoves = (ev: Event) => {
-		const editor = this.props.room.editor;
-		if (!editor) return;
-		const setIndex = Number((ev.currentTarget as HTMLElement).getAttribute('data-set-index'));
-		editor.innerFocus = { setIndex, type: 'move', typeIndex: -1 };
-		editor.setSearchType('move', setIndex, '', -1);
-		editor.update();
+		this.openPicker(setIndexOf(ev), 'move');
+		this.props.room.editor?.update();
 	};
 	dragAbility = (ev: DragEvent) => {
 		ev.dataTransfer!.effectAllowed = 'move';
@@ -231,7 +217,7 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 			}
 		}
 		if (to === from) return;
-		const setIndex = Number(box.getAttribute('data-set-index'));
+		const setIndex = setIndexOf(ev);
 		const abilities = this.abilitiesFor(setIndex).slice();
 		abilities.splice(to, 0, abilities.splice(from, 1)[0]);
 		this.setAbilities(setIndex, abilities);
@@ -244,7 +230,7 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		const target = ev.currentTarget as HTMLInputElement;
 		const value = Math.min(Math.abs(parseInt(target.value)), MAX_BASE_STAT);
 		if (!value) return;
-		const setIndex = Number(target.getAttribute('data-set-index'));
+		const setIndex = setIndexOf(ev);
 		const baseStats = { ...this.statsFor(setIndex) } as AnyObject;
 		baseStats[target.name] = value;
 		CustomDex.patch(this.speciesId(setIndex), { baseStats });
@@ -255,7 +241,7 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		const target = ev.currentTarget as HTMLSelectElement;
 		const editor = this.props.room.editor;
 		if (!editor) return;
-		const setIndex = Number(target.getAttribute('data-set-index'));
+		const setIndex = setIndexOf(ev);
 		const typeIndex = Number(target.getAttribute('data-type-index'));
 		const types = this.typesFor(setIndex).slice();
 		if (target.value && types.some((type, i) => i !== typeIndex && type === target.value)) return;
@@ -264,45 +250,43 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		this.save();
 		editor.update();
 	};
-	speciesJSON(id: ID) {
-		const data = CustomDex.overlay?.Pokedex[id];
-		if (!data) return null;
-		const out: AnyObject = { learnset: CustomDex.overlay!.Learnsets?.[id]?.learnset || {} };
-		for (const field of SPECIES_FIELDS) {
-			if (data[field] !== undefined) out[field] = data[field];
-		}
-		return JSON.stringify(out);
-	}
-	flush(id: ID) {
-		if (this.saveTimer) clearTimeout(this.saveTimer);
-		this.saveTimer = null;
-		const json = id && this.speciesJSON(id);
-		if (!json || this.savedJSON[id] === json) return;
-		this.savedJSON[id] = json;
-		PS.send(`/custompokemon edit ${CustomDex.overlay!.Pokedex[id].name}, ${json}`);
-	}
-	queueSave(id: ID) {
-		if (this.saveTimer) clearTimeout(this.saveTimer);
-		this.saveTimer = setTimeout(() => this.flush(id), SAVE_DELAY);
-	}
+	rename = (ev: Event) => {
+		const editor = this.props.room.editor;
+		const set = editor?.sets[setIndexOf(ev)];
+		if (!set) return;
+		const oldName = set.species;
+		PS.prompt(`Rename \`\`${oldName}\`\` to?`, {
+			defaultValue: oldName, okButton: 'Rename', parentElem: ev.currentTarget as HTMLElement,
+		}).then(name => {
+			name = name?.trim() || '';
+			if (!name || name === oldName) return;
+			CustomDex.flush(toID(oldName));
+			CustomDex.rename(oldName, name).then(renamed => {
+				if (!renamed) return;
+				set.species = renamed;
+				this.editingId = toID(renamed);
+				editor.update();
+			});
+		});
+	};
 	back = () => {
 		const editor = this.props.room.editor;
 		if (!editor) return;
-		this.flush(this.editingId);
+		CustomDex.flush(this.editingId);
 		this.editingId = '' as ID;
 		editor.sets.splice(0);
 		editor.save();
-		this.openSpecies(0);
+		this.openPicker(0, 'pokemon');
 		editor.update();
 	};
 	detail = (ev: Event) => {
 		const target = ev.currentTarget as HTMLInputElement;
-		const setIndex = Number(target.getAttribute('data-set-index'));
+		const setIndex = setIndexOf(ev);
 		const value = target.type === 'checkbox' ? target.checked : target.value.trim();
 		this.patchField(setIndex, target.name, value);
 	};
 	clearRatio = (ev: Event) => {
-		this.patchField(Number((ev.currentTarget as HTMLElement).getAttribute('data-set-index')), 'genderRatio', '');
+		this.patchField(setIndexOf(ev), 'genderRatio', '');
 	};
 	patchField(setIndex: number, field: string, value: string | boolean) {
 		const id = this.speciesId(setIndex);
@@ -313,13 +297,15 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 			const groups = (data.eggGroups || []).slice();
 			groups[field === 'eggGroup0' ? 0 : 1] = value as string;
 			const kept = groups.filter(Boolean);
+			if (!kept.length && CustomDex.requires(id, 'eggGroups')) return;
 			changes.eggGroups = kept.length ? kept : null;
 		} else if (value === '' || value === false) {
+			if (CustomDex.requires(id, field)) return;
 			changes[field] = null;
-		} else if (field === 'weightkg' || field === 'heightm') {
-			changes[field] = Number(value);
-		} else if (field === 'evoLevel' || field === 'maxHP') {
-			changes[field] = parseInt(value as string);
+		} else if (NUMBER_FIELDS.includes(field)) {
+			const amount = INT_FIELDS.includes(field) ? parseInt(value as string) : Number(value);
+			if (!Number.isFinite(amount)) return;
+			changes[field] = amount;
 		} else if (field === 'genderRatio') {
 			const male = Number(value) / 8;
 			changes.genderRatio = { M: male, F: Math.round((1 - male) * 1000) / 1000 };
@@ -335,6 +321,7 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		back: this.back,
 		renderAbilities: (editor, setIndex) => {
 			const abilities = this.abilitiesFor(setIndex);
+			const slots = this.abilitySlotsFor(setIndex);
 			const focus = editor.innerFocus;
 			const cur = focus?.type === 'ability' && focus.setIndex === setIndex ? ' cur' : '';
 			return <td class="set-abilities" colSpan={2}><div class="border-collapse">
@@ -346,7 +333,7 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 					{abilities.map((ability, index) => <span
 						class="chip" draggable data-index={index} onDragStart={this.dragAbility}
 					>
-						<small>{abilitySlots(abilities.length)[index]}:</small> {ability} <button
+						<small>{slots[index]}:</small> {ability} <button
 							class="chipx" data-set-index={setIndex} data-ability={ability} onClick={this.removeAbility}
 						>×</button>
 					</span>)}
@@ -430,7 +417,7 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 			});
 		},
 		renderRename: (_editor, setIndex) => (
-			<button class="button rename" data-href={`pbrename-${setIndex}`} aria-label="Rename">
+			<button class="button rename" data-set-index={setIndex} onClick={this.rename} aria-label="Rename">
 				<i class="fa fa-pencil" aria-hidden></i>
 			</button>
 		),
@@ -495,8 +482,8 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		},
 		renderNickname: (_editor, setIndex) => (
 			<div class="spritebuttons">
-				{SPRITE_LABELS.map((label, kindIndex) => (
-					<button class="button" data-href={`pbsprite-${setIndex}-${kindIndex}`}>{label}</button>
+				{SPRITES.map((sprite, kindIndex) => (
+					<button class="button" data-href={`pbsprite-${setIndex}-${kindIndex}`}>{sprite.label}</button>
 				))}
 			</div>
 		),
@@ -504,6 +491,9 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 			const abilities = this.abilitiesFor(setIndex).slice();
 			const index = abilities.indexOf(name);
 			if (index >= 0) {
+				if (abilities.length === 1 && CustomDex.requires(this.speciesId(setIndex), 'abilities')) {
+					return PS.alert(`A Pokémon needs at least one ability.`);
+				}
 				abilities.splice(index, 1);
 			} else if (abilities.length < MAX_ABILITIES) {
 				abilities.push(name);
@@ -528,42 +518,20 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 	};
 
 	handleChangeFormat = (ev: Event) => {
-		const room = this.props.room;
-		room.setFormat((ev.currentTarget as HTMLButtonElement).value);
+		this.props.room.setFormat((ev.currentTarget as HTMLButtonElement).value);
 		this.forceUpdate();
-		PokebuilderPanel.getFormatResources(room.team.format).then(() => {
-			this.forceUpdate();
-		});
+		this.loadResources();
 	};
 	save = () => {
 		const editor = this.props.room.editor;
 		const id = toID(editor?.sets[editor.innerFocus?.setIndex ?? 0]?.species);
 		if (id !== this.editingId) {
-			this.flush(this.editingId);
+			CustomDex.flush(this.editingId);
 			this.editingId = id;
-		} else if (id) {
-			this.queueSave(id);
 		}
+		if (id) CustomDex.queueSave(id);
 		this.forceUpdate();
 	};
-	renderResources() {
-		const info = PokebuilderPanel.formatResources[this.props.room.team.format];
-		const formatName = BattleLog.formatName(this.props.room.team.format);
-		return (info && (info.resources.length || info.url)) ? (
-			<details class="details" open>
-				<summary><strong>Teambuilding resources for {formatName}</strong></summary>
-				<div style="margin-left:5px"><ul>
-					{info.resources.map(resource => (
-						<li><p><a href={resource.url} target="_blank">{resource.resource_name}</a></p></li>
-					))}
-				</ul>
-				<p>
-					Find {info.resources.length ? 'more ' : ''}
-					helpful resources for {formatName} on <a href={info.url} target="_blank">the Smogon Dex</a>.
-				</p></div>
-			</details>
-		) : null;
-	}
 	override render() {
 		const { room } = this.props;
 		const team = room.team;
@@ -586,9 +554,9 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 				</label>
 			</div>
 			<TeamEditor
-				team={team} onChange={this.save} resources={this.renderResources()}
+				team={team} onChange={this.save} resources={TeamPanel.renderResources(team.format)}
 				narrow={room.width < 550}
-				editorRef={this.initEditor} setEditor={this.setEditor}
+				editorRef={this.initEditor}
 			>
 				{!!(team.packedTeam && team.format.length > 4) && <p>
 					<button data-cmd="/validate" class="button"><i class="fa fa-check"></i> Validate</button>
@@ -604,25 +572,24 @@ class SpritePanel extends PSRoomPanel {
 	static readonly location = 'popup';
 	static readonly noURL = true;
 
-	kindIndex() {
-		return Number(this.props.room.id.slice(this.props.room.id.lastIndexOf('-') + 1));
-	}
-	set() {
-		const parent = this.props.room.getParent() as PokebuilderRoom | null;
-		const setIndex = Number(this.props.room.id.split('-')[1]);
-		return parent?.editor?.sets[setIndex];
+	sprite() {
+		const [, setIndex, kindIndex] = this.props.room.id.split('-');
+		return { set: popupSet(this.props.room, Number(setIndex)), ...SPRITES[Number(kindIndex)] };
 	}
 	pick = () => {
 		this.base!.querySelector<HTMLInputElement>('input[type=file]')!.click();
 	};
 	upload = (ev: Event) => {
 		const file = (ev.currentTarget as HTMLInputElement).files?.[0];
-		const species = this.set()?.species;
+		const { set, kind, width, height } = this.sprite();
+		const species = set?.species;
 		if (!file || !species) return;
-		const [width, height] = SPRITE_SIZES[this.kindIndex()];
-		const kind = SPRITE_KINDS[this.kindIndex()];
 		const image = new Image();
 		const src = URL.createObjectURL(file);
+		image.onerror = () => {
+			URL.revokeObjectURL(src);
+			PS.alert(`That image couldn't be read. Try a PNG, JPEG or GIF.`);
+		};
 		image.onload = () => {
 			URL.revokeObjectURL(src);
 			const canvas = document.createElement('canvas');
@@ -634,18 +601,17 @@ class SpritePanel extends PSRoomPanel {
 			const drawWidth = Math.round(image.width * scale);
 			const drawHeight = Math.round(image.height * scale);
 			context.drawImage(image, (width - drawWidth) >> 1, (height - drawHeight) >> 1, drawWidth, drawHeight);
-			PS.send(`/custompokemon setsprite ${species}, ${kind}, ${canvas.toDataURL('image/png')}`);
-			setTimeout(() => CustomDex.load(true), 1000);
+			CustomDex.write({
+				command: `setsprite ${species}, ${kind}, ${canvas.toDataURL('image/png')}`, id: toID(species),
+			});
 			this.close();
 		};
 		image.src = src;
 	};
 	override render() {
-		const room = this.props.room;
-		const kind = SPRITE_KINDS[this.kindIndex()];
-		const [width, height] = SPRITE_SIZES[this.kindIndex()];
-		const url = CustomDex.sprites[toID(this.set()?.species)]?.[kind];
-		return <PSPanelWrapper room={room}><div class="pad">
+		const { set, kind, width, height } = this.sprite();
+		const url = CustomDex.sprites[toID(set?.species)]?.[kind];
+		return <PSPanelWrapper room={this.props.room}><div class="pad">
 			<p><strong>{kind}</strong> <small>({width}&times;{height})</small></p>
 			<p>{url ? (
 				<img src={url} width={width} height={height} alt={kind} class="pixelated" />
@@ -656,38 +622,5 @@ class SpritePanel extends PSRoomPanel {
 	}
 }
 
-class RenamePanel extends PSRoomPanel {
-	static readonly id = 'pbrename';
-	static readonly routes = ['pbrename-*'];
-	static readonly location = 'popup';
-	static readonly noURL = true;
-
-	set() {
-		const parent = this.props.room.getParent() as PokebuilderRoom | null;
-		return parent?.editor?.sets[Number(this.props.room.id.split('-')[1])];
-	}
-	rename = (ev: Event) => {
-		ev.preventDefault();
-		const set = this.set();
-		const name = this.base!.querySelector<HTMLInputElement>('input[name=name]')!.value.trim();
-		if (!set || !name || name === set.species) return this.close();
-		PS.send(`/custompokemon edit ${set.species}, ${JSON.stringify({ name })}`);
-		set.species = name;
-		setTimeout(() => CustomDex.load(true), 1000);
-		this.close();
-	};
-	override render() {
-		return <PSPanelWrapper room={this.props.room}><div class="pad">
-			<form onSubmit={this.rename}>
-				<p><label class="label">Name<input
-					type="text" name="name" class="textbox" autofocus value={this.set()?.species || ''}
-				/></label></p>
-				<p><button type="submit" class="button"><strong>Rename</strong></button></p>
-			</form>
-		</div></PSPanelWrapper>;
-	}
-}
-
 PS.addRoomType(PokebuilderPanel);
-PS.addRoomType(RenamePanel);
 PS.addRoomType(SpritePanel);

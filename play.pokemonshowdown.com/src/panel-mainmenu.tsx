@@ -8,6 +8,7 @@
 import preact from "../js/lib/preact";
 import { PSLoginServer } from "./client-connection";
 import { PSBackground } from "./client-core";
+import { CustomDex } from "./client-custom-dex";
 import { Config, PS, PSRoom, type PSRoomFocusOptions, type RoomID, type RoomOptions, type Team } from "./client-main";
 import { PSIcon, PSPanelErrorBoundary, PSPanelWrapper, PSRoomPanel, PSView, ReconnectTimer } from "./panels";
 import type { BattlesRoom } from "./panel-battle";
@@ -466,6 +467,12 @@ export class MainMenuRoom extends PSRoom {
 					(ladderRoom as LadderFormatRoom).update(response);
 				}
 			}
+			break;
+		case 'customdex':
+			CustomDex.receive(response);
+			break;
+		case 'custompokemon':
+			CustomDex.receiveWrite(response);
 			break;
 		case 'teamupload':
 			if (PS.teams.uploading) {
