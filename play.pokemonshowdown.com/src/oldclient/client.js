@@ -328,14 +328,10 @@ function toId() {
 				}
 			}), 'text');
 		},
-		/** Same domain as getActionPHP above, for the cookies and the origin check below. */
-		getDiscordOrigin: function () {
-			return Config.testclient ? 'https://' + Config.routes.client : location.origin;
-		},
-		/** Log in with Discord, in place of a password. The popup postMessages the assertion back. */
+		/** The popup postMessages an assertion back, in place of a password. */
 		discordRename: function () {
 			var self = this;
-			var origin = this.getDiscordOrigin();
+			var origin = Config.testclient ? 'https://' + Config.routes.client : location.origin;
 			var listener = function (event) {
 				if (event.origin !== origin) return;
 				if (!event.data || event.data.type !== 'discord-login') return;
@@ -347,7 +343,6 @@ function toId() {
 				self.finishRename(event.data.username, event.data.assertion);
 			};
 			window.addEventListener('message', listener);
-			// serverid, because the loginserver names the sim server in the assertion from it
 			window.open(
 				origin + '/api/discord/login?challstr=' + encodeURIComponent(this.challstr) +
 				'&serverid=' + encodeURIComponent(Config.server.id),

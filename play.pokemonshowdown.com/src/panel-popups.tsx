@@ -697,7 +697,6 @@ class OptionsPanel extends PSRoomPanel {
 				<button class="button" data-href="avatars">Avatar...</button>
 			</p>
 
-			{/* discordlogin accounts have no password, so neither button leads anywhere */}
 			{PS.user.named && !Config.discordlogin && (PS.user.registered?.userid === PS.user.userid ?
 				<button className="button" data-href="changepassword">Password...</button> :
 				<button className="button" data-href="register">Register</button>)}
@@ -941,8 +940,6 @@ class LoginPanel extends PSRoomPanel {
 	override render() {
 		const room = this.props.room;
 		const loginState = room.args as PSLoginState;
-		// with discordlogin there is no name to choose until you log in; after that
-		// the form below is the normal rename/nickname path
 		if (Config.discordlogin && !PS.user.registered) {
 			return <PSPanelWrapper room={room} width={280}><div class="pad">
 				<h3>Log in</h3>

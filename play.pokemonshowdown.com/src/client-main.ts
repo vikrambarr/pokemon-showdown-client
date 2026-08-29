@@ -57,7 +57,6 @@ export interface PSConfig {
 	customcolors: Record<string, string>;
 	whitelist?: string[];
 	testclient?: boolean;
-	/** log in with Discord instead of a password */
 	discordlogin?: boolean;
 }
 export declare const Config: PSConfig;
@@ -753,20 +752,17 @@ class PSUser extends PSStreamModel<PSLoginState | null> {
 			}
 		});
 	}
-	/** Log in with Discord, in place of a password. The popup postMessages the assertion back. */
+	/** The popup postMessages an assertion back, in place of a password. */
 	loginWithDiscord() {
-		// same domain as PSLoginServer.rawQuery, for the cookies and the origin check below
 		const origin = Config.testclient ? `https://${Config.routes.client}` : location.origin;
 		const listener = (event: MessageEvent) => {
-			if (event.origin !== origin) return;
-			if (event.data?.type !== 'discord-login') return;
+			if (event.origin !== origin || event.data?.type !== 'discord-login') return;
 			window.removeEventListener('message', listener);
 			const { username, assertion } = event.data;
 			this.registered = { name: username, userid: toID(username) };
 			this.handleAssertion(username, assertion);
 		};
 		window.addEventListener('message', listener);
-		// serverid, because the loginserver names the sim server in the assertion from it
 		window.open(
 			`${origin}/api/discord/login?challstr=${encodeURIComponent(this.challstr)}` +
 			`&serverid=${encodeURIComponent(PS.server.id)}`,

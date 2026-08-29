@@ -494,7 +494,6 @@
 				buf += '<p><input name="statustext" />';
 				buf += '<button class="button" name="editstatus"><i class="fa fa-pencil"></i></button></p>';
 			}
-			// discordlogin accounts have no password, so neither button leads anywhere
 			if (app.user.get('named') && !Config.discordlogin) {
 				var registered = app.user.get('registered');
 				if (registered && (registered.userid === app.user.get('userid'))) {
@@ -971,8 +970,6 @@
 				}
 			}
 
-			// with discordlogin there is no name to choose until you log in; after that
-			// the box below is the normal rename/nickname path
 			if (Config.discordlogin && !app.user.get('registered')) {
 				buf += '<p>Log in with Discord to play on this server.</p>';
 				buf += '<p class="buttonbar"><button type="button" name="discord" class="button"><strong>Log in with Discord</strong></button> <button type="button" name="close" class="button">Cancel</button></p>';
