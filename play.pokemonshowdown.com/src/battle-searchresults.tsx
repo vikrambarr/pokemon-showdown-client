@@ -38,7 +38,7 @@ export class PSSearchResults extends preact.Component<{
 	readonly URL_ROOT = `//${Config.routes.dex}/`;
 	speciesId: ID = '' as ID;
 	itemId: ID = '' as ID;
-	abilityId: ID = '' as ID;
+	abilityIds: ID[] = [];
 	moveIds: ID[] = [];
 	scrollFrame = 0;
 	renderedStart = -1;
@@ -172,7 +172,7 @@ export class PSSearchResults extends preact.Component<{
 		if (!ability) return `<li class="result" value="${index}">Unrecognized ability</li>`;
 
 		return `<li class="result" value="${index}"><a href="${this.URL_ROOT}abilities/${id}" ` +
-			`class="${id === this.abilityId ? 'cur' : ''}" data-target="push" data-entry="ability|${escapeHTML(ability.name)}">` +
+			`class="${this.abilityIds.includes(id) ? 'cur' : ''}" data-target="push" data-entry="ability|${escapeHTML(ability.name)}">` +
 			`<span class="col namecol">${id ? this.renderNameHTML(ability.name, matchStart, matchEnd) : '<i>(no ability)</i>'}</span>` +
 			(errorMessage || '') +
 			(!errorMessage ? `<span class="col abilitydesccol">${escapeHTML(ability.shortDesc)}</span>` : '') +
@@ -468,12 +468,12 @@ export class PSSearchResults extends preact.Component<{
 		if (set) {
 			this.speciesId = toID(set.species);
 			this.itemId = toID(set.item);
-			this.abilityId = toID(set.ability);
+			this.abilityIds = set.abilities?.map(toID) || [toID(set.ability)];
 			this.moveIds = set.moves.map(toID);
 		} else {
 			this.speciesId = '' as ID;
 			this.itemId = '' as ID;
-			this.abilityId = '' as ID;
+			this.abilityIds = [];
 			this.moveIds = [];
 		}
 	}

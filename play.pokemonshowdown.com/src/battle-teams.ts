@@ -15,6 +15,7 @@ export declare namespace Teams {
 		item?: string;
 		/** Defaults to no ability (error in Gen 3+) */
 		ability?: string;
+		abilities?: string[];
 		moves: string[];
 		/** Defaults to no nature (error in Gen 3+) */
 		nature?: Dex.NatureName;

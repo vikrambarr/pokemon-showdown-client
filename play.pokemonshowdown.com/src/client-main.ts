@@ -1919,6 +1919,7 @@ export const PS = new class extends PSModel {
 		// to update:
 		// console.log('\t\t' + JSON.stringify(Object.fromEntries(Object.entries(PS.routes).filter(([k, v]) => k !== 'dm-*').map(([k, v]) => [k, '*' + (PS.roomTypes[v].location || '')]))).replaceAll(',', ',\n\t\t').replaceAll('":"', '": "').slice(1, -1) + ',')
 		"teambuilder": "*",
+		"pokebuilder": "*",
 		"news": "*mini-window",
 		"": "*",
 		"rooms": "*right",
@@ -1958,6 +1959,8 @@ export const PS = new class extends PSModel {
 		"resources": "*",
 		"game-*": "*",
 		"teamstorage-*": "*modal-popup",
+		"pbsprite-*": "*popup",
+		"pbrename-*": "*popup",
 		"viewteam-*": "*",
 	});
 	/** List of rooms on the left side of the top tabbar */
@@ -2176,6 +2179,7 @@ export const PS = new class extends PSModel {
 			};
 		case 'team':
 		case 'teambuilder':
+		case 'pokebuilder':
 			return {
 				minWidth: 660,
 				width: 660,

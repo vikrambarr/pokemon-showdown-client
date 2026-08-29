@@ -1,0 +1,222 @@
+.pokebuilder .chipbox {
+	display: flex;
+	flex-wrap: nowrap;
+	align-items: center;
+	gap: 3px;
+	width: 100%;
+	height: 20px;
+	padding: 2px 3px;
+	overflow-x: auto;
+	overflow-y: hidden;
+	white-space: nowrap;
+	cursor: pointer;
+	scrollbar-width: none;
+}
+.pokebuilder .chipbox::-webkit-scrollbar {
+	display: none;
+}
+.pokebuilder .chip {
+	flex: 0 0 auto;
+	cursor: grab;
+	padding: 1px 5px;
+	border-radius: 3px;
+	background: rgba(0, 0, 0, 0.08);
+	font-size: 10px;
+	line-height: 14px;
+}
+.pokebuilder .chip small {
+	opacity: 0.6;
+}
+.pokebuilder .chipnote {
+	color: #777;
+}
+.pokebuilder .chipx {
+	position: relative;
+	top: 1px;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	opacity: 0.5;
+	cursor: pointer;
+	line-height: 1;
+}
+.pokebuilder .chipx:hover {
+	opacity: 1;
+}
+.dark .pokebuilder .chip {
+	background: rgba(255, 255, 255, 0.12);
+}
+.dark .pokebuilder .chipnote {
+	color: #999;
+}
+.pokebuilder .typeselects {
+	display: flex;
+	align-items: center;
+	height: 15px;
+	padding-top: 3px;
+}
+.pokebuilder .typeslot {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	margin-right: 6px;
+}
+.pokebuilder .typecaret {
+	margin-left: 1px;
+	cursor: pointer;
+}
+.pokebuilder .typeicon-blank {
+	display: inline-block;
+	width: 65px;
+	height: 15px;
+}
+.pokebuilder select.typearrow {
+	position: absolute;
+	left: 0;
+	top: 0;
+	display: block;
+	width: 65px;
+	height: 15px;
+	min-width: 0;
+	min-height: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	box-shadow: none;
+	cursor: pointer;
+}
+.pokebuilder select.typearrow > button {
+	display: block;
+	width: 65px;
+	height: 15px;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+}
+.pokebuilder select.typearrow::picker-icon {
+	display: none;
+}
+.pokebuilder select.typearrow::picker(select) {
+	position-area: block-end;
+	justify-self: anchor-center;
+	width: max-content;
+	min-width: 0;
+	padding: 0;
+	scrollbar-width: none;
+	font-size: 9pt;
+	line-height: normal;
+}
+.pokebuilder select.typearrow option {
+	padding: 0;
+	font-size: 9pt;
+	line-height: 15px;
+	color: inherit;
+}
+.pokebuilder .set-moves .learnset {
+	padding-top: 69px;
+}
+.teameditor-spacious .pokebuilder .set-moves .learnset,
+.pokebuilder .teameditor-spacious .set-moves .learnset {
+	padding-top: 75px;
+}
+.pokebuilder .statslider {
+	position: relative;
+	display: block;
+	height: 18px;
+}
+.pokebuilder .statslider > span {
+	position: relative;
+}
+.pokebuilder .statslider > span::after {
+	content: '';
+	position: absolute;
+	right: -5px;
+	top: -2px;
+	width: 9px;
+	height: 17px;
+	border: 1px solid #888888;
+	border-radius: 2px;
+	background: linear-gradient(#ffffff, #dddddd);
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+}
+.pokebuilder .statslider input {
+	position: absolute;
+	left: 5px;
+	top: 0;
+	width: 180px;
+	height: 18px;
+	margin: 0;
+	padding: 0;
+	opacity: 0;
+	cursor: ew-resize;
+}
+.pokebuilder .spritebuttons {
+	display: flex;
+	gap: 3px;
+}
+.pokebuilder .spritebuttons .button {
+	flex: 1 1 0;
+	padding: 2px 0;
+	text-align: center;
+}
+.pokebuilder .set-pokemon .label {
+	position: relative;
+}
+.pokebuilder .set-pokemon .rename {
+	position: absolute;
+	right: 0;
+	top: -2px;
+	padding: 0 3px;
+	font-size: 9px;
+	line-height: 12px;
+}
+.pokebuilder .genderratio {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+.pokebuilder .genderratio input {
+	width: 114px;
+	margin: 0;
+}
+.pokebuilder .genderratio input::-webkit-slider-runnable-track {
+	background-image: repeating-linear-gradient(to right, #AAAAAA 0 1px, transparent 1px 12px);
+	background-position: 9px 0;
+	background-size: 97px 100%;
+	background-repeat: no-repeat;
+}
+.pokebuilder .genderratio input.ratioset::-webkit-slider-runnable-track {
+	background-image:
+		repeating-linear-gradient(to right, rgba(0, 0, 0, 0.25) 0 1px, transparent 1px 12px),
+		linear-gradient(to right, #6f9de8 0 var(--fill), #f194c2 var(--fill) 100%);
+	background-position: 9px 0, 0 0;
+	background-size: 97px 100%, 100% 100%;
+	background-repeat: no-repeat, no-repeat;
+}
+.dark .pokebuilder .genderratio input::-webkit-slider-runnable-track {
+	background-image: repeating-linear-gradient(to right, #777777 0 1px, transparent 1px 12px);
+}
+.dark .pokebuilder .genderratio input.ratioset::-webkit-slider-runnable-track {
+	background-image:
+		repeating-linear-gradient(to right, rgba(0, 0, 0, 0.4) 0 1px, transparent 1px 12px),
+		linear-gradient(to right, #4a72b8 0 var(--fill), #b86890 var(--fill) 100%);
+}
+.pokebuilder .ratiolabel {
+	font-size: 9pt;
+	color: #666666;
+}
+.dark .pokebuilder .ratiolabel {
+	color: #999999;
+}
+.pokebuilder .detailtable th {
+	text-align: right;
+	font-weight: normal;
+	padding: 2px 6px 2px 0;
+	white-space: nowrap;
+}
+.pokebuilder .detailtable td {
+	padding: 2px 0;
+}
