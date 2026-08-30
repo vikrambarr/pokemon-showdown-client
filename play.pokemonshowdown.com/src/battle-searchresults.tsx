@@ -36,7 +36,7 @@ export class PSSearchResults extends preact.Component<{
 	onSelect?: (type: SearchType | '' | null, name: string, moveSlot?: string) => void,
 }> {
 	readonly URL_ROOT = `//${Config.routes.dex}/`;
-	speciesId: ID = '' as ID;
+	speciesIds: ID[] = [];
 	itemId: ID = '' as ID;
 	abilityIds: ID[] = [];
 	moveIds: ID[] = [];
@@ -90,7 +90,7 @@ export class PSSearchResults extends preact.Component<{
 		if (search.dex.gen < 2) bst -= stats['spd'];
 
 		let buf = `<li class="result" value="${index}"><a href="${this.URL_ROOT}pokemon/${id}" ` +
-			`class="${id === this.speciesId ? 'cur' : ''}" data-target="push" ` +
+			`class="${this.speciesIds.includes(id) ? 'cur' : ''}" data-target="push" ` +
 			`data-entry="pokemon|${escapeHTML(pokemon.name)}">` +
 			`<span class="col numcol">${escapeHTML(search.getTier(pokemon))}</span>` +
 			`<span class="col iconcol"><span class="pixelated" style="${escapeHTML(Dex.getPokemonIcon(pokemon.id))}"></span></span>` +
@@ -466,12 +466,12 @@ export class PSSearchResults extends preact.Component<{
 		const search = this.props.search;
 		const set = search.typedSearch?.set;
 		if (set) {
-			this.speciesId = toID(set.species);
+			this.speciesIds = search.selectedSpecies || [toID(set.species)];
 			this.itemId = toID(set.item);
 			this.abilityIds = set.abilities?.map(toID) || [toID(set.ability)];
 			this.moveIds = set.moves.map(toID);
 		} else {
-			this.speciesId = '' as ID;
+			this.speciesIds = search.selectedSpecies || [];
 			this.itemId = '' as ID;
 			this.abilityIds = [];
 			this.moveIds = [];

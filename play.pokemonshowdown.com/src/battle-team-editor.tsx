@@ -30,8 +30,28 @@ export interface SetEditor {
 	renderDetails: (editor: TeamEditorState, setIndex: number) => preact.ComponentChildren;
 	renderDetailCell: (editor: TeamEditorState, setIndex: number) => preact.ComponentChildren;
 	renderRename: (editor: TeamEditorState, setIndex: number) => preact.ComponentChildren;
+	deleteSet: (ev: Event) => void;
+	renderSearchBottom: (editor: TeamEditorState, setIndex: number, type: InnerFocusType) => preact.ComponentChildren;
+	/** Called before the team view would render, for editors that only ever show one set. */
+	restoreFocus: (editor: TeamEditorState) => void;
+	/** Tooltips for the shared set-form controls, keyed by control name. */
+	titles?: { [control: string]: string };
+	/** Editors whose sets aren't team members have nowhere to copy them to. */
+	hideCopy?: boolean;
+	/** Sample and saved competitive sets don't apply to every kind of set. */
+	hideSampleSets?: boolean;
+	/** Extra buttons at the start of the set form's action row. */
+	renderActions?: (editor: TeamEditorState, setIndex: number) => preact.ComponentChildren;
+	/** Import/export of whatever this editor considers a "set", in place of PokePaste sets. */
+	importExport?: {
+		export: (editor: TeamEditorState, setIndex: number) => string,
+		/** Applies the text, returning an error message to show, or '' on success. */
+		import: (editor: TeamEditorState, setIndex: number, text: string) => string,
+	};
 	back: (ev?: Event) => void;
 	selectAbility: (editor: TeamEditorState, setIndex: number, name: string) => void;
+	/** Return true to claim the click, for pickers that aren't choosing the set's own species. */
+	selectSpecies: (editor: TeamEditorState, setIndex: number, name: string) => boolean;
 }
 type TeamEditorMode = 'form' | 'import';
 
@@ -2233,7 +2253,10 @@ class TeamEditorForm extends preact.Component<{
 		return <div class="team-focus-editor" onKeyDown={editor.handleParentKeyDown}>
 			<div class={isSearchMode && (set?.moves.length || 0) > 5 ? 'team-focus-top' : ''}>
 				<ul class="tabbar">
-					<li class="home-li"><button class="button" onClick={editor.setEditor?.back || this.closeInnerFocus}>
+					<li class="home-li"><button
+						class="button" onClick={editor.setEditor?.back || this.closeInnerFocus}
+						title={editor.setEditor?.titles?.back}
+					>
 						<i class="fa fa-chevron-left" aria-hidden></i> Back
 					</button></li>
 					{editor.sets.map((curSet, i) => <li><button
@@ -2278,16 +2301,18 @@ class TeamEditorForm extends preact.Component<{
 					search={editor.search} hideFilters
 					onSelect={this.selectResult}
 				>
-					{type === 'ability' && <SetSourceButtons
+					{type === 'ability' && !editor.setEditor?.hideSampleSets && <SetSourceButtons
 						editor={editor} set={set}
 						onLoadSampleSet={this.handleLoadSampleSet} onLoadUserSet={this.handleLoadUserSet}
 					/>}
+					{editor.setEditor?.renderSearchBottom(editor, setIndex, type)}
 				</PSSearchResults>
 			)}
 		</div>;
 	}
 	override render() {
 		const { editor } = this.props;
+		if (!editor.innerFocus) editor.setEditor?.restoreFocus(editor);
 		if (editor.innerFocus) return this.renderInnerFocus();
 		if (editor.fetching) {
 			return <div class="teameditor">Fetching Paste...</div>;
@@ -2855,6 +2880,10 @@ class TeamEditorForm extends preact.Component<{
 		} else if (type === 'ability' && this.props.editor.setEditor) {
 			this.props.editor.setEditor.selectAbility(this.props.editor, this.props.editor.innerFocus!.setIndex, name);
 			this.handleSetChange();
+		} else if (type === 'pokemon' && this.props.editor.setEditor?.selectSpecies(
+			this.props.editor, this.props.editor.innerFocus!.setIndex, name
+		)) {
+			this.handleSetChange();
 		} else {
 			this.setFocusedValue(name);
 		}
@@ -2915,6 +2944,7 @@ class TeamEditorForm extends preact.Component<{
 		const { editor } = this.props;
 		return <input
 			type="text" class="textbox default-placeholder set-field" name={type}
+			title={editor.setEditor?.titles?.[type]}
 			data-focus={editor.stringifyFocus({ setIndex, type, typeIndex })}
 			defaultValue={value || ''} placeholder={placeholder} autocomplete="off" readOnly={editor.readonly}
 			onMouseDown={this.mouseDownField} onFocus={this.setFocusTextbox}
@@ -2953,7 +2983,7 @@ class TeamEditorForm extends preact.Component<{
 						<i class="fa fa-upload" aria-hidden></i> Import
 					</button>
 				</div>
-				<table class={spriteClass} style={sprite}>
+				<table class={`emptyset${spriteClass}`} style={sprite}>
 					<tr>
 						<td rowSpan={2} class="set-pokemon"><div class="border-collapse">
 							<span class="sprite-inner">
@@ -2980,22 +3010,26 @@ class TeamEditorForm extends preact.Component<{
 		const overfull = set.moves.length > 5 ? ' overfull' : set.moves.length > 4 ? ' overfull overfull5' : '';
 		return <div class={`set-form${isCur}`} data-set-index={i}>
 			<div style="text-align:right">
-				<button class="option" onClick={this.copySet} value={i}>
+				{setEditor?.renderActions?.(editor, i)}
+				{!setEditor?.hideCopy && <button
+					class="option" onClick={this.copySet} value={i} title={setEditor?.titles?.copy}
+				>
 					<i class="fa fa-copy" aria-hidden></i> {
 						isCur ? "Deselect" :
 						TeamEditorState.clipboard ? "Add to clipboard" :
 						editor.readonly ? "Copy" :
 						"Copy/Move"
 					}
-				</button> {}
+				</button>} {}
 				{!(TeamEditorState.clipboard || editor.readonly) && <button
 					class="option" name="import" onClick={this.clickPanelButton}
-					value={`set-${i}-import`}
+					value={`set-${i}-import`} title={setEditor?.titles?.import}
 				>
 					<i class="fa fa-upload" aria-hidden></i> Import/Export
 				</button>} {}
 				{!(TeamEditorState.clipboard || editor.readonly) && <button
-					class="option" name="delete" onClick={this.deleteSet} value={i}
+					class="option" name="delete" onClick={setEditor?.deleteSet || this.deleteSet} value={i}
+					title={setEditor?.titles?.delete}
 				>
 					<i class="fa fa-trash" aria-hidden></i> Delete
 				</button>}
@@ -3016,7 +3050,7 @@ class TeamEditorForm extends preact.Component<{
 							<button
 								class={`textbox${this.cur('details', i)}`} onClick={this.clickPanelButton}
 								onKeyDown={this.keyDownPanelButton} name="details"
-								value={`set-${i}-details`}
+								value={`set-${i}-details`} title={setEditor?.titles?.details}
 							>
 								{setEditor ? setEditor.renderDetailCell(editor, i) : <>
 									<span class="detailcell">
@@ -3065,7 +3099,7 @@ class TeamEditorForm extends preact.Component<{
 							<button
 								class={`textbox${this.cur('stats', i)}`} onClick={this.clickPanelButton}
 								onKeyDown={this.keyDownPanelButton} name="stats"
-								value={`set-${i}-stats`}
+								value={`set-${i}-stats`} title={setEditor?.titles?.stats}
 							>
 								{setEditor ? setEditor.renderStatCell(editor, i) :
 								StatForm.renderStatGraph(set, this.props.editor, true)}
@@ -3167,8 +3201,10 @@ class SetImportForm extends preact.Component<{
 	textbox: HTMLTextAreaElement | null = null;
 	revertText = '';
 	getExportText() {
+		const { editor, setIndex } = this.props;
+		if (editor.setEditor?.importExport) return editor.setEditor.importExport.export(editor, setIndex);
 		if (!this.props.set) return '';
-		return Teams.exportSet(this.props.set, this.props.editor.dex).trim();
+		return Teams.exportSet(this.props.set, editor.dex).trim();
 	}
 	override componentDidMount() {
 		this.setRevertPoint();
@@ -3196,6 +3232,11 @@ class SetImportForm extends preact.Component<{
 	}
 	revertSetToRevertPoint() {
 		const { editor, setIndex } = this.props;
+		if (editor.setEditor?.importExport) {
+			editor.setEditor.importExport.import(editor, setIndex, this.revertText);
+			this.props.onChange();
+			return true;
+		}
 		const set = Teams.import(this.revertText)[0];
 		if (set) {
 			editor.sets[setIndex] = set;
@@ -3239,6 +3280,12 @@ class SetImportForm extends preact.Component<{
 		const { editor, setIndex } = this.props;
 		if (editor.readonly || !this.textbox) return;
 		const dirty = this.textbox.value !== this.revertText;
+		if (editor.setEditor?.importExport) {
+			const error = editor.setEditor.importExport.import(editor, setIndex, this.textbox.value);
+			if (!error) this.props.onChange();
+			this.setState({ error, copied: false, dirty });
+			return;
+		}
 		const set = Teams.import(this.textbox.value)[0];
 		if (!set) {
 			this.revertSetToRevertPoint();
@@ -3273,13 +3320,15 @@ class SetImportForm extends preact.Component<{
 				{this.state.error && <p class="message-error">{this.state.error}</p>}
 				<textarea
 					ref={this.setTextbox} class="textbox set-import-textbox" rows={14}
-					readOnly={editor.readonly} onInput={this.inputText}
+					readOnly={editor.readonly}
+					onInput={editor.setEditor?.importExport ? undefined : this.inputText}
+					onChange={editor.setEditor?.importExport ? this.inputText : undefined}
 					style="min-height:6em"
 				></textarea>
-				<SetSourceButtons
+				{!editor.setEditor?.hideSampleSets && <SetSourceButtons
 					editor={editor} set={this.props.set}
 					onLoadSampleSet={this.loadSampleSet} onLoadUserSet={this.loadUserSet}
-				/>
+				/>}
 			</div>
 		</div>;
 	}

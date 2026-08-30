@@ -84,6 +84,8 @@ export class DexSearch {
 	 */
 	sortCol: string | null = null;
 	reverseSort = false;
+	/** Species to mark as current, when that isn't just the set's own species. */
+	selectedSpecies: ID[] | null = null;
 
 	/**
 	 * Filters for the search result. Does not include the two base filters

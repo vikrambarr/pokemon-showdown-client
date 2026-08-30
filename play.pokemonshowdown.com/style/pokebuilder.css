@@ -27,6 +27,9 @@
 .pokebuilder .chip small {
 	opacity: 0.6;
 }
+.pokebuilder .chipvalue {
+	flex: 0 0 auto;
+}
 .pokebuilder .chipnote {
 	color: #777;
 }
@@ -116,12 +119,21 @@
 	line-height: 15px;
 	color: inherit;
 }
-.pokebuilder .set-moves .learnset {
-	padding-top: 69px;
+/*
+ * `.label` inherits `line-height: normal`, so its height comes from font metrics and doesn't scale
+ * linearly under browser zoom. This column stacks three labels where the others stack one, so the
+ * rounding error is tripled and the Learnset box drifts above the Abilities box off 100% zoom.
+ */
+.pokebuilder .set-form .label {
+	line-height: 14px;
 }
-.teameditor-spacious .pokebuilder .set-moves .learnset,
-.pokebuilder .teameditor-spacious .set-moves .learnset {
-	padding-top: 75px;
+/* Prevo + Evos + Learnset stack to the same height the four move rows used to fill. */
+.pokebuilder .set-moves .movescell {
+	padding-top: 1px;
+}
+.teameditor-spacious .pokebuilder .set-moves .movescell,
+.pokebuilder .teameditor-spacious .set-moves .movescell {
+	padding-top: 3px;
 }
 .pokebuilder .statslider {
 	position: relative;
@@ -154,14 +166,49 @@
 	opacity: 0;
 	cursor: ew-resize;
 }
-.pokebuilder .spritebuttons {
+.pokebuilder .spritebox {
 	display: flex;
-	gap: 3px;
+	height: 20px;
+	padding: 0;
+	overflow: hidden;
 }
-.pokebuilder .spritebuttons .button {
+.pokebuilder .spritecell {
 	flex: 1 1 0;
-	padding: 2px 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	background: none;
+	font: inherit;
+	font-size: 9pt;
+	line-height: 18px;
 	text-align: center;
+	cursor: pointer;
+}
+.pokebuilder .spritecell + .spritecell {
+	border-left: 1px solid #CCCCCC;
+}
+.pokebuilder .spritecell.has {
+	background: #d9f2d9;
+	color: #206020;
+}
+.pokebuilder .spritecell.missing {
+	background: #f7dcdc;
+	color: #903030;
+}
+.pokebuilder .spritecell:hover {
+	filter: brightness(0.94);
+}
+.dark .pokebuilder .spritecell + .spritecell {
+	border-left-color: #555555;
+}
+.dark .pokebuilder .spritecell.has {
+	background: #2c4a2c;
+	color: #b8e6b8;
+}
+.dark .pokebuilder .spritecell.missing {
+	background: #4a2c2c;
+	color: #e6b8b8;
 }
 .pokebuilder .set-pokemon .label {
 	position: relative;
@@ -213,4 +260,71 @@
 }
 .pokebuilder .detailtable td {
 	padding: 2px 0;
+}
+.pokebuilder .tagpicker {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 3px;
+	max-width: 280px;
+}
+.pokebuilder .tagpicker .button {
+	padding: 1px 5px;
+	font-size: 8pt;
+}
+.pokebuilder .detailtable .divider td {
+	padding: 3px 0;
+}
+.pokebuilder .detailtable hr {
+	margin: 0;
+	border: 0;
+	border-top: 1px solid #BBBBBB;
+}
+.dark .pokebuilder .detailtable hr {
+	border-top-color: #555555;
+}
+.pokebuilder .detailtable .dexentry {
+	width: 280px;
+	height: auto;
+	font-family: inherit;
+	resize: vertical;
+}
+.pokebuilder .emptyset .label {
+	visibility: hidden;
+}
+.pokebuilder .emptyset input.set-field {
+	opacity: 0;
+	pointer-events: none;
+}
+.pokebuilder .newmon {
+	display: block;
+	box-sizing: border-box;
+	width: calc(100% - 10px);
+	height: 30px;
+	margin: 1px 5px 8px 5px;
+	border: 1px dashed #999;
+	border-radius: 4px;
+	background: none;
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
+}
+.pokebuilder .newmon:hover {
+	border-style: solid;
+	border-color: #ccc;
+	background: #f2f2f2;
+}
+.dark .pokebuilder .newmon:hover {
+	border-color: #555;
+	background: #2b2b30;
+}
+/* Keep the hover outline on whichever box the picker below is currently editing. */
+.pokebuilder .textbox.cur {
+	border-color: #474747;
+	box-shadow: inset 0 1px 2px #d2d2d2, 1px 1px 0 rgba(255, 255, 255, 0.6);
+	background: #fff;
+}
+.dark .pokebuilder .textbox.cur {
+	border-color: #8d959f;
+	box-shadow: inset 0.5px 1px 2px rgba(0, 0, 0, 0.8), inset -0.5px -1px 1px rgba(255, 255, 255, 0.5), -0.5px -1px 1px rgba(255, 255, 255, 0.1);
+	background: #111;
 }
