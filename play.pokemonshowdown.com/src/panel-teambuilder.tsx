@@ -16,7 +16,7 @@ import { TeamEditorState } from "./battle-team-editor";
 const ADD_FORMAT_FOLDER_VALUE = '+';
 const ADD_FOLDER_VALUE = '++';
 
-class TeambuilderRoom extends PSRoom {
+export class TeambuilderRoom extends PSRoom {
 	readonly DEFAULT_FORMAT = Dex.modid;
 
 	/**
@@ -239,12 +239,12 @@ class TeambuilderRoom extends PSRoom {
 	};
 }
 
-class TeambuilderPanel extends PSRoomPanel<TeambuilderRoom> {
-	static readonly id = 'teambuilder';
-	static readonly routes = ['teambuilder'];
+export class TeambuilderPanel extends PSRoomPanel<TeambuilderRoom> {
+	static readonly id: string = 'teambuilder';
+	static readonly routes: string[] = ['teambuilder'];
 	static readonly Model = TeambuilderRoom;
 	static readonly icon = <i class="fa fa-pencil-square-o" aria-hidden></i>;
-	static readonly title = 'Teambuilder';
+	static readonly title: string = 'Teambuilder';
 	mobileFormatFolderButton: HTMLButtonElement | null = null;
 	backupCopiedTimeout: ReturnType<typeof setTimeout> | null = null;
 	override componentDidUpdate() {

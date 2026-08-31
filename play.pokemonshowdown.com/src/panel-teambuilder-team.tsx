@@ -14,7 +14,7 @@ import { Net, PSLoginServer } from "./client-connection";
 import { Teams } from "./battle-teams";
 import { CopyableURLBox } from "./panel-chat";
 
-class TeamRoom extends PSRoom {
+export class TeamRoom extends PSRoom {
 	/** Doesn't _literally_ always exist, but does in basically all code
 	 * and constantly checking for its existence is legitimately annoying... */
 	team!: Team;
@@ -30,11 +30,26 @@ class TeamRoom extends PSRoom {
 			this.send(`/vtm ${this.team.format}`);
 		},
 	});
+	/** Shown instead of the not-found error while what the room is looking for is still on its way. */
+	pendingMessage(): string | null {
+		return null;
+	}
+	/** What this room edits, for its title and the button back to the list. */
+	roomLabel() {
+		return 'Team';
+	}
+	listRoomid() {
+		return 'teambuilder';
+	}
+	/** Where this room's team comes from; subclasses can back a room with something else. */
+	findTeam(): Team | null {
+		return PS.teams.byKey[this.id.slice(5)] || null;
+	}
 	constructor(options: RoomOptions) {
 		super(options);
-		const team = PS.teams.byKey[this.id.slice(5)] || null;
+		const team = this.findTeam();
 		this.team = team!;
-		this.title = `[Team] ${this.team?.name || 'Not found'}`;
+		this.title = `[${this.roomLabel()}] ${this.team?.name || (this.pendingMessage() ? 'Loading' : 'Not found')}`;
 		if (team) this.setFormat(team.format);
 		this.load();
 	}
@@ -42,10 +57,12 @@ class TeamRoom extends PSRoom {
 		return this.editor?.handleParentKeyDown?.(e as KeyboardEvent);
 	};
 	getTeam() {
-		const team = PS.teams.byKey[this.id.slice(5)] || null;
+		const team = this.findTeam();
 		this.teamDeleted = !team && (!!this.team || this.teamDeleted);
 		this.team = team!;
-		this.title = `[Team] ${this.team?.name || (this.teamDeleted ? 'Team deleted' : 'Not found')}`;
+		const missing = this.teamDeleted ? `${this.roomLabel()} deleted` :
+			this.pendingMessage() ? 'Loading' : 'Not found';
+		this.title = `[${this.roomLabel()}] ${this.team?.name || missing}`;
 		return team;
 	}
 	setFormat(format: string) {
@@ -100,15 +117,15 @@ class TeamRoom extends PSRoom {
 
 export type FormatResource = { url: string, resources: { resource_name: string, url: string }[] } | null;
 export class TeamPanel extends PSRoomPanel<TeamRoom> {
-	static readonly id = 'team';
-	static readonly routes = ['team-*'];
+	static readonly id: string = 'team';
+	static readonly routes: string[] = ['team-*'];
 	static readonly Model = TeamRoom;
-	static readonly title = 'Team';
+	static readonly title: string = 'Team';
 
 	constructor(props?: { room: TeamRoom }) {
 		super(props);
 		const room = this.props.room;
-		if (room.team) {
+		if (room.team && this.usesResources()) {
 			TeamPanel.getFormatResources(room.team.format).then(() => {
 				this.forceUpdate();
 			});
@@ -269,6 +286,10 @@ export class TeamPanel extends PSRoomPanel<TeamRoom> {
 		this.props.room.save();
 		this.forceUpdate();
 	};
+	/** Where a subclass hooks the editor up to whatever it's really editing. */
+	initEditor = (editor: TeamEditorState) => {
+		this.props.room.editor = editor;
+	};
 	static renderResources(format: string) {
 		const info = this.formatResources[format];
 		const formatName = BattleLog.formatName(format);
@@ -291,6 +312,83 @@ export class TeamPanel extends PSRoomPanel<TeamRoom> {
 		const room = this.props.room;
 		room.load();
 	}
+	/** Whether Smogon's teambuilding links belong here: a room not building a team has no use. */
+	usesResources() {
+		return true;
+	}
+	/** Where the team is stored. A room backed by something other than PS.teams has no use for it. */
+	renderStorage(team: Team, unsaved: boolean): preact.ComponentChildren {
+		if (team.uploaded) {
+			return <>
+				<button class={`button${unsaved ? ' button-first' : ''}`} data-href={`teamstorage-${team.key}`}>
+					<i class="fa fa-globe"></i> Account {team.uploaded.private ? '' : "(public)"}
+				</button>
+				{unsaved && <button class="button button-last notifying" onClick={this.uploadTeam}>
+					<strong>Upload changes</strong>
+				</button>}
+			</>;
+		}
+		return <button class="button" data-href={`teamstorage-${team.key}`}>
+			{team.teamid ? <><i class="fa fa-plug"></i> Disconnected (wrong account?)</> : <>
+				<i class="fa fa-laptop"></i> Local
+			</>}
+		</button>;
+	}
+	/** The format this team is built for; subclasses can move the picker or drop it. */
+	renderFormatSelect(team: Team): preact.ComponentChildren {
+		return <div style={this.props.room.width < 550 ? "margin-top:8px" : "float:right"}><button
+			name="format" value={team.format} data-selecttype="teambuilder"
+			class="select formatselect" data-href="/formatdropdown" onChange={this.handleChangeFormat}
+		>
+			<i class="fa fa-folder-o"></i> {BattleLog.formatName(team.format)} {}
+			{team.format.length <= 4 && <em>(uncategorized)</em>}
+		</button></div>;
+	}
+	/** What sits under the editor: for a team, what it can be validated against and uploaded to. */
+	renderExtras(team: Team, unsaved: boolean): preact.ComponentChildren {
+		return <>
+			{!!(team.packedTeam && team.format.length > 4) && <p>
+				<button data-cmd="/validate" class="button"><i class="fa fa-check"></i> Validate</button>
+			</p>}
+			{!!(team.packedTeam || team.uploaded) && <p class="infobox" style="padding: 5px 8px">
+				{team.uploadedPackedTeam && !team.uploaded ? <>
+					Uploading...
+				</> : team.uploaded ? <>
+					<small>Share URL:</small> {}
+					<CopyableURLBox
+						url={`https://psim.us/t/${team.uploaded.teamid}${team.uploaded.private ? '-' + team.uploaded.private : ''}`}
+					/> {}
+					{unsaved && <div style="padding-top:5px">
+						<button class="button notifying" onClick={this.uploadTeam}>
+							<i class="fa fa-upload"></i> <strong>Upload changes</strong>
+						</button> {}
+						<button class="button" onClick={this.restore}>
+							Revert to uploaded version
+						</button> {}
+						<button class="button" onClick={this.compare}>
+							Compare
+						</button>
+					</div>}
+				</> : !team.teamid ? <>
+					<label class="checkbox inline">
+						<input
+							name="teamprivacy" checked={!PS.prefs.uploadprivacy}
+							type="checkbox" onChange={this.changePrivacyPref}
+						/> Public
+					</label>
+					<button class="button exportbutton" onClick={this.uploadTeam}>
+						<i class="fa fa-upload"></i> Upload for
+						{PS.prefs.uploadprivacy ? ' shareable URL' : ' shareable/searchable URL'}
+					</button>
+				</> : <>
+					This is a disconnected team. This could be because you uploaded it
+					on a different account, or because you deleted or un-uploaded it on
+					a different computer. For safety, you can't edit this team. You can,
+					however, delete it, or make a copy (which will be editable).
+				</>}
+			</p>}
+		</>;
+	}
 	override render() {
 		const { room } = this.props;
 		const team = room.getTeam();
@@ -300,46 +398,23 @@ export class TeamPanel extends PSRoomPanel<TeamRoom> {
 				room.update(null);
 			}
 			return <PSPanelWrapper room={room}>
-				<a class="button" href="teambuilder" data-target="replace">
+				<a class="button" href={room.listRoomid()} data-target="replace">
 					<i class="fa fa-chevron-left" aria-hidden></i> List
 				</a>
-				<p class="error">
-					{room.teamDeleted ? 'Team was deleted' : 'Team doesn\'t exist'}
-				</p>
+				{room.pendingMessage() ? <p>{room.pendingMessage()}</p> : <p class="error">
+					{room.teamDeleted ? `${room.roomLabel()} was deleted` : `${room.roomLabel()} doesn't exist`}
+				</p>}
 			</PSPanelWrapper>;
 		}
 
 		const unsaved = team.uploaded && team.uploadedPackedTeam ? team.uploadedPackedTeam !== team.packedTeam : false;
 		return <PSPanelWrapper room={room}>
 			<div class="team-pad">
-				<a class="button" href="teambuilder" data-target="replace">
-					<i class="fa fa-chevron-left" aria-hidden></i> Teams
+				<a class="button" href={room.listRoomid()} data-target="replace">
+					<i class="fa fa-chevron-left" aria-hidden></i> {room.roomLabel()}s
 				</a> {}
-				{team.uploaded ? (
-					<>
-						<button class={`button${unsaved ? ' button-first' : ''}`} data-href={`teamstorage-${team.key}`}>
-							<i class="fa fa-globe"></i> Account {team.uploaded.private ? '' : "(public)"}
-						</button>
-						{unsaved && <button class="button button-last notifying" onClick={this.uploadTeam}>
-							<strong>Upload changes</strong>
-						</button>}
-					</>
-				) : team.teamid ? (
-					<button class="button" data-href={`teamstorage-${team.key}`}>
-						<i class="fa fa-plug"></i> Disconnected (wrong account?)
-					</button>
-				) : (
-					<button class="button" data-href={`teamstorage-${team.key}`}>
-						<i class="fa fa-laptop"></i> Local
-					</button>
-				)}
-				<div style={room.width < 550 ? "margin-top:8px" : "float:right"}><button
-					name="format" value={team.format} data-selecttype="teambuilder"
-					class="select formatselect" data-href="/formatdropdown" onChange={this.handleChangeFormat}
-				>
-					<i class="fa fa-folder-o"></i> {BattleLog.formatName(team.format)} {}
-					{team.format.length <= 4 && <em>(uncategorized)</em>}
-				</button></div>
+				{this.renderStorage(team, unsaved)}
+				{this.renderFormatSelect(team)}
 				<label class="label teamname">
 					Team name:{}
 					<input
@@ -350,50 +425,11 @@ export class TeamPanel extends PSRoomPanel<TeamRoom> {
 			</div>
 			<TeamEditor
 				team={team} onChange={this.save} readOnly={!!team.teamid && !team.uploadedPackedTeam}
-				resources={TeamPanel.renderResources(team.format)}
+				resources={this.usesResources() ? TeamPanel.renderResources(team.format) : null}
 				narrow={room.width < 550}
-				editorRef={(editor: TeamEditorState) => { room.editor = editor; }}
+				editorRef={this.initEditor}
 			>
-				{!!(team.packedTeam && team.format.length > 4) && <p>
-					<button data-cmd="/validate" class="button"><i class="fa fa-check"></i> Validate</button>
-				</p>}
-				{!!(team.packedTeam || team.uploaded) && <p class="infobox" style="padding: 5px 8px">
-					{team.uploadedPackedTeam && !team.uploaded ? <>
-						Uploading...
-					</> : team.uploaded ? <>
-						<small>Share URL:</small> {}
-						<CopyableURLBox
-							url={`https://psim.us/t/${team.uploaded.teamid}${team.uploaded.private ? '-' + team.uploaded.private : ''}`}
-						/> {}
-						{unsaved && <div style="padding-top:5px">
-							<button class="button notifying" onClick={this.uploadTeam}>
-								<i class="fa fa-upload"></i> <strong>Upload changes</strong>
-							</button> {}
-							<button class="button" onClick={this.restore}>
-								Revert to uploaded version
-							</button> {}
-							<button class="button" onClick={this.compare}>
-								Compare
-							</button>
-						</div>}
-					</> : !team.teamid ? <>
-						<label class="checkbox inline">
-							<input
-								name="teamprivacy" checked={!PS.prefs.uploadprivacy}
-								type="checkbox" onChange={this.changePrivacyPref}
-							/> Public
-						</label>
-						<button class="button exportbutton" onClick={this.uploadTeam}>
-							<i class="fa fa-upload"></i> Upload for
-							{PS.prefs.uploadprivacy ? ' shareable URL' : ' shareable/searchable URL'}
-						</button>
-					</> : <>
-						This is a disconnected team. This could be because you uploaded it
-						on a different account, or because you deleted or un-uploaded it on
-						a different computer. For safety, you can't edit this team. You can,
-						however, delete it, or make a copy (which will be editable).
-					</>}
-				</p>}
+				{this.renderExtras(team, unsaved)}
 			</TeamEditor>
 		</PSPanelWrapper>;
 	}

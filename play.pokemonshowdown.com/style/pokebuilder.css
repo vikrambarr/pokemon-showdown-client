@@ -188,11 +188,14 @@
 .pokebuilder .spritecell + .spritecell {
 	border-left: 1px solid #CCCCCC;
 }
-.pokebuilder .spritecell.has {
+.pokebuilder .spritecell.has,
+.formatsettings .chip.cur,
+.formatsettings .chip.unbanned {
 	background: #d9f2d9;
 	color: #206020;
 }
-.pokebuilder .spritecell.missing {
+.pokebuilder .spritecell.missing,
+.formatsettings .chip.banned {
 	background: #f7dcdc;
 	color: #903030;
 }
@@ -202,11 +205,14 @@
 .dark .pokebuilder .spritecell + .spritecell {
 	border-left-color: #555555;
 }
-.dark .pokebuilder .spritecell.has {
+.dark .pokebuilder .spritecell.has,
+.dark .formatsettings .chip.cur,
+.dark .formatsettings .chip.unbanned {
 	background: #2c4a2c;
 	color: #b8e6b8;
 }
-.dark .pokebuilder .spritecell.missing {
+.dark .pokebuilder .spritecell.missing,
+.dark .formatsettings .chip.banned {
 	background: #4a2c2c;
 	color: #e6b8b8;
 }
@@ -327,4 +333,72 @@
 	border-color: #8d959f;
 	box-shadow: inset 0.5px 1px 2px rgba(0, 0, 0, 0.8), inset -0.5px -1px 1px rgba(255, 255, 255, 0.5), -0.5px -1px 1px rgba(255, 255, 255, 0.1);
 	background: #111;
+}
+
+.formatsettings {
+	margin: 0 0 8px 0;
+}
+.formatsettings .label {
+	display: inline-block;
+	margin-right: 12px;
+}
+.formatsettings .rulechips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 3px;
+	max-height: 132px;
+	padding: 3px;
+	overflow-y: auto;
+	border: 1px solid rgba(0, 0, 0, 0.2);
+	border-radius: 4px;
+}
+.formatsettings .chip {
+	padding: 1px 6px;
+	border: 0;
+	border-radius: 3px;
+	background: rgba(0, 0, 0, 0.08);
+	color: inherit;
+	font-size: 10px;
+	line-height: 14px;
+	cursor: pointer;
+}
+.formatsettings .chip:hover {
+	background: rgba(0, 0, 0, 0.16);
+}
+.formatsettings .chipnote {
+	color: #777;
+	font-size: 10px;
+}
+.dark .formatsettings .chip {
+	background: rgba(255, 255, 255, 0.12);
+}
+.dark .formatsettings .chip:hover {
+	background: rgba(255, 255, 255, 0.22);
+}
+.dark .formatsettings .chipnote {
+	color: #999;
+}
+.formatsettings .chip.locked {
+	opacity: 0.5;
+	cursor: default;
+}
+.formatsettings .chip.off {
+	text-decoration: line-through;
+	opacity: 0.7;
+}
+.formatsettings .chip.inherit {
+	border: 1px dashed rgba(0, 0, 0, 0.35);
+	padding: 0 5px;
+}
+.dark .formatsettings .chip.inherit {
+	border-color: rgba(255, 255, 255, 0.35);
+}
+.formatsettings p.chipnote {
+	margin: 4px 0 0 0;
+}
+
+.formatsettings .pickers button {
+	display: block;
+	width: 100%;
+	margin-bottom: 3px;
 }

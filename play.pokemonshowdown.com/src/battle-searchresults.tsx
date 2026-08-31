@@ -37,7 +37,7 @@ export class PSSearchResults extends preact.Component<{
 }> {
 	readonly URL_ROOT = `//${Config.routes.dex}/`;
 	speciesIds: ID[] = [];
-	itemId: ID = '' as ID;
+	itemIds: ID[] = [];
 	abilityIds: ID[] = [];
 	moveIds: ID[] = [];
 	scrollFrame = 0;
@@ -50,7 +50,7 @@ export class PSSearchResults extends preact.Component<{
 		const sortCol = search.sortCol;
 		return [
 			`<li class="result" value="${index}"><div class="sortrow">`,
-			`<button class="sortcol numsortcol${!sortCol ? ' cur' : ''}">`,
+			`<button class="sortcol numsortcol${!sortCol ? ' cur' : ''}"${sortCol ? ' data-unsort' : ''}>`,
 			`${!sortCol ? 'Sort: ' : escapeHTML(search.firstPokemonColumn)}</button>`,
 			`<button class="sortcol pnamesortcol${sortCol === 'name' ? ' cur' : ''}" data-sort="name">Name</button>`,
 			`<button class="sortcol typesortcol${sortCol === 'type' ? ' cur' : ''}" data-sort="type">Types</button>`,
@@ -158,7 +158,8 @@ export class PSSearchResults extends preact.Component<{
 		if (!item) return `<li class="result" value="${index}">Unrecognized item</li>`;
 
 		return `<li class="result" value="${index}"><a href="${this.URL_ROOT}items/${id}" ` +
-			`class="${id === this.itemId ? 'cur' : ''}" data-target="push" data-entry="item|${escapeHTML(item.name)}">` +
+			`class="${this.itemIds.includes(id) ? 'cur' : ''}" data-target="push" ` +
+			`data-entry="item|${escapeHTML(item.name)}">` +
 			`<span class="col itemiconcol"><span class="pixelated" style="${escapeHTML(Dex.getItemIcon(item))}"></span></span>` +
 			`<span class="col namecol">${id ? this.renderNameHTML(item.name, matchStart, matchEnd) : '<i>(no item)</i>'}</span>` +
 			(id ? (errorMessage || '') : '') +
@@ -418,6 +419,16 @@ export class PSSearchResults extends preact.Component<{
 					break;
 				}
 
+				// back to the default order
+				if (target.hasAttribute('data-unsort')) {
+					search.clearSort();
+					search.find('');
+					ev.preventDefault();
+					ev.stopPropagation();
+					this.props.onSelect?.(null, '');
+					break;
+				}
+
 				// sort
 				const sort = target.getAttribute('data-sort');
 				if (sort) {
@@ -467,14 +478,14 @@ export class PSSearchResults extends preact.Component<{
 		const set = search.typedSearch?.set;
 		if (set) {
 			this.speciesIds = search.selectedSpecies || [toID(set.species)];
-			this.itemId = toID(set.item);
-			this.abilityIds = set.abilities?.map(toID) || [toID(set.ability)];
-			this.moveIds = set.moves.map(toID);
+			this.itemIds = search.selectedItems || [toID(set.item)];
+			this.abilityIds = search.selectedAbilities || set.abilities?.map(toID) || [toID(set.ability)];
+			this.moveIds = search.selectedMoves || set.moves.map(toID);
 		} else {
 			this.speciesIds = search.selectedSpecies || [];
-			this.itemId = '' as ID;
-			this.abilityIds = [];
-			this.moveIds = [];
+			this.itemIds = search.selectedItems || [];
+			this.abilityIds = search.selectedAbilities || [];
+			this.moveIds = search.selectedMoves || [];
 		}
 	}
 

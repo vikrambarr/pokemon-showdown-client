@@ -10,8 +10,7 @@ import { PSIcon, PSPanelWrapper, PSRoomPanel } from "./panels";
 import { Dex, toID, type ID } from "./battle-dex";
 import { BattleStatNames } from "./battle-dex-data";
 import { BattleLog } from "./battle-log";
-import { TeamEditor, type SetEditor, type TeamEditorState } from "./battle-team-editor";
-import { TeamPanel } from "./panel-teambuilder-team";
+import { SetImportForm, TeamEditor, type SetEditor, type TeamEditorState } from "./battle-team-editor";
 import {
 	abilitySlots, COLORS, CustomDex, EGG_GROUPS, EVO_TYPES, exportSpecies, type ParsedSpecies, parseSpecies,
 	PokebuilderDexSearch, speciesAbilities, TAGS,
@@ -153,14 +152,6 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 	/** Which set the picker below is editing, remembered across focus changes. */
 	focusIndex = 0;
 
-	loadResources() {
-		const format = this.props.room.team.format;
-		if (format.length <= 4) return;
-		TeamPanel.getFormatResources(format).then(() => {
-			this.forceUpdate();
-		});
-	}
-
 	override componentWillUnmount() {
 		this.props.room.editor = undefined;
 		super.componentWillUnmount();
@@ -174,7 +165,6 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 			this.forceUpdate();
 		});
 		CustomDex.load();
-		this.loadResources();
 	}
 
 	initEditor = (editor: TeamEditorState) => {
@@ -334,7 +324,7 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		const editor = this.props.room.editor;
 		if (!editor) return;
 		const target = ev.currentTarget as HTMLElement;
-		this.setEditor.selectAbility(editor, setIndexOf(ev), target.getAttribute('data-ability')!);
+		this.setEditor.selectAbility!(editor, setIndexOf(ev), target.getAttribute('data-ability')!);
 		editor.update();
 	};
 	openMoves = (ev: Event) => {
@@ -423,6 +413,10 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		// See rename: an unstopped click reaches PS's outside-click handler and closes the popup.
 		ev.preventDefault();
 		ev.stopImmediatePropagation();
+		const max = CustomDex.limits.species?.max;
+		if (max !== undefined && CustomDex.ids.length >= max) {
+			return PS.alert(`You already have ${max} custom Pokémon, which is the limit. Delete one first.`);
+		}
 		PS.prompt(`Name your new Pokémon:`, {
 			okButton: 'Create', parentElem: ev.currentTarget as HTMLElement,
 		}).then(name => {
@@ -498,7 +492,9 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		return '';
 	}
 	applyImport(id: ID, parsed: ParsedSpecies) {
-		CustomDex.patch(id, parsed.fields);
+		const { inheritsFrom, ...fields } = parsed.fields;
+		CustomDex.setInherits(id, inheritsFrom ?? null);
+		CustomDex.patch(id, fields);
 		CustomDex.setLearnset(id, parsed.moves);
 		this.edited();
 		this.props.room.editor?.update();
@@ -585,7 +581,14 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 				{unsaved ? 'Save' : 'Saved'}
 			</button> {}</>;
 		},
+		/** The tab's text is the Pokemon being edited; the team paste behind it means nothing here. */
+		textTab: editor => <SetImportForm
+			editor={editor} setIndex={Math.min(this.focusIndex, editor.sets.length - 1)}
+			set={editor.sets[Math.min(this.focusIndex, editor.sets.length - 1)]}
+			onChange={() => editor.update()}
+		/>,
 		importExport: {
+			label: 'Pok\u00e9mon',
 			export: (_editor, setIndex) => exportSpecies(this.speciesId(setIndex)),
 			import: (_editor, setIndex, text) => this.importSpecies(setIndex, text),
 		},
@@ -889,7 +892,6 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 	handleChangeFormat = (ev: Event) => {
 		this.props.room.setFormat((ev.currentTarget as HTMLButtonElement).value);
 		this.forceUpdate();
-		this.loadResources();
 	};
 	/** An edit landed locally; saving to the server is the Save button's job now. */
 	edited = () => {
@@ -923,14 +925,10 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 				</label>
 			</div>
 			<TeamEditor
-				team={team} onChange={this.edited} resources={TeamPanel.renderResources(team.format)}
+				team={team} onChange={this.edited}
 				narrow={room.width < 550}
 				editorRef={this.initEditor}
-			>
-				{!!(team.packedTeam && team.format.length > 4) && <p>
-					<button data-cmd="/validate" class="button"><i class="fa fa-check"></i> Validate</button>
-				</p>}
-			</TeamEditor>
+			/>
 		</div></PSPanelWrapper>;
 	}
 }

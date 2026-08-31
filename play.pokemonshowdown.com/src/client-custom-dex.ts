@@ -13,14 +13,41 @@ declare const BattleTeambuilderTable: any;
 
 export type CustomSpriteSet = { [kind: string]: string };
 
-type CustomDexWrite = { command: string, id: ID, json?: string, resolve?: (name: string | null) => void };
+/** The four lists a format's rules decide, and that the builder edits with a picker each. */
+export const ROSTER_KINDS = ['pokemon', 'move', 'ability', 'item'] as const;
+export type RosterKind = typeof ROSTER_KINDS[number];
+export type Roster = { [kind in RosterKind]: ID[] };
+export type FormatBans = { tags: { [tagid: string]: string }, other: string[] };
+
+export function emptyRoster(): Roster {
+	return { pokemon: [], move: [], ability: [], item: [] };
+}
+function toRoster(data: AnyObject | undefined): Roster {
+	const roster = emptyRoster();
+	for (const kind of ROSTER_KINDS) roster[kind] = (data?.[kind] || []).map(toID);
+	return roster;
+}
+
+type CustomDexWrite = {
+	command: string, id: ID, json?: string, resolve?: (name: string | null) => void,
+	/** The CRQ to send it to; formats and species share this queue so they stay ordered. */
+	cmd?: string,
+};
 
 export interface CustomDexOverlay {
 	Pokedex: { [id: string]: AnyObject };
 	Learnsets: { [id: string]: { learnset?: { [moveid: string]: string[] } } };
 	sprites: { [id: string]: CustomSpriteSet };
 	limits?: { [field: string]: FieldLimit };
-	entries?: { name: string, inheritsFrom: string | null }[];
+	entries?: { name: string, inheritsFrom: string | null, species: AnyObject, learnset: AnyObject }[];
+	formats?: {
+		id: string, name: string, mod: string, baseMod: string, base: string,
+		ruleset: string[], banlist: string[], unbanlist: string[],
+	}[];
+	/** Sent with the overlay: what the format builder may offer, straight from the sim. */
+	rulesets?: { id: ID, name: string, desc?: string }[];
+	tags?: { id: ID, name: string, kind: string }[];
+	mods?: string[];
 }
 
 export interface FieldLimit { min?: number; max?: number; maxLength?: number }
@@ -39,9 +66,28 @@ export const CustomDex = new class extends PSModel {
 	limits: { [field: string]: FieldLimit } = {};
 	ids: ID[] = [];
 	baseOf: { [id: string]: ID } = {};
+	/**
+	 * Each entry as its owner wrote it: overrides only. `Pokedex` holds the *resolved* species
+	 * (base + overrides), so saving that back would freeze everything a variant inherits.
+	 */
+	raw: { [id: string]: { species: AnyObject, learnset: AnyObject, inheritsFrom: string | null } } = {};
+	/** Bumped whenever the overlay object is replaced, so derived caches can tell. */
+	revision = 0;
 	requestedFor: ID | null = null;
 	loadTimer: ReturnType<typeof setTimeout> | null = null;
 	saved: { [id: string]: string } = {};
+	/** What each custom format currently allows, keyed by format id, straight from its rule table. */
+	formatLegal: { [formatid: string]: Roster } = {};
+	/** The same, with everything the pickers wrote dropped: what "reset" goes back to. */
+	formatDefaultLegal: { [formatid: string]: Roster } = {};
+	/** The named rulesets each custom format resolves to, base format included. */
+	formatRules: { [formatid: string]: ID[] } = {};
+	/** The roster request in flight, so the two mount paths asking at once only cost one. */
+	legalPending: ID | null = null;
+	/** Of those, the ones the format can't switch off, mapped to the reason it can't. */
+	formatLockedRules: { [formatid: string]: { [ruleid: string]: string } } = {};
+	/** The tags the format bans, and whatever else in its lists no picker or chip covers. */
+	formatBans: { [formatid: string]: FormatBans } = {};
 	queue: CustomDexWrite[] = [];
 	pending: CustomDexWrite | null = null;
 
@@ -107,13 +153,37 @@ export const CustomDex = new class extends PSModel {
 		}
 	}
 	apply(overlay: CustomDexOverlay) {
+		// Any write refreshes the whole overlay, so edits the user hasn't saved yet — which may
+		// belong to a Pokemon that had nothing to do with this write — have to be carried across.
+		const pending: { [id: string]: { species: AnyObject, learnset: AnyObject, raw: AnyObject } } = {};
+		for (const id of this.ids) {
+			if (!overlay.Pokedex[id] || !this.isDirty(id)) continue;
+			pending[id] = {
+				species: this.overlay!.Pokedex[id],
+				learnset: this.overlay!.Learnsets?.[id]?.learnset || {},
+				raw: this.raw[id]?.species || {},
+			};
+		}
+
 		this.unapply(this.ids.filter(id => !overlay.Pokedex[id]));
 		this.overlay = overlay;
+		this.revision++;
 		this.sprites = overlay.sprites || {};
 
 		this.baseOf = {};
+		this.raw = {};
 		for (const entry of overlay.entries || []) {
-			if (entry.inheritsFrom) this.baseOf[toID(entry.name)] = toID(entry.inheritsFrom);
+			const id = toID(entry.name);
+			if (entry.inheritsFrom) this.baseOf[id] = toID(entry.inheritsFrom);
+			this.raw[id] = {
+				species: { ...entry.species }, learnset: { ...entry.learnset },
+				inheritsFrom: entry.inheritsFrom || null,
+			};
+		}
+		for (const id in pending) {
+			overlay.Pokedex[id] = pending[id].species;
+			if (overlay.Learnsets) overlay.Learnsets[id] = { learnset: pending[id].learnset };
+			if (this.raw[id]) this.raw[id].species = pending[id].raw;
 		}
 
 		for (const id in overlay.Pokedex) {
@@ -137,8 +207,10 @@ export const CustomDex = new class extends PSModel {
 		this.ids = Object.keys(overlay.Pokedex).sort((a, b) => (
 			(overlay.Pokedex[a].name || a).localeCompare(overlay.Pokedex[b].name || b)
 		)) as ID[];
-		// Everything the server just sent us counts as saved, so nothing reads as dirty on load.
-		for (const id of this.ids) this.saved[id] = this.speciesJSON(id)!;
+		// Everything the server just sent us counts as saved; anything we carried over stays dirty.
+		for (const id of this.ids) {
+			if (!pending[id]) this.saved[id] = this.speciesJSON(id)!;
+		}
 	}
 	patch(id: ID, changes: AnyObject) {
 		if (!this.overlay?.Pokedex[id]) return;
@@ -149,8 +221,35 @@ export const CustomDex = new class extends PSModel {
 		}
 		Object.assign(this.overlay.Pokedex[id], changes);
 		Object.assign(window.BattlePokedex[id], changes);
+		if (this.raw[id]) Object.assign(this.raw[id].species, changes);
 		for (const mod of Object.values(Dex.moddedDexes)) delete mod.cache.Species[id];
 		this.update();
+	}
+	/**
+	 * Asks what the format's rules allow now. `changed` is what an edit sends: it always re-asks,
+	 * where a request that only wants to be sure waits for the one already out. The default roster
+	 * costs the server as much as the real one, so it's asked for only when we don't have it.
+	 */
+	loadFormatLegal(name: string, changed?: boolean) {
+		const id = toID(name);
+		if (!changed && this.legalPending === id) return;
+		this.legalPending = id;
+		PS.send(`/cmd customformatlegal ${name}${this.formatDefaultLegal[id] ? '' : ', default'}`);
+	}
+	receiveFormatLegal(response: AnyObject | null) {
+		this.legalPending = null;
+		if (!response || response.actionerror || !response.name) return;
+		const id = toID(response.name);
+		this.formatLegal[id] = toRoster(response.legal);
+		if (response.defaultLegal) this.formatDefaultLegal[id] = toRoster(response.defaultLegal);
+		this.formatRules[id] = (response.rules || []).map(toID);
+		this.formatLockedRules[id] = response.locked || {};
+		this.formatBans[id] = response.bans || { tags: {}, other: [] };
+		this.update();
+	}
+	/** Import can change what an entry inherits from; it lives outside the species overrides. */
+	setInherits(id: ID, name: string | null) {
+		if (this.raw[id]) this.raw[id].inheritsFrom = name;
 	}
 	learnset(id: ID): string[] {
 		const learnset = this.overlay?.Learnsets?.[id]?.learnset;
@@ -160,21 +259,36 @@ export const CustomDex = new class extends PSModel {
 	setLearnset(id: ID, moves: string[]) {
 		if (!this.overlay?.Pokedex[id]) return;
 		if (!this.overlay.Learnsets) this.overlay.Learnsets = {};
+		const max = this.limits.learnset?.max;
+		if (max !== undefined && moves.length > max) {
+			PS.alert(`A learnset can hold at most ${max} moves.`);
+			moves = moves.slice(0, max);
+		}
 		const previous = this.overlay.Learnsets[id]?.learnset || {};
+		const own = this.raw[id]?.learnset || {};
 		const learnset: { [moveid: string]: string[] } = {};
+		const ownNext: { [moveid: string]: string[] } = {};
 		const table: { [moveid: string]: string } = {};
 		for (const move of moves) {
 			const moveid = toID(move);
-			learnset[moveid] = previous[moveid] || ['9L1'];
+			const sources = previous[moveid] || [`${Dex.gen}L1`];
+			learnset[moveid] = sources;
+			// A move that came from the inherited base stays inherited rather than becoming an override.
+			if (own[moveid] || !(moveid in previous)) ownNext[moveid] = own[moveid] || sources;
 			table[moveid] = ALL_SOURCE_CHARS;
 		}
 		this.overlay.Learnsets[id] = { learnset };
+		if (this.raw[id]) this.raw[id].learnset = ownNext;
 		BattleTeambuilderTable.learnsets[id] = table;
 	}
 	speciesJSON(id: ID) {
-		const data = this.overlay?.Pokedex[id];
-		if (!data) return null;
-		const out: AnyObject = { learnset: this.overlay!.Learnsets?.[id]?.learnset || {} };
+		if (!this.overlay?.Pokedex[id]) return null;
+		const entry = this.raw[id];
+		const data = entry?.species || this.overlay.Pokedex[id];
+		const out: AnyObject = {
+			inheritsFrom: entry ? entry.inheritsFrom : null,
+			learnset: entry ? entry.learnset : this.overlay.Learnsets?.[id]?.learnset || {},
+		};
 		for (const field of SPECIES_FIELDS) {
 			if (data[field] !== undefined) out[field] = data[field];
 		}
@@ -213,6 +327,36 @@ export const CustomDex = new class extends PSModel {
 			});
 		});
 	}
+	/** Formats share the species queue, so every write lands in the order it was made. */
+	formatWrite(command: string, name: string) {
+		return new Promise<string | null>(resolve => {
+			this.write({ cmd: 'customformat', command, id: toID(name), resolve });
+		});
+	}
+	/** A format starts from an existing one; its rules are the starting roster. */
+	createFormat(name: string, base: string) {
+		return this.formatWrite(`create ${JSON.stringify({ name, base })}`, name);
+	}
+	/** Throws away every change to the rules, back to the base format they were copied from. */
+	resetFormat(name: string) {
+		return this.formatWrite(`reset ${name}`, name);
+	}
+	deleteFormat(name: string) {
+		return this.formatWrite(`delete ${name}`, name);
+	}
+	/**
+	 * Applies a format edit to the local overlay right away. Without this, anything that reads the
+	 * overlay back sees the server's copy until the write lands, so the UI runs an edit behind.
+	 */
+	patchFormat(id: string, changes: AnyObject) {
+		const entry = this.overlay?.formats?.find(format => format.id === id);
+		if (!entry) return;
+		Object.assign(entry, changes);
+		this.update();
+	}
+	editFormat(name: string, changes: AnyObject) {
+		return this.formatWrite(`edit ${name}, ${JSON.stringify(changes)}`, name);
+	}
 	rename(oldName: string, newName: string) {
 		return new Promise<string | null>(resolve => {
 			this.write({
@@ -227,7 +371,7 @@ export const CustomDex = new class extends PSModel {
 	pump() {
 		if (this.pending || !this.queue.length) return;
 		this.pending = this.queue.shift()!;
-		PS.send(`/cmd custompokemon ${this.pending.command}`);
+		PS.send(`/cmd ${this.pending.cmd || 'custompokemon'} ${this.pending.command}`);
 	}
 	receiveWrite(response: AnyObject | null) {
 		const job = this.pending;
@@ -235,6 +379,12 @@ export const CustomDex = new class extends PSModel {
 		if (!response || response.actionerror) {
 			PS.alert(response?.actionerror || `Couldn't save your custom Pokémon.`);
 			job?.resolve?.(null);
+			// A refused write leaves whatever was applied locally standing in for it, and the next
+			// edit would be built on top of that: go back to the server's copy of both the format
+			// and the rules it resolves to.
+			this.load(true);
+			const format = this.overlay?.formats?.find(entry => toID(entry.name) === job?.id);
+			if (format) this.loadFormatLegal(format.name, true);
 		} else {
 			if (job?.json) this.saved[job.id] = job.json;
 			job?.resolve?.(response.name || null);
@@ -247,11 +397,34 @@ export const CustomDex = new class extends PSModel {
 		if (!this.ids.length) return [['header', this.emptyMessage()]];
 		return this.ids.map(id => ['pokemon', id] as SearchRow);
 	}
-	emptyMessage() {
-		if (!PS.user.named) return `Log in to see your custom Pokémon`;
+	/**
+	 * Flip one named ruleset locally, so a chip doesn't sit a click behind the server. Turning a
+	 * ruleset on can pull others in with it; the rule table that comes back settles that.
+	 */
+	patchFormatRules(key: ID, rule: ID, on: boolean) {
+		const rules = this.formatRules[key] || [];
+		this.formatRules[key] = on ? [...rules, rule] : rules.filter(id => id !== rule);
+		this.update();
+	}
+	/** Every ruleset and tag the builder can toggle, and every mod it can name: all from the server. */
+	rulesets() {
+		return this.overlay?.rulesets || [];
+	}
+	tags() {
+		return this.overlay?.tags || [];
+	}
+	mods() {
+		return this.overlay?.mods || [];
+	}
+	/** Why the server's copy isn't here to look at yet, or null once it has actually arrived. */
+	pendingReason(kind: string) {
+		if (!PS.user.named) return `Log in to see your ${kind}`;
 		if (this.error && !this.loading) return this.error;
-		if (this.loading || !this.loadedFor) return `Loading your custom Pokémon...`;
-		return `You haven't made any custom Pokémon yet`;
+		if (this.loading || !this.loadedFor) return `Loading your ${kind}...`;
+		return null;
+	}
+	emptyMessage() {
+		return this.pendingReason('custom Pokémon') || `You haven't made any custom Pokémon yet`;
 	}
 	nameMatches(query: ID): SearchRow[] {
 		if (!query) return [];
@@ -336,11 +509,13 @@ Dex.getTeambuilderSprite = (pokemon: any, dex?: any, xOffset = 0, yOffset = 0) =
 const INSTAFILTERABLE: SearchType[] = ['type', 'ability', 'move'];
 
 const allCache: { [type: string]: { rows: SearchRow[], table: { [id: string]: AnyObject } } } = {};
-function allOf(searchType: 'ability' | 'move') {
+function allOf(searchType: 'ability' | 'move' | 'item') {
 	if (!allCache[searchType]) {
-		const source = searchType === 'ability' ? BattleAbilities : BattleMovedex;
+		const source = searchType === 'ability' ? BattleAbilities :
+			searchType === 'item' ? BattleItems : BattleMovedex;
 		const ids = Object.keys(source).filter(id => id !== 'noability');
-		const get = (id: string) => (searchType === 'ability' ? Dex.abilities.get(id) : Dex.moves.get(id)).name;
+		const get = (id: string) => (searchType === 'ability' ? Dex.abilities.get(id) :
+			searchType === 'item' ? Dex.items.get(id) : Dex.moves.get(id)).name;
 		ids.sort((a, b) => get(a).localeCompare(get(b)));
 		const rows: SearchRow[] = [['header', 'All']];
 		const table: { [id: string]: AnyObject } = {};
@@ -397,6 +572,70 @@ const STAT_LABELS: { [stat: string]: string } = {
 };
 const STAT_IDS = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'];
 
+/**
+ * A format as text, the way a species is: its name, what it's built on, then its rules. The rules
+ * are spelled the way the sim spells them everywhere else - bare to add a ruleset, `-` to ban, `+`
+ * to unban - so a line here is a line a challenge would take.
+ */
+export function exportFormat(format: {
+	name: string, base: string, mod: string, ruleset: string[], banlist: string[], unbanlist: string[],
+}): string {
+	const lines = [format.name];
+	if (format.base) lines.push(`Base: ${format.base}`);
+	if (format.mod) lines.push(`Mod: ${format.mod}`);
+	lines.push('');
+	return [
+		...lines, ...format.ruleset,
+		...format.banlist.map(rule => `-${rule}`), ...format.unbanlist.map(rule => `+${rule}`),
+	].join('\n');
+}
+
+export interface ParsedFormat {
+	base: string | null; mod: string | null; ruleset: string[]; banlist: string[]; unbanlist: string[];
+}
+
+/**
+ * The same text back into fields. `Base: X @@@ a, b` is how a challenge writes a format, so that
+ * spelling is taken too, on any line. The name is the format's identity rather than one of its
+ * fields, so a first line that isn't a rule is read past.
+ */
+export function parseFormat(text: string): ParsedFormat | string {
+	const parsed: ParsedFormat = { base: null, mod: null, ruleset: [], banlist: [], unbanlist: [] };
+	const lines: string[] = [];
+	for (const line of text.split('\n')) {
+		const trimmed = line.trim();
+		if (!trimmed) continue;
+		if (!trimmed.includes('@@@')) {
+			lines.push(trimmed);
+			continue;
+		}
+		const [base, rules] = trimmed.split('@@@');
+		if (base.trim()) lines.push(`Base: ${base.trim()}`);
+		for (const rule of rules.split(',')) {
+			if (rule.trim()) lines.push(rule.trim());
+		}
+	}
+	let readName = false;
+	for (const line of lines) {
+		const field = /^(base|mod)\s*:(.*)$/i.exec(line);
+		if (field) {
+			parsed[field[1].toLowerCase() as 'base' | 'mod'] = field[2].trim() || null;
+		} else if (line.startsWith('-')) {
+			parsed.banlist.push(line.slice(1).trim());
+		} else if (line.startsWith('+')) {
+			parsed.unbanlist.push(line.slice(1).trim());
+		} else if (!readName && line === lines[0]) {
+			readName = true;
+		} else {
+			parsed.ruleset.push(line);
+		}
+	}
+	if (!parsed.base && !parsed.mod) {
+		return `Name a "Base:" format to build on, or a "Mod:" to start from scratch.`;
+	}
+	return parsed;
+}
+
 export function exportSpecies(id: ID): string {
 	const data = CustomDex.overlay?.Pokedex[id];
 	if (!data) return '';
@@ -407,6 +646,7 @@ export function exportSpecies(id: ID): string {
 	};
 	const list = (value: any) => (value || []).join(' / ');
 	const abilities = data.abilities || {};
+	line('Inherits From', CustomDex.raw[id]?.inheritsFrom);
 	line('Types', list(data.types));
 	line('Abilities', [abilities['0'], abilities['1']].filter(Boolean).join(' / '));
 	line('Hidden Ability', abilities.H);
@@ -426,6 +666,9 @@ export function exportSpecies(id: ID): string {
 	line('Evo Level', data.evoLevel);
 	line('Evo Condition', data.evoCondition);
 	line('Tags', list(data.tags));
+	line('Forme', data.forme);
+	line('Max HP', data.maxHP);
+	if (data.cannotDynamax) line('Cannot Dynamax', 'Yes');
 	line('Color', data.color);
 	line('Category', data.category);
 	line('Dex Entry', (data.dexEntry || '').replace(/\s+/g, ' ').trim());
@@ -445,10 +688,21 @@ function oneOf(value: string, options: readonly string[], what: string) {
 	if (!match) throw new Error(`"${value}" is not a ${what}. Try: ${options.join(', ')}.`);
 	return match;
 }
-function number(value: string, what: string) {
-	const parsed = parseFloat(value);
-	if (isNaN(parsed)) throw new Error(`"${what}" needs a number.`);
+function number(value: string, what: string, field?: string, whole?: boolean) {
+	const parsed = Number(value.trim());
+	if (!value.trim() || !Number.isFinite(parsed)) throw new Error(`"${what}" needs a number.`);
+	if (whole && !Number.isInteger(parsed)) throw new Error(`"${what}" must be a whole number.`);
+	const { min, max } = (field && CustomDex.limits[field]) || {};
+	if (min !== undefined && parsed < min) throw new Error(`"${what}" can't be below ${min}.`);
+	if (max !== undefined && parsed > max) throw new Error(`"${what}" can't be above ${max}.`);
 	return parsed;
+}
+function capped(value: string, what: string, field: string) {
+	const maxLength = CustomDex.limits[field]?.maxLength;
+	if (maxLength !== undefined && value.length > maxLength) {
+		throw new Error(`"${what}" can be at most ${maxLength} characters.`);
+	}
+	return value;
 }
 
 /** Returns the parsed species, or an error message to show the user. */
@@ -495,7 +749,7 @@ export function parseSpecies(text: string): ParsedSpecies | string {
 						if (toID(STAT_LABELS[statID]) === toID(words[1])) stat = statID;
 					}
 					if (!stat) throw new Error(`"${words[1] || part}" is not a stat.`);
-					baseStats[stat] = number(words[0], 'Base Stats');
+					baseStats[stat] = number(words[0], 'Base Stats', 'baseStat', true);
 				}
 				fields.baseStats = baseStats;
 				break;
@@ -503,8 +757,12 @@ export function parseSpecies(text: string): ParsedSpecies | string {
 			case 'egggroups':
 				fields.eggGroups = parts.map(part => oneOf(part, EGG_GROUPS, 'egg group'));
 				break;
-			case 'weight': fields.weightkg = number(value, 'Weight'); break;
-			case 'height': fields.heightm = number(value, 'Height'); break;
+			case 'inheritsfrom': fields.inheritsFrom = named(Dex.species, value, 'Pokemon'); break;
+			case 'weight': fields.weightkg = number(value, 'Weight', 'weightkg'); break;
+			case 'height': fields.heightm = number(value, 'Height', 'heightm'); break;
+			case 'forme': fields.forme = capped(value, 'Forme', 'forme'); break;
+			case 'maxhp': fields.maxHP = number(value, 'Max HP', 'maxHP', true); break;
+			case 'cannotdynamax': fields.cannotDynamax = toID(value) !== 'no'; break;
 			case 'gender': fields.gender = oneOf(value, ['M', 'F', 'N'], 'gender'); break;
 			case 'genderratio': {
 				const [male] = value.split(':');
@@ -517,12 +775,12 @@ export function parseSpecies(text: string): ParsedSpecies | string {
 				fields.evos = parts.map(part => named(Dex.species, part, 'Pokemon'));
 				break;
 			case 'evotype': fields.evoType = oneOf(value, EVO_TYPES, 'evolution type'); break;
-			case 'evolevel': fields.evoLevel = number(value, 'Evo Level'); break;
-			case 'evocondition': fields.evoCondition = value; break;
+			case 'evolevel': fields.evoLevel = number(value, 'Evo Level', 'evoLevel', true); break;
+			case 'evocondition': fields.evoCondition = capped(value, 'Evo Condition', 'evoCondition'); break;
 			case 'tags': fields.tags = parts.map(part => oneOf(part, TAGS, 'tag')); break;
 			case 'color': fields.color = oneOf(value, COLORS, 'colour'); break;
-			case 'category': fields.category = value; break;
-			case 'dexentry': fields.dexEntry = value; break;
+			case 'category': fields.category = capped(value, 'Category', 'category'); break;
+			case 'dexentry': fields.dexEntry = capped(value, 'Dex Entry', 'dexEntry'); break;
 			default:
 				throw new Error(`"${trimmed.slice(0, colon)}" isn't a field.`);
 			}
@@ -531,6 +789,14 @@ export function parseSpecies(text: string): ParsedSpecies | string {
 		return err.message;
 	}
 	if (!name) return `Start with the Pokemon's name on the first line.`;
+	const maxName = CustomDex.limits.name?.maxLength;
+	if (maxName !== undefined && name.length > maxName) {
+		return `Names can be at most ${maxName} characters.`;
+	}
+	const maxMoves = CustomDex.limits.learnset?.max;
+	if (maxMoves !== undefined && moves.length > maxMoves) {
+		return `A learnset can hold at most ${maxMoves} moves.`;
+	}
 	if (sawAbility) fields.abilities = abilities;
 	return { name, fields, moves };
 }
@@ -564,6 +830,48 @@ export function speciesAbilities(species: AnyObject | null | undefined): [string
 		.filter(([, name]) => name && name !== 'No Ability') as [string, string][];
 }
 
+/** What a format allows, pinned above everything there is, the way selected moves are. */
+function pinRoster(kind: RosterKind, roster: ID[], rows: SearchRow[]): SearchRow[] {
+	const legal: { [id: string]: boolean } = {};
+	for (const id of roster) legal[id] = true;
+	const inFormat: SearchRow[] = [];
+	const rest: SearchRow[] = [];
+	let sortRow: SearchRow | null = null;
+	/** The section the next legal species falls under, until its divider has been emitted. */
+	let divider: SearchRow | null = null;
+	for (const row of rows) {
+		if (row[0] === 'sortpokemon') {
+			sortRow = row;
+			continue;
+		}
+		if (row[0] === 'header') {
+			// Tagged, so a divider still says which section it belongs to once the title scrolls off.
+			// A list with no sections of its own has only the one everything is under, and that's
+			// nothing to divide.
+			divider = row[1] === 'All' ? null : ['header', `Legal: ${row[1]}`];
+		} else if (row[0] === kind && legal[row[1]]) {
+			if (divider) {
+				inFormat.push(divider);
+				divider = null;
+			}
+			inFormat.push(row);
+		}
+		rest.push(row);
+	}
+	// Each section drops its own empty dividers: a title followed by its first divider only looks
+	// like the empty section `dropEmptyHeaders` exists to collapse.
+	const below = dropEmptyHeaders(rest);
+	return [
+		...(sortRow ? [sortRow] : []),
+		...(inFormat.length ? [
+			['header', `Legal in this format (${roster.length})`] as SearchRow, ...dropEmptyHeaders(inFormat),
+		] : []),
+		// Lists that already open with one don't need a second heading over the same rows.
+		...(below[0]?.[0] === 'header' && below[0][1] === 'All' ? [] : [['header', 'All'] as SearchRow]),
+		...below,
+	];
+}
+
 function pinAbilities(typedSearch: AnyObject, rows: SearchRow[]): SearchRow[] {
 	const ids: ID[] = (typedSearch.set?.abilities || []).map(toID);
 	const species = Dex.species.get(typedSearch.set?.species);
@@ -595,7 +903,81 @@ function evolvable(data: AnyObject | undefined) {
 	return !data.isNonstandard || data.isNonstandard === 'Past';
 }
 
+let everyCache: { key: string, rows: SearchRow[], table: { [id: string]: AnyObject } } | null = null;
 let officialCache: { rows: SearchRow[], table: { [id: string]: AnyObject } } | null = null;
+let assembled: { key: string, value: { rows: SearchRow[], table: { [id: string]: AnyObject } } } | null = null;
+const tierCache: { [gen: string]: SearchRow[] } = {};
+
+/**
+ * Formes that only ever exist mid-battle, which no teambuilder offers, so the picker shouldn't
+ * either: the tier tables leave exactly these out, and the server won't call them legal
+ * (`unbuildableForme` in `chat-plugins/custom-formats.ts` keeps the same list). Battle-only alone is
+ * the wrong test, since Zacian-Crowned, Palafin-Hero and every mega are battle-only and buildable.
+ */
+const UNBUILDABLE_BASES = [
+	'Aegislash', 'Castform', 'Cherrim', 'Cramorant', 'Eiscue', 'Meloetta', 'Mimikyu', 'Minior',
+	'Morpeko', 'Ramnarok', 'Wishiwashi',
+];
+function unbuildableForme(id: ID) {
+	const species = Dex.species.get(id);
+	if (!species.forme) return false;
+	return UNBUILDABLE_BASES.includes(species.baseSpecies) || species.forme.includes('Totem') ||
+		species.forme.includes('Zen') || (species.baseSpecies === 'Ogerpon' && species.forme.includes('Tera'));
+}
+
+/**
+ * The teambuilder's own tier order, tier headers included. Built the way `getBaseResults` builds
+ * it, so whichever runs first the other still finds its `tierSet`.
+ */
+function tierRows(gen: number): SearchRow[] {
+	if (!tierCache[gen]) {
+		const table = (gen < 9 ? BattleTeambuilderTable?.[`gen${gen}`] : BattleTeambuilderTable) || {};
+		if (!table.tierSet) {
+			table.tierSet = (table.tiers || []).map((r: any) => (typeof r === 'string' ? ['pokemon', r] : [r[0], r[1]]));
+			table.tiers = null;
+		}
+		tierCache[gen] = table.tierSet;
+	}
+	return tierCache[gen];
+}
+
+/** Every species there is, with no eligibility filter: a format roster can hold anything. */
+function everySpecies(gen: number) {
+	const key = `${gen}|${CustomDex.revision}|${CustomDex.ids.join(',')}`;
+	if (everyCache?.key !== key) {
+		const own: { [id: string]: boolean } = {};
+		for (const id of CustomDex.ids) own[id] = true;
+		const listed: { [id: string]: boolean } = {};
+		const tiered: SearchRow[] = [];
+		for (const row of tierRows(gen)) {
+			if (row[0] === 'header') {
+				tiered.push(row);
+			} else if (window.BattlePokedex[row[1]]?.name && !own[row[1]] && !listed[row[1]]) {
+				listed[row[1]] = true;
+				tiered.push(row);
+			}
+		}
+		const rest = (Object.keys(window.BattlePokedex) as ID[])
+			.filter(id => id && window.BattlePokedex[id]?.name && !own[id] && !listed[id] && !unbuildableForme(id));
+		const names: { [id: string]: string } = {};
+		for (const id of rest) names[id] = Dex.species.get(id).name;
+		rest.sort((a, b) => names[a].localeCompare(names[b]));
+		const table: { [id: string]: AnyObject } = {};
+		for (const id of [...Object.keys(listed), ...rest]) table[id] = window.BattlePokedex[id];
+		everyCache = {
+			key,
+			rows: dropEmptyHeaders([
+				['header', 'Custom'], ...CustomDex.ids.map(id => ['pokemon', id] as SearchRow),
+				...tiered,
+				// Whatever the tier table leaves out: past-gen formes, megas, Gmax, Pokestar.
+				['header', 'Illegal'], ...rest.map(id => ['pokemon', id] as SearchRow),
+			]),
+			table: { ...table, ...CustomDex.pokedex() },
+		};
+	}
+	return everyCache;
+}
+
 /** Every species, the owner's own first. Custom entries live in BattlePokedex but not in the tier tables. */
 function allSpecies(exclude?: ID) {
 	if (!officialCache) {
@@ -608,23 +990,35 @@ function allSpecies(exclude?: ID) {
 		for (const id of ids) table[id] = window.BattlePokedex[id];
 		officialCache = { rows: ids.map(id => ['pokemon', id as ID] as SearchRow), table };
 	}
-	return {
-		rows: dropEmptyHeaders([
-			['header', 'Custom'],
-			...CustomDex.ids.filter(id => id !== exclude).map(id => ['pokemon', id] as SearchRow),
-			['header', 'All'], ...officialCache.rows.filter(row => row[1] !== exclude),
-		]),
-		table: { ...officialCache.table, ...CustomDex.pokedex() },
-	};
+	const key = `${CustomDex.revision}|${exclude || ''}|${CustomDex.ids.join(',')}`;
+	if (assembled?.key !== key) {
+		assembled = {
+			key,
+			value: {
+				rows: dropEmptyHeaders([
+					['header', 'Custom'],
+					...CustomDex.ids.filter(id => id !== exclude).map(id => ['pokemon', id] as SearchRow),
+					['header', 'All'], ...officialCache.rows.filter(row => row[1] !== exclude),
+				]),
+				table: { ...officialCache.table, ...CustomDex.pokedex() },
+			},
+		};
+	}
+	return assembled.value;
 }
 
 export class PokebuilderDexSearch extends DexSearch {
-	/** 'all' is the prevo/evos picker; 'own' is the species list the builder opens on. */
-	speciesMode: 'own' | 'all' = 'own';
+	/**
+	 * 'own' is the builder's own species list, 'all' the prevo/evos picker (evolution-capable
+	 * species only), 'every' a format roster (anything at all).
+	 */
+	speciesMode: 'own' | 'all' | 'every' = 'own';
 	/** The species being edited: it can't be its own relative. */
 	pickerExclude: ID | null = null;
 	/** Species already open in another set, so the builder's own list can't open one twice. */
 	openIds: ID[] = [];
+	/** What a format allows, pinned above the rest, when this search is a format's own picker. */
+	roster: ID[] | null = null;
 	override setType(searchType: SearchType | '', format = '' as ID, speciesOrSet: ID | Dex.PokemonSet = '' as ID) {
 		super.setType(searchType, format, speciesOrSet);
 		this.restrict();
@@ -632,22 +1026,37 @@ export class PokebuilderDexSearch extends DexSearch {
 	restrict() {
 		const typedSearch = this.typedSearch as any;
 		if (typedSearch?.searchType === 'pokemon') {
-			const all = this.speciesMode === 'all';
+			const mode = this.speciesMode;
 			const exclude = this.pickerExclude || undefined;
-			typedSearch.getTable = () => (all ? allSpecies(exclude).table : CustomDex.pokedex());
+			// The unsorted order is the tier order, so that's what the sort row's reset button restores.
+			this.firstPokemonColumn = mode === 'every' ? 'Tier' : 'Number';
+			const source = () => (mode === 'every' ? everySpecies(typedSearch.dex.gen) : allSpecies(exclude));
+			typedSearch.getTable = () => (mode === 'own' ? CustomDex.pokedex() : source().table);
 			typedSearch.getBaseResults = typedSearch.getDefaultResults = () => (
-				all ? allSpecies(exclude).rows : dropEmptyHeaders(CustomDex.baseResults().filter(this.notOpen))
+				mode === 'own' ? dropEmptyHeaders(CustomDex.baseResults().filter(this.notOpen)) : source().rows
 			);
-		} else if (typedSearch?.searchType === 'ability' || typedSearch?.searchType === 'move') {
-			const kind: 'ability' | 'move' = typedSearch.searchType;
+			if (!typedSearch.unpinnedResults) {
+				typedSearch.unpinnedResults = typedSearch.getResults.bind(typedSearch);
+				typedSearch.getResults = (filters: AnyObject, sortCol: string, reverseSort: boolean) => {
+					const rows = typedSearch.unpinnedResults(filters, sortCol, reverseSort);
+					if (!this.roster || sortCol) return rows;
+					return pinRoster('pokemon', this.roster, rows);
+				};
+			}
+		} else if (typedSearch?.searchType === 'ability' || typedSearch?.searchType === 'move' ||
+			typedSearch?.searchType === 'item') {
+			const kind: 'ability' | 'move' | 'item' = typedSearch.searchType;
 			typedSearch.getTable = () => allOf(kind).table;
 			typedSearch.getBaseResults = typedSearch.getDefaultResults = () => allOf(kind).rows;
 			if (!typedSearch.unpinnedResults) {
 				typedSearch.unpinnedResults = typedSearch.getResults.bind(typedSearch);
 				typedSearch.getResults = (filters: AnyObject, sortCol: string, reverseSort: boolean) => {
 					const rows = typedSearch.unpinnedResults(filters, sortCol, reverseSort);
+					// A format's own list is pinned whole; a set's picker pins what the set has.
+					if (this.roster) return sortCol ? rows : pinRoster(kind, this.roster, rows);
 					if (PICKER_SORTS.includes(sortCol)) return rows;
-					return kind === 'move' ? pinMoves(typedSearch, rows) : pinAbilities(typedSearch, rows);
+					return kind === 'move' ? pinMoves(typedSearch, rows) :
+						kind === 'ability' ? pinAbilities(typedSearch, rows) : rows;
 				};
 			}
 		} else {
@@ -667,9 +1076,11 @@ export class PokebuilderDexSearch extends DexSearch {
 	override textSearch(query: string): SearchRow[] {
 		if (this.typedSearch?.searchType !== 'pokemon') return super.textSearch(query);
 		const id = toID(query);
-		if (this.speciesMode === 'all') {
-			const keep = (row: SearchRow) => row[0] !== 'pokemon' ||
-				(row[1] !== this.pickerExclude && evolvable(window.BattlePokedex[row[1]]));
+		if (this.speciesMode !== 'own') {
+			const every = this.speciesMode === 'every';
+			const keep = (row: SearchRow) => row[0] !== 'pokemon' || (row[1] !== this.pickerExclude &&
+				// Own creations are always eligible; their 'Custom' isNonstandard isn't disqualifying.
+				(every || CustomDex.has(row[1]) || evolvable(window.BattlePokedex[row[1]])));
 			return (this.results = dropEmptyHeaders([
 				...CustomDex.nameMatches(id).filter(keep), ...super.textSearch(query).filter(keep),
 			]));

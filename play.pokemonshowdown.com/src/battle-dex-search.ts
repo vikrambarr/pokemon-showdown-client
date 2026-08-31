@@ -86,6 +86,10 @@ export class DexSearch {
 	reverseSort = false;
 	/** Species to mark as current, when that isn't just the set's own species. */
 	selectedSpecies: ID[] | null = null;
+	/** The same for the other kinds of result, for a picker that isn't editing a set. */
+	selectedMoves: ID[] | null = null;
+	selectedAbilities: ID[] | null = null;
+	selectedItems: ID[] | null = null;
 
 	/**
 	 * Filters for the search result. Does not include the two base filters
@@ -263,6 +267,12 @@ export class DexSearch {
 		if (!this.filters.length) this.filters = null;
 		this.results = null;
 		return true;
+	}
+
+	clearSort() {
+		this.sortCol = null;
+		this.reverseSort = false;
+		this.results = null;
 	}
 
 	toggleSort(sortCol: string) {

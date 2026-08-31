@@ -472,7 +472,11 @@ export class MainMenuRoom extends PSRoom {
 			CustomDex.receive(response);
 			break;
 		case 'custompokemon':
+		case 'customformat':
 			CustomDex.receiveWrite(response);
+			break;
+		case 'customformatlegal':
+			CustomDex.receiveFormatLegal(response);
 			break;
 		case 'teamupload':
 			if (PS.teams.uploading) {
@@ -756,6 +760,7 @@ class MainMenuPanel extends PSRoomPanel<MainMenuRoom> {
 					<div class="menugroup">
 						<p><a class="mainmenu2 mainmenu button" href="teambuilder">Teambuilder</a></p>
 						<p><a class="mainmenu2 mainmenu button" href="pokebuilder">Pokébuilder</a></p>
+						<p><a class="mainmenu2 mainmenu button" href="formatbuilder">Formatbuilder</a></p>
 						<p><a class={"mainmenu3 mainmenu" + onlineButton} href="ladder">Ladder</a></p>
 						<p><a class={"mainmenu4 mainmenu" + onlineButton} href="view-tournaments-all">Tournaments</a></p>
 					</div>

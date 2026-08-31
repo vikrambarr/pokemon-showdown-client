@@ -1922,6 +1922,9 @@ export const PS = new class extends PSModel {
 		// console.log('\t\t' + JSON.stringify(Object.fromEntries(Object.entries(PS.routes).filter(([k, v]) => k !== 'dm-*').map(([k, v]) => [k, '*' + (PS.roomTypes[v].location || '')]))).replaceAll(',', ',\n\t\t').replaceAll('":"', '": "').slice(1, -1) + ',')
 		"teambuilder": "*",
 		"pokebuilder": "*",
+		"formatbuilder": "*",
+		"format-*": "*",
+		"formatunsaved": "*modal-popup",
 		"pokebuilderunsaved": "*modal-popup",
 		"news": "*mini-window",
 		"": "*",
@@ -2180,8 +2183,10 @@ export const PS = new class extends PSModel {
 				maxWidth: 640,
 			};
 		case 'team':
+		case 'format':
 		case 'teambuilder':
 		case 'pokebuilder':
+		case 'formatbuilder':
 			return {
 				minWidth: 660,
 				width: 660,
