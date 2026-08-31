@@ -475,6 +475,14 @@ export class MainMenuRoom extends PSRoom {
 		case 'customformat':
 			CustomDex.receiveWrite(response);
 			break;
+		case 'battledex':
+			CustomDex.receiveBattleDex(response);
+			break;
+
+		case 'customformatinfo':
+			CustomDex.receiveFormatInfo(response);
+			break;
+
 		case 'customformatlegal':
 			CustomDex.receiveFormatLegal(response);
 			break;

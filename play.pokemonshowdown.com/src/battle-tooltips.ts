@@ -2964,7 +2964,7 @@ export class BattleStatGuesser {
 
 	constructor(formatid: ID) {
 		this.formatid = formatid;
-		this.dex = formatid ? Dex.mod(formatid.slice(0, 4) as ID) : Dex;
+		this.dex = formatid ? Dex.forFormat(formatid) : Dex;
 		this.ignoreEVLimits = (
 			this.dex.gen < 3 ||
 			((this.formatid.endsWith('hackmons') || this.formatid.endsWith('bh')) && this.dex.gen !== 6) ||
@@ -3580,7 +3580,7 @@ export class BattleStatGuesser {
 export function BattleStatOptimizer(set: Dex.PokemonSet, formatid: ID) {
 	if (!set.evs) return null;
 
-	const dex = Dex.mod(formatid.slice(0, 4) as ID);
+	const dex = Dex.forFormat(formatid);
 	const ignoreEVLimits = (
 		dex.gen < 3 ||
 		((formatid.endsWith('hackmons') || formatid.endsWith('bh')) && dex.gen !== 6) ||

@@ -23,6 +23,7 @@ import type { Args } from "./battle-text-parser";
 import { ModifiableValue } from "./battle-tooltips";
 import { Net } from "./client-connection";
 import { BattleLog } from "./battle-log";
+import { CustomDex } from "./client-custom-dex";
 
 type BattleDesc = {
 	id: RoomID,
@@ -214,6 +215,7 @@ export class BattleRoom extends ChatRoom {
 	override destroy() {
 		this.request = null;
 		this.choices = null;
+		CustomDex.releaseBattleDex(this.id);
 		super.destroy();
 	}
 
@@ -442,6 +444,7 @@ class BattlePanel extends PSRoomPanel<BattleRoom> {
 			log: room.backlog?.map(args => '|' + args.join('|')),
 		}));
 		const scene = battle.scene as BattleScene;
+		CustomDex.loadBattleDex(room.id);
 		room.backlog = null;
 		room.log ||= scene.log;
 		room.log.getHighlight = room.handleHighlight;

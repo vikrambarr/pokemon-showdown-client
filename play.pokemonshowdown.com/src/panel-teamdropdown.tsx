@@ -9,6 +9,7 @@ import { PS, type Team } from "./client-main";
 import { PSIcon, PSPanelWrapper, PSRoomPanel } from "./panels";
 import { Dex, toID, type ID } from "./battle-dex";
 import { Teams } from "./battle-teams";
+import { formatBasename, formatFolder, formatText } from "./client-custom-dex";
 
 export class PSTeambuilder {
 	static exportPackedTeam(team: Team) {
@@ -166,7 +167,8 @@ export function TeamBox(props: {
 			<em>(empty {team.isBox ? 'box' : 'team'})</em>
 		);
 		let format = team.format as string;
-		if (format.startsWith(Dex.modid)) format = format.slice(4);
+		if (formatFolder(format) === 'custom') format = formatBasename(format);
+		else if (format.startsWith(Dex.modid)) format = format.slice(4);
 		format = (format ? `[${format}] ` : ``) + (team.folder ? `${team.folder}/` : ``);
 		contents = [
 			<strong>{team.isBox && <i class="fa fa-archive"></i>} {format && <span>{format}</span>}{team.name}</strong>,
@@ -258,7 +260,7 @@ class TeamDropdownPanel extends PSRoomPanel {
 		}
 		let teams = this.getTeams();
 		if (!teams.length && this.format && isFirstLoad) {
-			this.gen = this.format.slice(0, 4);
+			this.gen = formatFolder(this.format);
 			this.format = '';
 			teams = this.getTeams();
 		}
@@ -280,22 +282,22 @@ class TeamDropdownPanel extends PSRoomPanel {
 
 		let teamList = [];
 
-		const baseGen = baseFormat.slice(0, 4);
+		const baseGen = formatFolder(baseFormat);
 		let genList: string[] = [];
 		for (const team of PS.teams.list) {
 			if (team.isBox) continue;
-			const gen = team.format.slice(0, 4);
+			const gen = formatFolder(team.format);
 			if (gen && !genList.includes(gen)) genList.push(gen);
 		}
 		const hasOtherGens = genList.length > 1 || genList[0] !== baseGen;
 
 		teamList.push(<p>
-			{baseFormat.length > 4 && (
+			{!!formatBasename(baseFormat) && (
 				<button
 					class={'button' + (baseFormat === this.format ? ' disabled' : '')}
 					onClick={this.setFormat} name="format" value={baseFormat}
 				>
-					<i class="fa fa-folder-o" aria-hidden></i> [{baseFormat.slice(0, 4)}] {baseFormat.slice(4)}
+					<i class="fa fa-folder-o" aria-hidden></i> [{baseGen}] {formatBasename(baseFormat)}
 				</button>
 			)} {}
 			<button
@@ -328,7 +330,7 @@ class TeamDropdownPanel extends PSRoomPanel {
 			if (folder && (this.gen || this.format)) {
 				teamList.push(<h2>
 					<i class="fa fa-folder-open" aria-hidden></i> {folder} + {}
-					<i class="fa fa-folder-open-o" aria-hidden></i> {this.format || this.gen}
+					<i class="fa fa-folder-open-o" aria-hidden></i> {this.format ? formatText(this.format) : this.gen}
 				</h2>);
 			} else if (folder) {
 				teamList.push(<h2>
@@ -336,7 +338,7 @@ class TeamDropdownPanel extends PSRoomPanel {
 				</h2>);
 			} else if (this.gen || this.format) {
 				teamList.push(<h2>
-					<i class="fa fa-folder-open-o" aria-hidden></i> {this.format || this.gen}
+					<i class="fa fa-folder-open-o" aria-hidden></i> {this.format ? formatText(this.format) : this.gen}
 				</h2>);
 			} else {
 				teamList.push(<h2>

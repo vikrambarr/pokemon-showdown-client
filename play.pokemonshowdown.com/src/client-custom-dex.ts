@@ -8,6 +8,9 @@ import { PS } from "./client-main";
 import { PSModel } from "./client-core";
 import { Dex, toID, type ID } from "./battle-dex";
 import { DexSearch, type SearchRow, type SearchType } from "./battle-dex-search";
+import { MainMenuRoom } from "./panel-mainmenu";
+import { ChatRoom } from "./panel-chat";
+import { TeamEditorState } from "./battle-team-editor";
 
 declare const BattleTeambuilderTable: any;
 
@@ -34,16 +37,22 @@ type CustomDexWrite = {
 	cmd?: string,
 };
 
+/** As much of a custom format as a selector needs: what it's called, and what it's built on. */
+export interface CustomFormatSummary {
+	id: string;
+	name: string;
+	mod: string;
+	baseMod: string;
+	base: string;
+}
+
 export interface CustomDexOverlay {
 	Pokedex: { [id: string]: AnyObject };
 	Learnsets: { [id: string]: { learnset?: { [moveid: string]: string[] } } };
 	sprites: { [id: string]: CustomSpriteSet };
 	limits?: { [field: string]: FieldLimit };
 	entries?: { name: string, inheritsFrom: string | null, species: AnyObject, learnset: AnyObject }[];
-	formats?: {
-		id: string, name: string, mod: string, baseMod: string, base: string,
-		ruleset: string[], banlist: string[], unbanlist: string[],
-	}[];
+	formats?: (CustomFormatSummary & { ruleset: string[], banlist: string[], unbanlist: string[] })[];
 	/** Sent with the overlay: what the format builder may offer, straight from the sim. */
 	rulesets?: { id: ID, name: string, desc?: string }[];
 	tags?: { id: ID, name: string, kind: string }[];
@@ -51,6 +60,36 @@ export interface CustomDexOverlay {
 }
 
 export interface FieldLimit { min?: number; max?: number; maxLength?: number }
+
+/**
+ * The name a custom format plays under, matching the server's own, so that `toID` of it is the id
+ * the server registers it by: a selector can offer the name and a challenge resolves it.
+ */
+/** Which folder a team sorts into. A custom format's id has no gen in it, so they share one. */
+export function formatFolder(format: string) {
+	return format.startsWith('custom') ? 'custom' : format.slice(0, 4);
+}
+/** How a format id reads in a team list: a custom format's is its owner and a slug, so it goes by
+ * the name it was given instead. */
+export function formatText(format: string) {
+	return CustomDex.formatEntry(format)?.name || format;
+}
+/** The heading a list of format folders groups them under. */
+export function formatFolderName(folder: string) {
+	return folder === 'custom' ? 'Custom' : `Gen ${folder.slice(3)}`;
+}
+/** The same, without the folder that the list is already showing. */
+export function formatBasename(format: string) {
+	const text = formatText(format);
+	return text === format ? format.slice(formatFolder(format).length) : text;
+}
+
+export function formatTitle(entry: { id: string, name: string }) {
+	return `Custom (${entry.id.split('-')[1]}) ${entry.name}`;
+}
+
+/** Both spellings the server accepts: the id a challenge carries, and the name a selector offers. */
+const CUSTOM_FORMAT_NAME = /^custom(?:-[a-z0-9]+-|\s\([a-z0-9]+\)\s)/i;
 
 const ALL_SOURCE_CHARS = '123456789pqga';
 const LOAD_TIMEOUT = 20000;
@@ -91,8 +130,106 @@ export const CustomDex = new class extends PSModel {
 	queue: CustomDexWrite[] = [];
 	pending: CustomDexWrite | null = null;
 
+	/** Every format a selector may offer, keyed by the id everything outside the builder uses. */
+	formatsById: { [formatid: string]: CustomFormatSummary } = {};
+	/** Other users' formats, learned from a challenge, so a team can be built for one. */
+	foreignFormats: { [formatid: string]: CustomFormatSummary } = {};
+	askedFormats: { [formatid: string]: boolean } = {};
+	/** The custom species each open battle is using, so leaving one takes its own back out. */
+	battleDexes: { [roomid: string]: ID[] } = {};
+	/** Art for species that aren't the user's own, looked up the same way theirs is. */
+	battleSprites: { [id: string]: CustomSpriteSet } = {};
+
 	has(id: ID) {
 		return !!this.overlay?.Pokedex[id];
+	}
+	formatEntry(format: string | undefined) {
+		return this.formatsById[toID(format)] || null;
+	}
+	/** A custom format's own id says nothing about gen or mod, so its base format's stands in. */
+	baseFormat(format: string) {
+		const entry = this.formatEntry(format);
+		if (!entry) return toID(format);
+		return toID(entry.base) || toID(`${entry.mod || entry.baseMod}customgame`);
+	}
+	/**
+	 * Custom formats are kept out of the format list the server sends - every connection pays for
+	 * that one - so the user's own are added here instead, where every format selector reads them.
+	 */
+	registerFormats() {
+		for (const id in this.formatsById) delete window.BattleFormats?.[id];
+		this.formatsById = {};
+		const entries = [...this.overlay?.formats || [], ...Object.values(this.foreignFormats)];
+		for (const entry of entries) {
+			const name = formatTitle(entry);
+			const id = toID(name);
+			if (this.formatsById[id]) continue;
+			this.formatsById[id] = entry;
+			if (!window.BattleFormats) continue;
+			window.BattleFormats[id] = {
+				id, name, section: 'Custom Formats', column: 0,
+				// Never rated, so there's no ladder to search and no tournament to run.
+				searchShow: false, challengeShow: true, tournamentShow: false,
+				rated: false, isTeambuilderFormat: true, effectType: 'Format',
+			};
+		}
+		PS.teams.update('format');
+	}
+	/**
+	 * Picks up a custom format the user doesn't own, named in full the way a challenge names it,
+	 * so that the format they've been challenged to can be built for like any other.
+	 */
+	learnFormat(format: string | undefined) {
+		const id = toID(format);
+		if (!id || !format || this.formatsById[id] || this.askedFormats[id]) return;
+		if (!CUSTOM_FORMAT_NAME.test(format.trim())) return;
+		this.askedFormats[id] = true;
+		PS.send(`/cmd customformatinfo ${format.trim()}`);
+	}
+	receiveFormatInfo(response: AnyObject | null) {
+		if (!response || response.actionerror || !response.id) return;
+		this.foreignFormats[toID(response.id)] = response as CustomFormatSummary;
+		this.registerFormats();
+		this.update();
+	}
+	/**
+	 * A battle's own dex. A client only ever holds its own user's custom Pokemon, so without this
+	 * an opponent's - and any the format's author supplied - are species that don't exist.
+	 */
+	loadBattleDex(roomid: string) {
+		if (!roomid.startsWith('battle-') || this.battleDexes[roomid]) return;
+		if (!roomid.split('-')[1]?.startsWith('custom') || !PS.user.named) return;
+		this.battleDexes[roomid] = [];
+		PS.send(`/cmd battledex ${roomid}`);
+	}
+	receiveBattleDex(response: AnyObject | null) {
+		if (!response || response.actionerror || !response.roomid) return;
+		const ids: ID[] = [];
+		for (const id in response.Pokedex) {
+			// The user's own are already applied, with any edit they haven't saved yet on top.
+			if (this.has(id as ID)) continue;
+			ids.push(id as ID);
+			window.BattlePokedex[id] ||= response.Pokedex[id];
+			if (response.sprites?.[id]) this.battleSprites[id] ||= response.sprites[id];
+			for (const mod of Object.values(Dex.moddedDexes)) delete mod.cache.Species[id];
+		}
+		this.battleDexes[response.roomid] = ids;
+		this.update();
+	}
+	releaseBattleDex(roomid: string) {
+		const ids = this.battleDexes[roomid];
+		if (!ids) return;
+		delete this.battleDexes[roomid];
+		const stillOpen: { [id: string]: boolean } = {};
+		for (const other in this.battleDexes) {
+			for (const id of this.battleDexes[other]) stillOpen[id] = true;
+		}
+		for (const id of ids) {
+			if (stillOpen[id]) continue;
+			delete window.BattlePokedex[id];
+			delete this.battleSprites[id];
+			for (const mod of Object.values(Dex.moddedDexes)) delete mod.cache.Species[id];
+		}
 	}
 	pokedex() {
 		return this.overlay?.Pokedex || {};
@@ -142,6 +279,9 @@ export const CustomDex = new class extends PSModel {
 		this.saved = {};
 		this.ids = [];
 		this.queue = [];
+		// Whose species a battle's belong to depends on who is asking, so they're asked for again.
+		for (const roomid in this.battleDexes) this.releaseBattleDex(roomid);
+		this.registerFormats();
 		this.update();
 	}
 	unapply(ids: ID[]) {
@@ -211,6 +351,9 @@ export const CustomDex = new class extends PSModel {
 		for (const id of this.ids) {
 			if (!pending[id]) this.saved[id] = this.speciesJSON(id)!;
 		}
+		this.registerFormats();
+		// A battle open before the overlay arrived asked as nobody, and got nothing back.
+		for (const roomid in PS.rooms) this.loadBattleDex(roomid);
 	}
 	patch(id: ID, changes: AnyObject) {
 		if (!this.overlay?.Pokedex[id]) return;
@@ -230,16 +373,19 @@ export const CustomDex = new class extends PSModel {
 	 * where a request that only wants to be sure waits for the one already out. The default roster
 	 * costs the server as much as the real one, so it's asked for only when we don't have it.
 	 */
-	loadFormatLegal(name: string, changed?: boolean) {
-		const id = toID(name);
+	loadFormatLegal(format: string, changed?: boolean) {
+		const entry = this.formatEntry(format);
+		// Asked for by full name: a format the asker doesn't own is only findable that way.
+		const target = entry ? formatTitle(entry) : format;
+		const id = toID(entry?.id || format);
 		if (!changed && this.legalPending === id) return;
 		this.legalPending = id;
-		PS.send(`/cmd customformatlegal ${name}${this.formatDefaultLegal[id] ? '' : ', default'}`);
+		PS.send(`/cmd customformatlegal ${target}${this.formatDefaultLegal[id] ? '' : ', default'}`);
 	}
 	receiveFormatLegal(response: AnyObject | null) {
 		this.legalPending = null;
 		if (!response || response.actionerror || !response.name) return;
-		const id = toID(response.name);
+		const id = toID(response.id || response.name);
 		this.formatLegal[id] = toRoster(response.legal);
 		if (response.defaultLegal) this.formatDefaultLegal[id] = toRoster(response.defaultLegal);
 		this.formatRules[id] = (response.rules || []).map(toID);
@@ -384,7 +530,7 @@ export const CustomDex = new class extends PSModel {
 			// and the rules it resolves to.
 			this.load(true);
 			const format = this.overlay?.formats?.find(entry => toID(entry.name) === job?.id);
-			if (format) this.loadFormatLegal(format.name, true);
+			if (format) this.loadFormatLegal(format.id, true);
 		} else {
 			if (job?.json) this.saved[job.id] = job.json;
 			job?.resolve?.(response.name || null);
@@ -445,7 +591,8 @@ PS.user.subscribe(() => {
 
 const spriteIdOf = (pokemon: any): ID => toID(pokemon?.speciesForme || pokemon?.species || pokemon);
 const customArt = (pokemon: any, kinds: string[]) => {
-	const set = CustomDex.sprites[spriteIdOf(pokemon)];
+	const id = spriteIdOf(pokemon);
+	const set = CustomDex.sprites[id] || CustomDex.battleSprites[id];
 	if (!set) return null;
 	for (const kind of kinds) {
 		if (set[kind]) return set[kind];
@@ -504,6 +651,97 @@ Dex.getTeambuilderSprite = (pokemon: any, dex?: any, xOffset = 0, yOffset = 0) =
 	return `background-image:url(${url})${gradient ? `,${gradient}` : ''};` +
 		`background-position:${8 + xOffset}px ${10 + yOffset}px${gradient ? ',0 0' : ''};` +
 		`background-repeat:no-repeat;background-size:96px${gradient ? ',auto' : ''}`;
+};
+
+/** What the format's rules leave in. Whatever it drops turns up under "Illegal results" instead. */
+function keepLegal(kind: RosterKind, roster: ID[], rows: SearchRow[]): SearchRow[] {
+	const legal: { [id: string]: boolean } = {};
+	for (const id of roster) legal[id] = true;
+	return dropEmptyHeaders(rows.filter(row => row[0] !== kind || legal[row[1]]));
+}
+
+/**
+ * A team built for a custom format searches as the format it's based on, narrowed to what its
+ * rules actually allow. The tier tables the search is built from know neither, so the base format
+ * stands in for the gen and tier order, and the roster the server works out does the rest.
+ */
+const dexSearchSetType = DexSearch.prototype.setType;
+DexSearch.prototype.setType = function (this: DexSearch, searchType, format, speciesOrSet) {
+	const entry = searchType ? CustomDex.formatEntry(format) : null;
+	if (!entry) return dexSearchSetType.call(this, searchType, format, speciesOrSet);
+
+	dexSearchSetType.call(this, searchType, CustomDex.baseFormat(format || ''), speciesOrSet);
+	const search = this.typedSearch;
+	const kind = ROSTER_KINDS.find(candidate => candidate === searchType);
+	if (!search || !kind) return;
+
+	const key = toID(entry.id);
+	// Asked for once: working one out costs the server a full pass over the dex.
+	if (!CustomDex.formatLegal[key]) CustomDex.loadFormatLegal(entry.id);
+	const roster = () => CustomDex.formatLegal[key]?.[kind] || null;
+	const baseResults = search.getBaseResults.bind(search);
+	const results = search.getResults.bind(search);
+	let usedRoster = roster();
+	search.getBaseResults = () => {
+		// Custom species are in the dex but in none of the tier tables, so they're added by hand.
+		const rows = kind === 'pokemon' && CustomDex.ids.length ? [
+			['header', 'Custom'] as SearchRow,
+			...CustomDex.ids.map(id => ['pokemon', id] as SearchRow),
+			...baseResults(),
+		] : baseResults();
+		return usedRoster ? keepLegal(kind, usedRoster, rows) : rows;
+	};
+	search.getResults = (filters, sortCol, reverseSort) => {
+		// The roster comes from the server, so the first list built may well predate it.
+		if (usedRoster !== roster()) {
+			usedRoster = roster();
+			search.baseResults = search.baseIllegalResults = null;
+		}
+		return results(filters, sortCol, reverseSort);
+	};
+};
+
+/**
+ * Both of these fire on messages that can arrive before this file has run - the script list puts
+ * it after everything it patches - so they're hooked here rather than called from there, where an
+ * early `|formats|` would throw before the client had finished loading.
+ */
+const mainMenuParseFormats = MainMenuRoom.prototype.parseFormats;
+MainMenuRoom.prototype.parseFormats = function (this: MainMenuRoom, formatsList: string[]) {
+	// A format list replaces `BattleFormats` wholesale, so the custom ones have to go back in.
+	mainMenuParseFormats.call(this, formatsList);
+	CustomDex.registerFormats();
+};
+
+const chatParseChallenge = ChatRoom.prototype.parseChallenge;
+ChatRoom.prototype.parseChallenge = function (this: ChatRoom, challengeString: string | null) {
+	const challenge = chatParseChallenge.call(this, challengeString);
+	CustomDex.learnFormat(challenge?.formatName);
+	return challenge;
+};
+
+const dexGetSpriteData = Dex.getSpriteData.bind(Dex);
+Dex.getSpriteData = (pokemon: any, isFront: boolean, options?: any) => {
+	const data = dexGetSpriteData(pokemon, isFront, options);
+	const shiny = data.shiny ? '-shiny' : '';
+	// A back sprite is optional: a species with only a front one faces the wrong way rather than
+	// falling back to art of something else entirely.
+	const url = customArt(pokemon, isFront ?
+		[`front${shiny}`, 'front'] : [`back${shiny}`, 'back', `front${shiny}`, 'front']);
+	// Uploads are held to 96x96, which is the size the default sprite box already is.
+	return url ? { ...data, url, w: 96, h: 96, y: 0, pixelated: true } : data;
+};
+
+const dexForFormat = Dex.forFormat.bind(Dex);
+Dex.forFormat = (format: string) => dexForFormat(CustomDex.baseFormat(format));
+
+const teamEditorSetFormat = TeamEditorState.prototype.setFormat;
+TeamEditorState.prototype.setFormat = function (this: TeamEditorState, format: string) {
+	if (!CustomDex.formatEntry(format)) return teamEditorSetFormat.call(this, format);
+	// A custom format's id is its owner and its name, so everything the editor reads out of an id
+	// by substring - level, forme legality, whether it's Let's Go - has to come from the base.
+	teamEditorSetFormat.call(this, CustomDex.baseFormat(format));
+	this.format = this.team.format = toID(format);
 };
 
 const INSTAFILTERABLE: SearchType[] = ['type', 'ability', 'move'];

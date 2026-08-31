@@ -12,6 +12,7 @@ import { Dex, PSUtils, toID, type ID } from "./battle-dex";
 import { Teams } from "./battle-teams";
 import { BattleLog } from "./battle-log";
 import { TeamEditorState } from "./battle-team-editor";
+import { formatBasename, formatFolder, formatFolderName } from "./client-custom-dex";
 
 const ADD_FORMAT_FOLDER_VALUE = '+';
 const ADD_FOLDER_VALUE = '++';
@@ -558,7 +559,7 @@ export class TeambuilderPanel extends PSRoomPanel<TeambuilderRoom> {
 		} else {
 			children = [
 				<i class={`fa ${folderOpenIcon}-o`}></i>,
-				value.slice(4) || '(uncategorized)',
+				formatBasename(value) || '(uncategorized)',
 			];
 		}
 
@@ -688,7 +689,7 @@ export class TeambuilderPanel extends PSRoomPanel<TeambuilderRoom> {
 		}
 
 		PSUtils.sortBy(folders, folder => [
-			folder.endsWith('/') ? 10 : -parseInt(folder.charAt(3), 10),
+			folder.endsWith('/') ? 10 : formatFolder(folder) === 'custom' ? 1 : -parseInt(folder.charAt(3), 10),
 			folder,
 		]);
 
@@ -708,19 +709,19 @@ export class TeambuilderPanel extends PSRoomPanel<TeambuilderRoom> {
 
 		let renderedFolders: preact.ComponentChild[] = [];
 
-		/** 0 = folder, 1-9 = format generation */
-		let gen = -1;
-		for (let format of folders) {
-			const newGen = format.endsWith('/') ? 0 : parseInt(format.charAt(3), 10);
+		/** '' = folder, otherwise the folder its formats share */
+		let gen = '?';
+		for (const format of folders) {
+			const newGen = format.endsWith('/') ? '' : formatFolder(format);
 			if (gen !== newGen) {
 				gen = newGen;
-				if (gen === 0) {
+				if (!gen) {
 					renderedFolders.push(...renderedFormatFolders);
 					renderedFormatFolders = [];
 					renderedFolders.push(<div class="foldersep"></div>);
 					renderedFolders.push(<div class="folder"><h3>Folders</h3></div>);
 				} else {
-					renderedFolders.push(<div class="folder"><h3>Gen {gen}</h3></div>);
+					renderedFolders.push(<div class="folder"><h3>{formatFolderName(gen)}</h3></div>);
 				}
 			}
 			renderedFolders.push(this.renderFolder(format));
@@ -741,8 +742,8 @@ export class TeambuilderPanel extends PSRoomPanel<TeambuilderRoom> {
 	renderMobileFolderSelect() {
 		const room = this.props.room;
 		const renderedFolders: preact.ComponentChild[] = [];
-		const formatGroups: { [gen: number]: preact.ComponentChild[] | undefined } = {};
-		const gens: number[] = [];
+		const formatGroups: { [gen: string]: preact.ComponentChild[] | undefined } = {};
+		const gens: string[] = [];
 
 		for (const folder of this.getFolderList()) {
 			if (folder.endsWith('/')) {
@@ -750,7 +751,7 @@ export class TeambuilderPanel extends PSRoomPanel<TeambuilderRoom> {
 					<option value={folder}>{folder.slice(0, -1) || 'Teams not in any folders'}</option>
 				);
 			} else {
-				const gen = parseInt(folder.charAt(3), 10);
+				const gen = formatFolder(folder);
 				const group = formatGroups[gen] || (formatGroups[gen] = []);
 				if (!group.length) gens.push(gen);
 				group.push(
@@ -765,7 +766,7 @@ export class TeambuilderPanel extends PSRoomPanel<TeambuilderRoom> {
 			<select class="select teambuilder-folder-select" value={room.curFolder} onChange={this.changeMobileFolder}>
 				<option value="">All teams</option>
 				{gens.map(gen => (
-					<optgroup label={`Gen ${gen}`}>
+					<optgroup label={formatFolderName(gen)}>
 						{formatGroups[gen]}
 					</optgroup>
 				))}

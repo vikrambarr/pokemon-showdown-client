@@ -84,7 +84,7 @@ export class FormatRoom extends TeamRoom {
 		CustomDex.patchFormat(entry.id, changes);
 		if (!keepsDefault) delete CustomDex.formatDefaultLegal[this.legalKey()];
 		void CustomDex.editFormat(entry.name, changes)
-			.then(() => CustomDex.loadFormatLegal(entry.name, true));
+			.then(() => CustomDex.loadFormatLegal(entry.id, true));
 	}
 	/** The picker on this page chooses what the custom format is built on, not what it is. */
 	override setFormat(format: string) {
@@ -102,7 +102,7 @@ export class FormatRoom extends TeamRoom {
 	afterUnsaved: (() => void) | null = null;
 
 	legalKey() {
-		return toID(this.formatEntry()?.name);
+		return toID(this.formatEntry()?.id);
 	}
 	/**
 	 * Which rulesets this format sets itself, on or off, leaving out the ones it says nothing about.
@@ -322,7 +322,7 @@ export class FormatPanel extends TeamPanel {
 			if (!confirmed) return;
 			room.pending = {};
 			delete CustomDex.formatDefaultLegal[room.legalKey()];
-			void CustomDex.resetFormat(entry.name).then(() => CustomDex.loadFormatLegal(entry.name, true));
+			void CustomDex.resetFormat(entry.name).then(() => CustomDex.loadFormatLegal(entry.id, true));
 		});
 	};
 	changeMod = (ev: Event) => {
@@ -530,7 +530,7 @@ export class FormatPanel extends TeamPanel {
 	/** Which species the rules allow is the server's to work out, so it gets asked. */
 	loadLegal() {
 		const entry = this.room().formatEntry();
-		if (entry) CustomDex.loadFormatLegal(entry.name);
+		if (entry) CustomDex.loadFormatLegal(entry.id);
 	}
 
 	override componentDidMount() {
