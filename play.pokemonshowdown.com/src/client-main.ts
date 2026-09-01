@@ -770,10 +770,7 @@ class PSUser extends PSStreamModel<PSLoginState | null> {
 			'ps-discord-login', 'popup=1,width=500,height=750'
 		);
 	}
-	/**
-	 * Ends the initial auto-login attempt, so the header stops saying "Connecting...".
-	 * Must notify subscribers: `PSHeader` only rerenders when `PS.user` updates.
-	 */
+	/** Ends the auto-login attempt. Must notify: `PSHeader` only rerenders when `PS.user` updates. */
 	finishInitializing() {
 		if (!this.initializing) return;
 		this.initializing = false;

@@ -84,12 +84,8 @@ export class DexSearch {
 	 */
 	sortCol: string | null = null;
 	reverseSort = false;
-	/** Species to mark as current, when that isn't just the set's own species. */
-	selectedSpecies: ID[] | null = null;
-	/** The same for the other kinds of result, for a picker that isn't editing a set. */
-	selectedMoves: ID[] | null = null;
-	selectedAbilities: ID[] | null = null;
-	selectedItems: ID[] | null = null;
+	/** Entries to mark as current, by result type, when that isn't just the set's own. */
+	selected: { [type: string]: ID[] } | null = null;
 
 	/**
 	 * Filters for the search result. Does not include the two base filters

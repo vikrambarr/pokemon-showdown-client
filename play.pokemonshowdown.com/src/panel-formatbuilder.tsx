@@ -1,8 +1,7 @@
 /**
  * Formatbuilder panel
  *
- * The teambuilder's own room and panel, under a second roomid, so the view is identical
- * to start with and diverges from here. The team pane lists the user's custom formats.
+ * The teambuilder's room and panel under a second roomid; the team pane lists custom formats.
  *
  * @license AGPLv3
  */
@@ -21,11 +20,11 @@ import {
 
 /** What each picker edits: the label on its button, and how a rule names one of its entries. */
 type NamedTable = { get: (name: string) => { id: ID, name: string, exists: boolean } };
-const PICKERS: { [kind in RosterKind]: { label: string, prefix: string, dex: NamedTable } } = {
-	pokemon: { label: 'Pok\u00e9mon', prefix: '', dex: Dex.species },
-	move: { label: 'Moves', prefix: 'move:', dex: Dex.moves },
-	ability: { label: 'Abilities', prefix: 'ability:', dex: Dex.abilities },
-	item: { label: 'Items', prefix: 'item:', dex: Dex.items },
+const PICKERS: { [kind in RosterKind]: { label: string, prefix: string, dex: NamedTable, all: string } } = {
+	pokemon: { label: 'Pok\u00e9mon', prefix: '', dex: Dex.species, all: 'All Pokemon' },
+	move: { label: 'Moves', prefix: 'move:', dex: Dex.moves, all: 'All Moves' },
+	ability: { label: 'Abilities', prefix: 'ability:', dex: Dex.abilities, all: 'All Abilities' },
+	item: { label: 'Items', prefix: 'item:', dex: Dex.items, all: 'All Items' },
 };
 /** The tags a format can ban, in the order the editor shows them. */
 const TAG_GROUPS = [
@@ -34,16 +33,13 @@ const TAG_GROUPS = [
 	{ kind: 'other', name: 'Tag' },
 ];
 /** The rule that turns a list into an allowlist, one per picker. */
-const ALL_OF: { [kind in RosterKind]: string } = {
-	pokemon: 'All Pokemon', move: 'All Moves', ability: 'All Abilities', item: 'All Items',
-};
 /** How a picker's own entry is spelled, prefixed where a bare name could mean two things. */
 function ruleFor(kind: RosterKind, id: ID) {
 	return `${PICKERS[kind].prefix}${PICKERS[kind].dex.get(id).name}`;
 }
 /** Whether a stored rule is a picker's own, so rewriting a list doesn't drop the owner's rules. */
 function pickerRule(rule: string) {
-	if (Object.values(ALL_OF).some(all => toID(all) === toID(rule))) return true;
+	if (ROSTER_KINDS.some(kind => toID(PICKERS[kind].all) === toID(rule))) return true;
 	if (/^(?:base)?(?:pokemon|move|ability|item):/.test(rule)) return true;
 	return ROSTER_KINDS.some(kind => PICKERS[kind].dex.get(rule).exists);
 }
@@ -55,11 +51,7 @@ function formatMod(format: { mod: string, baseMod?: string }) {
 
 export class FormatbuilderRoom extends TeambuilderRoom {}
 
-/**
- * The team each format room is edited through. Kept out of `PS.teams` (these aren't the user's
- * teams) and off the room itself, since a subclass field initializer would run after the
- * `TeamRoom` constructor has already asked for it.
- */
+/** Kept off the room: a subclass field initializer runs after `TeamRoom` has asked for it. */
 const formatTeams: { [id: string]: Team } = {};
 
 /** A format room borrows the team editor's screen, so it needs a team to render. */
@@ -73,11 +65,7 @@ export class FormatRoom extends TeamRoom {
 	formatEntry() {
 		return CustomDex.overlay?.formats?.find(entry => entry.id === this.id.slice(7));
 	}
-	/**
-	 * Applies an edit locally so nothing sits a click behind, then asks what rules it produced.
-	 * `keepsDefault` is for the pickers: what the rules allow on their own doesn't count their own
-	 * output, so only they can edit a list without changing what "reset" goes back to.
-	 */
+	/** Applies an edit locally, then asks what rules it produced. `keepsDefault` is for the pickers. */
 	applyEdit(changes: AnyObject, keepsDefault?: boolean) {
 		const entry = this.formatEntry();
 		if (!entry) return;
@@ -104,11 +92,7 @@ export class FormatRoom extends TeamRoom {
 	legalKey() {
 		return toID(this.formatEntry()?.id);
 	}
-	/**
-	 * Which rulesets this format sets itself, on or off, leaving out the ones it says nothing about.
-	 * Its own spellings carry the sim's `^` prefix, which is what lets a setting be stored even when
-	 * it agrees with the base format and would otherwise be refused as a rule that does nothing.
-	 */
+	/** Which rulesets the format sets itself. The sim's `^` prefix stores one that agrees with the base. */
 	ruleSettings() {
 		const settings: { [ruleid: string]: 'on' | 'off' } = {};
 		for (const rule of this.formatEntry()?.ruleset || []) {
@@ -151,11 +135,7 @@ export class FormatRoom extends TeamRoom {
 		this.pending[kind] = roster;
 		this.update(null);
 	}
-	/**
-	 * Legality lives in the rules, so each list is stored as whichever spelling is shorter: the
-	 * difference from what the rules allow on their own, or `-All X` plus the list as an allowlist.
-	 * Trimming OU by three Pokemon is three bans; keeping twelve of them is thirteen rules.
-	 */
+	/** Each list is stored as whichever is shorter: the difference, or `-All X` plus an allowlist. */
 	saveRoster() {
 		const entry = this.formatEntry();
 		if (!entry) return;
@@ -166,11 +146,15 @@ export class FormatRoom extends TeamRoom {
 		ROSTER_KINDS.forEach(kind => {
 			const roster = this.roster(kind);
 			const base = this.defaultRoster(kind);
-			const bans = base.filter(id => !roster.includes(id)).map(id => ruleFor(kind, id));
-			const unbans = roster.filter(id => !base.includes(id)).map(id => ruleFor(kind, id));
+			const inRoster: { [id: string]: boolean } = {};
+			const inBase: { [id: string]: boolean } = {};
+			for (const id of roster) inRoster[id] = true;
+			for (const id of base) inBase[id] = true;
+			const bans = base.filter(id => !inRoster[id]).map(id => ruleFor(kind, id));
+			const unbans = roster.filter(id => !inBase[id]).map(id => ruleFor(kind, id));
 			if (1 + roster.length < bans.length + unbans.length) {
 				// `-All Pokemon` has to precede every other Pokemon rule, tag bans included.
-				banlist.unshift(ALL_OF[kind]);
+				banlist.unshift(PICKERS[kind].all);
 				unbanlist.push(...roster.map(id => ruleFor(kind, id)));
 			} else {
 				banlist.push(...bans);
@@ -195,8 +179,11 @@ export class FormatRoom extends TeamRoom {
 	}
 	override interruptClose(explicit?: boolean, elem?: HTMLElement | null) {
 		if (this.unsaved()) {
-			this.afterUnsaved = () => PS.leave(this.id);
-			PS.join('formatunsaved' as RoomID, { parentElem: elem, parentRoomid: this.id });
+			// see PokebuilderRoom: a popup opened behind the browser's prompt outlives a cancel
+			if (!explicit) {
+				this.afterUnsaved = () => PS.leave(this.id);
+				PS.join('formatunsaved' as RoomID, { parentElem: elem, parentRoomid: this.id });
+			}
 			return `You have unsaved changes to ${this.title}`;
 		}
 		return super.interruptClose(explicit, elem);
@@ -247,10 +234,8 @@ export class FormatPanel extends TeamPanel {
 		const search = editor.search as PokebuilderDexSearch;
 		const room = this.room();
 		search.roster = this.hideSelected ? [] : room.roster(this.pickerKind(editor));
-		search.selectedSpecies = room.roster('pokemon');
-		search.selectedMoves = room.roster('move');
-		search.selectedAbilities = room.roster('ability');
-		search.selectedItems = room.roster('item');
+		search.selected = {};
+		for (const kind of ROSTER_KINDS) search.selected[kind] = room.roster(kind);
 		if (ROSTER_KINDS.includes(editor.innerFocus?.type as RosterKind)) search.refresh();
 	}
 	editRoster(kind: RosterKind, change: (roster: ID[]) => ID[]) {
@@ -266,8 +251,7 @@ export class FormatPanel extends TeamPanel {
 		if (!editor) return;
 		editor.innerFocus = { setIndex: 0, type: kind, typeIndex: -1 };
 		editor.setSearchType(kind, 0, '', -1);
-		// No set is being edited, so there's no current choice to pin above the list. Without this
-		// the item picker opens on a "(no item)" row, which is a set's choice and not a format's.
+		// no set is being edited, so "(no item)" is a set's choice and not a format's
 		editor.search.prependResults = null;
 		this.syncRoster(editor);
 		editor.update();
@@ -295,8 +279,7 @@ export class FormatPanel extends TeamPanel {
 		const base = (ev.currentTarget as HTMLButtonElement).value;
 		const entry = room.formatEntry();
 		if (!entry || toID(base) === toID(entry.base)) return;
-		// The dropdown closes every popup right after handing over its value, this one included, so
-		// the question has to wait until it has finished doing that.
+		// the dropdown closes every popup after handing over its value, this one included
 		setTimeout(() => void PS.confirm(
 			`Start this format's rules over from ${BattleLog.formatName(base)}? Its rules and legal ` +
 			`Pokémon are replaced by that format's.`,
@@ -359,8 +342,7 @@ export class FormatPanel extends TeamPanel {
 		const on = (CustomDex.formatRules[room.legalKey()] || []).includes(id);
 		const named = (existing: string) => toID(existing.replace(/^\^/, '').replace(/^!/, '')) === id;
 		const others = entry.ruleset.filter(existing => !named(existing));
-		// Turning a rule off means deleting the line that adds it, or repealing it when a ruleset
-		// like `Standard` is what brings it in. Turning one on is the same in reverse.
+		// off means deleting the line that adds it, or repealing it when a ruleset brings it in
 		const ruleset = on ?
 			setting === 'on' ? others : [...others, `!${rule.name}`] :
 			setting === 'off' ? others : [...others, rule.name];

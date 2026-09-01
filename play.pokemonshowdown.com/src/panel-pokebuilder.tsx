@@ -69,8 +69,12 @@ class PokebuilderRoom extends PSRoom {
 	}
 	override interruptClose(explicit?: boolean, elem?: HTMLElement | null) {
 		if (this.unsavedIds().length) {
-			this.afterUnsaved = () => PS.leave(this.id);
-			PS.join('pokebuilderunsaved' as RoomID, { parentElem: elem, parentRoomid: this.id });
+			// `onbeforeunload` asks with `explicit`, and a popup opened behind the browser's
+			// own prompt outlives a cancelled reload
+			if (!explicit) {
+				this.afterUnsaved = () => PS.leave(this.id);
+				PS.join('pokebuilderunsaved' as RoomID, { parentElem: elem, parentRoomid: this.id });
+			}
 			return `You have unsaved Pokémon in ${this.title}`;
 		}
 		return super.interruptClose(explicit, elem);
@@ -147,7 +151,6 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 	static readonly Model = PokebuilderRoom;
 	static readonly title = 'Pokébuilder';
 
-	editingId = '' as ID;
 	speciesPicker: 'prevo' | 'evos' | null = null;
 	/** Which set the picker below is editing, remembered across focus changes. */
 	focusIndex = 0;
@@ -268,9 +271,9 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		const editor = this.props.room.editor;
 		const search = editor?.search as PokebuilderDexSearch | undefined;
 		if (!search || !this.speciesPicker) return;
-		search.selectedSpecies = this.speciesPicker === 'prevo' ?
+		search.selected = { pokemon: this.speciesPicker === 'prevo' ?
 			[toID(this.prevoFor(setIndex))].filter(Boolean) :
-			this.evosFor(setIndex).map(toID);
+			this.evosFor(setIndex).map(toID) };
 		if (editor?.innerFocus?.type === 'pokemon') search.refresh();
 	}
 	/** Back to the builder's own species list; the relatives pickers borrow the same focus type. */
@@ -279,7 +282,7 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		this.speciesPicker = null;
 		if (search) {
 			search.speciesMode = 'own';
-			search.selectedSpecies = null;
+			search.selected = null;
 			search.pickerExclude = null;
 		}
 	}
@@ -404,7 +407,6 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 			CustomDex.rename(oldName, name).then(renamed => {
 				if (!renamed) return;
 				set.species = renamed;
-				this.editingId = toID(renamed);
 				editor.update();
 			});
 		});
@@ -457,8 +459,9 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		this.resetSpeciesPicker();
 		const setIndex = Math.min(editor.innerFocus?.setIndex ?? editor.sets.length, editor.sets.length);
 		const set = (editor.sets[setIndex] ||= { species: '', moves: [] });
+		// the species leaving this slot drops out of `openIds`, so nothing would send its edits
+		CustomDex.flush(toID(set.species));
 		editor.changeSpecies(set, name);
-		this.editingId = toID(name);
 		editor.save();
 		// Where selecting an existing species lands, via focusAdjacentField.
 		this.openPicker(setIndex, 'move');
@@ -483,7 +486,6 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 				if (!renamed) return;
 				const set = this.props.room.editor?.sets[setIndex];
 				if (set) set.species = renamed;
-				this.editingId = toID(renamed);
 				this.applyImport(toID(renamed), parsed);
 			});
 			return '';
@@ -509,7 +511,6 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		const editor = this.props.room.editor;
 		if (!editor) return;
 		this.resetSpeciesPicker();
-		this.editingId = '' as ID;
 		this.focusIndex = 0;
 		editor.sets.splice(0);
 		editor.save();
@@ -594,7 +595,6 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		},
 		titles: {
 			back: 'Save and return to your Pokemon list',
-			copy: 'Copy this Pokemon to the clipboard',
 			import: 'Import or export this Pokemon as text',
 			delete: 'Delete this custom Pokemon',
 			pokemon: 'Switch to another Pokemon',
@@ -895,8 +895,6 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 	};
 	/** An edit landed locally; saving to the server is the Save button's job now. */
 	edited = () => {
-		const editor = this.props.room.editor;
-		this.editingId = toID(editor?.sets[editor.innerFocus?.setIndex ?? 0]?.species);
 		this.forceUpdate();
 	};
 	saveEdits = () => {
