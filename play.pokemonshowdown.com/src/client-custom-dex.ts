@@ -6,7 +6,7 @@
 
 import { PS, type RoomID, type Team } from "./client-main";
 import { PSModel } from "./client-core";
-import { Dex, toID, type ID } from "./battle-dex";
+import { Dex, TL, toID, type ID } from "./battle-dex";
 import { BattleStatNames } from "./battle-dex-data";
 import { DexSearch, type SearchRow, type SearchType } from "./battle-dex-search";
 import { MainMenuRoom } from "./panel-mainmenu";
@@ -74,7 +74,9 @@ export function formatText(format: string) {
 }
 /** The heading a list of format folders groups them under. */
 export function formatFolderName(folder: string) {
-	return folder === 'custom' ? 'Custom' : `Gen ${folder.slice(3)}`;
+	if (folder === 'custom') return 'Custom';
+	const gen = folder.slice(3);
+	return TL`Gen ${gen}`;
 }
 /** The same, without the folder that the list is already showing. */
 export function formatBasename(format: string) {

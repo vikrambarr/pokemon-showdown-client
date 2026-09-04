@@ -9,7 +9,7 @@
 import { PS, type RoomID, type Team } from "./client-main";
 import { PSPanelWrapper, PSRoomPanel } from "./panels";
 import { BattleLog } from "./battle-log";
-import { Dex, type ID, toID } from "./battle-dex";
+import { Dex, TL, type ID, toID } from "./battle-dex";
 import { TeambuilderPanel, TeambuilderRoom } from "./panel-teambuilder";
 import { SetImportForm, type SetEditor, type TeamEditorState } from "./battle-team-editor";
 import { TeamPanel, TeamRoom } from "./panel-teambuilder-team";
@@ -61,7 +61,13 @@ export class FormatRoom extends TeamRoom {
 		return CustomDex.pendingReason('formats');
 	}
 	override roomLabel() {
-		return 'Format';
+		return TL.term.format;
+	}
+	override listLabel() {
+		return TL.term.formats;
+	}
+	override missingMessage() {
+		return this.teamDeleted ? `${TL.term.format} was deleted` : `${TL.term.format} doesn't exist`;
 	}
 	/** The format as the server holds it, before anything this page is still holding. */
 	savedEntry() {
@@ -538,7 +544,7 @@ export class FormatPanel extends TeamPanel {
 		/** The tab edits the whole format, not a set: there are no sets here. */
 		textTab: editor => <SetImportForm editor={editor} setIndex={0} onChange={() => editor.update()} />,
 		importExport: {
-			label: 'Format',
+			label: 'Import/Export Format',
 			export: () => {
 				const entry = this.room().formatEntry();
 				return entry ? exportFormat(entry) : '';
@@ -637,6 +643,9 @@ export class FormatbuilderPanel extends TeambuilderPanel {
 	static override readonly routes = ['formatbuilder'];
 	static override readonly Model = FormatbuilderRoom;
 	static override readonly title = 'Formatbuilder';
+	static override getTitle() {
+		return this.title;
+	}
 
 	override componentDidMount() {
 		super.componentDidMount();

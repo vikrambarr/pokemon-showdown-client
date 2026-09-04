@@ -601,7 +601,7 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		/>,
 		// no Pokemon is open on the list screen, where the text is the whole collection instead
 		importExport: {
-			label: 'Pok\u00e9mon',
+			label: 'Import/Export Pok\u00e9mon',
 			export: (_editor, setIndex) => (
 				this.speciesId(setIndex) ? exportSpecies(this.speciesId(setIndex)) : exportSpeciesList()
 			),
