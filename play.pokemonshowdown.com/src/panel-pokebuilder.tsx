@@ -12,8 +12,8 @@ import { BattleStatNames } from "./battle-dex-data";
 import { BattleLog } from "./battle-log";
 import { SetImportForm, TeamEditor, type SetEditor, type TeamEditorState } from "./battle-team-editor";
 import {
-	abilitySlots, COLORS, CustomDex, EGG_GROUPS, EVO_TYPES, exportSpecies, type ParsedSpecies, parseSpecies,
-	PokebuilderDexSearch, speciesAbilities, TAGS,
+	abilitySlots, COLORS, CustomDex, EGG_GROUPS, EVO_TYPES, exportSpecies, exportSpeciesList,
+	type ParsedSpecies, parseSpecies, parseSpeciesList, PokebuilderDexSearch, speciesAbilities, TAGS,
 } from "./client-custom-dex";
 
 class PokebuilderRoom extends PSRoom {
@@ -467,19 +467,11 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		this.openPicker(setIndex, 'move');
 		editor.update();
 	}
-	/** Applies a pasted species to this slot, creating it if the slot is empty. */
+	/** Applies a pasted species to this slot, renaming it if the paste gives another name. */
 	importSpecies(setIndex: number, text: string): string {
 		const parsed = parseSpecies(text);
 		if (typeof parsed === 'string') return parsed;
 		const id = this.speciesId(setIndex);
-		if (!id) {
-			CustomDex.create(parsed.name).then(created => {
-				if (!created) return;
-				this.openSpecies(created);
-				this.applyImport(toID(created), parsed);
-			});
-			return '';
-		}
 		if (toID(parsed.name) !== id) {
 			CustomDex.flush(id);
 			CustomDex.rename(CustomDex.overlay!.Pokedex[id].name, parsed.name).then(renamed => {
@@ -492,6 +484,25 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		}
 		this.applyImport(id, parsed);
 		return '';
+	}
+	/** Applies a pasted list to the collection, creating whatever it doesn't hold yet. */
+	importList(text: string): string {
+		const parsed = parseSpeciesList(text);
+		if (typeof parsed === 'string') return parsed;
+		// one at a time: a Pokemon has to exist before the edit that fills it in, and the list
+		// screen has no Save button, so each one goes to the server as it lands
+		void parsed.reduce((chain, entry) => chain.then(() => {
+			const id = toID(entry.name);
+			if (CustomDex.has(id)) return void this.saveImport(id, entry);
+			return CustomDex.create(entry.name).then(created => {
+				if (created) this.saveImport(toID(created), entry);
+			});
+		}), Promise.resolve() as Promise<unknown>);
+		return '';
+	}
+	saveImport(id: ID, parsed: ParsedSpecies) {
+		this.applyImport(id, parsed);
+		CustomDex.flush(id);
 	}
 	applyImport(id: ID, parsed: ParsedSpecies) {
 		const { inheritsFrom, ...fields } = parsed.fields;
@@ -588,10 +599,15 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 			set={editor.sets[Math.min(this.focusIndex, editor.sets.length - 1)]}
 			onChange={() => editor.update()}
 		/>,
+		// no Pokemon is open on the list screen, where the text is the whole collection instead
 		importExport: {
 			label: 'Pok\u00e9mon',
-			export: (_editor, setIndex) => exportSpecies(this.speciesId(setIndex)),
-			import: (_editor, setIndex, text) => this.importSpecies(setIndex, text),
+			export: (_editor, setIndex) => (
+				this.speciesId(setIndex) ? exportSpecies(this.speciesId(setIndex)) : exportSpeciesList()
+			),
+			import: (_editor, setIndex, text) => (
+				this.speciesId(setIndex) ? this.importSpecies(setIndex, text) : this.importList(text)
+			),
 		},
 		titles: {
 			back: 'Save and return to your Pokemon list',

@@ -416,7 +416,7 @@ export class TeamPanel extends PSRoomPanel<TeamRoom> {
 				{this.renderStorage(team, unsaved)}
 				{this.renderFormatSelect(team)}
 				<label class="label teamname">
-					Team name:{}
+					{room.roomLabel()} name:{}
 					<input
 						class="textbox" type="text" defaultValue={team.name}
 						onInput={this.handleRename} onChange={this.handleRename} onKeyUp={this.handleRename}

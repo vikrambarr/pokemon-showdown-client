@@ -484,7 +484,16 @@ export class MainMenuRoom extends PSRoom {
 			break;
 
 		case 'customformatlegal':
+		case 'customformatdraft':
 			CustomDex.receiveFormatLegal(response);
+			break;
+
+		case 'customformatbuild':
+			CustomDex.receiveFormatBuild(response);
+			break;
+
+		case 'customformatdex':
+			CustomDex.receiveFormatDex(response);
 			break;
 		case 'teamupload':
 			if (PS.teams.uploading) {

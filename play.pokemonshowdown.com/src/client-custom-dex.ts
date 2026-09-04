@@ -4,7 +4,7 @@
  * @license AGPLv3
  */
 
-import { PS } from "./client-main";
+import { PS, type RoomID, type Team } from "./client-main";
 import { PSModel } from "./client-core";
 import { Dex, toID, type ID } from "./battle-dex";
 import { BattleStatNames } from "./battle-dex-data";
@@ -119,6 +119,8 @@ export const CustomDex = new class extends PSModel {
 	formatRules: { [formatid: string]: ID[] } = {};
 	/** The roster request in flight, so the two mount paths asking at once only cost one. */
 	legalPending: ID | null = null;
+	/** Why the last preview was refused, for the room that asked for it. */
+	draftError: string | null = null;
 	/** Of those, the ones the format can't switch off, mapped to the reason it can't. */
 	formatLockedRules: { [formatid: string]: { [ruleid: string]: string } } = {};
 	/** The tags the format bans, and whatever else in its lists no picker or chip covers. */
@@ -129,9 +131,15 @@ export const CustomDex = new class extends PSModel {
 
 	/** Every format a selector may offer, keyed by the id everything outside the builder uses. */
 	formatsById: { [formatid: string]: CustomFormatSummary } = {};
-	/** Other users' formats, learned from a challenge, so a team can be built for one. */
+	/** Other users' formats, learned from a challenge or the directory, so a team can be built for one. */
 	foreignFormats: { [formatid: string]: CustomFormatSummary } = {};
 	askedFormats: { [formatid: string]: boolean } = {};
+	/** What a shared link gave us: a private format is only readable by whoever has one. */
+	formatPasswords: { [formatid: string]: string } = {};
+	/** Another owner's species, keyed by the format they were fetched for. */
+	formatDexes: { [formatid: string]: ID[] } = {};
+	/** The search a late roster or dex has to reach: the panel showing one renders from a cache. */
+	liveSearch: DexSearch | null = null;
 	/** The custom species each open battle is using, so leaving one takes its own back out. */
 	battleDexes: { [roomid: string]: ID[] } = {};
 	/** Art for species that aren't the user's own, looked up the same way theirs is. */
@@ -169,19 +177,96 @@ export const CustomDex = new class extends PSModel {
 		}
 		PS.teams.update('format');
 	}
+	/** Whose format it is: the owner is in the id, and our own species are applied already. */
+	ownsFormat(entry: { id: string }) {
+		return entry.id.split('-')[1] === PS.user.userid;
+	}
 	/** Picks up a format the user doesn't own, named in full the way a challenge names it. */
-	learnFormat(format: string | undefined) {
+	learnFormat(format: string | undefined, password?: string) {
 		const id = toID(format);
 		if (!id || !format || this.formatsById[id] || this.askedFormats[id]) return;
-		if (!CUSTOM_FORMAT_NAME.test(format.trim())) return;
+		// a challenge names it in full; a saved team carries the id `toID` collapsed that name to
+		const bareId = id.startsWith('custom') && !window.BattleFormats?.[id];
+		if (!CUSTOM_FORMAT_NAME.test(format.trim()) && !bareId) return;
 		this.askedFormats[id] = true;
-		PS.send(`/cmd customformatinfo ${format.trim()}`);
+		if (password) this.formatPasswords[id] = password;
+		PS.send(`/cmd customformatinfo ${format.trim()}${password ? `, ${password}` : ''}`);
+	}
+	/** Formats our saved teams name but we don't own, so a team keeps its name across a reload. */
+	learnSavedFormats() {
+		for (const team of PS.teams.list) this.learnFormat(team.format);
 	}
 	receiveFormatInfo(response: AnyObject | null) {
 		if (!response || response.actionerror || !response.id) return;
 		this.foreignFormats[toID(response.id)] = response as CustomFormatSummary;
 		this.registerFormats();
 		this.update();
+	}
+	/** Keeps a browsed format, so it can be picked in a selector the way our own are. */
+	adoptFormat(entry: CustomFormatSummary) {
+		const id = toID(entry.id);
+		this.askedFormats[id] = true;
+		this.foreignFormats[id] = entry;
+		this.registerFormats();
+		this.update();
+		return id;
+	}
+	/**
+	 * The species another owner's format is built with. Applied for the session rather than while a
+	 * room is open: a team saved in the format has to render wherever it's shown.
+	 */
+	loadFormatDex(format: string | undefined) {
+		const entry = this.formatEntry(format);
+		if (!entry || this.ownsFormat(entry) || !PS.user.named) return;
+		const id = toID(entry.id);
+		if (this.formatDexes[id]) return;
+		this.formatDexes[id] = [];
+		const password = this.formatPasswords[id];
+		PS.send(`/cmd customformatdex ${formatTitle(entry)}${password ? `, ${password}` : ''}`);
+	}
+	receiveFormatDex(response: AnyObject | null) {
+		if (!response || response.actionerror || !response.id) return;
+		const ids: ID[] = [];
+		for (const id in response.Pokedex) {
+			// ours are applied already, with any edit we haven't saved yet on top
+			if (this.has(id as ID)) continue;
+			ids.push(id as ID);
+			const data = response.Pokedex[id];
+			window.BattlePokedex[id] ||= { ...data, tier: data.tier || 'Custom' };
+			delete window.BattlePokedexAltForms?.[id];
+			const moves: { [moveid: string]: string } = {};
+			for (const moveid in response.Learnsets?.[id]?.learnset || {}) moves[moveid] = ALL_SOURCE_CHARS;
+			BattleTeambuilderTable.learnsets[id] ||= moves;
+			if (response.sprites?.[id]) this.battleSprites[id] ||= response.sprites[id];
+			for (const mod of Object.values(Dex.moddedDexes)) delete mod.cache.Species[id];
+		}
+		this.formatDexes[toID(response.id)] = ids;
+		this.refreshSearch();
+		this.update();
+	}
+	/** Nothing rebuilds a result list on its own, so whatever arrives late has to. */
+	refreshSearch() {
+		const search = this.liveSearch;
+		if (!search) return;
+		search.results = null;
+		search.find(search.query || '');
+		search.resultsComponent?.forceUpdate();
+	}
+	/** The directory's build button: a format is picked out of it by starting a team in it. */
+	receiveFormatBuild(response: AnyObject | null) {
+		if (!response || response.actionerror || !response.id) {
+			PS.alert(response?.actionerror || `The server didn't send that format.`);
+			return;
+		}
+		if (response.password) this.formatPasswords[toID(response.id)] = response.password;
+		const format = this.adoptFormat(response as CustomFormatSummary);
+		const team: Team = {
+			name: `Untitled ${PS.teams.list.length + 1}`,
+			format, folder: '', packedTeam: '', iconCache: null, isBox: false, key: '',
+		};
+		PS.teams.unshift(team);
+		PS.teams.save();
+		PS.join(`team-${team.key}` as RoomID);
 	}
 	/** A battle's own dex: without it an opponent's custom Pokemon don't exist. */
 	loadBattleDex(roomid: string) {
@@ -214,6 +299,9 @@ export const CustomDex = new class extends PSModel {
 		const stillOpen: { [id: string]: boolean } = {};
 		for (const other in this.battleDexes) {
 			for (const id of this.battleDexes[other]) stillOpen[id] = true;
+		}
+		for (const formatid in this.formatDexes) {
+			for (const id of this.formatDexes[formatid]) stillOpen[id] = true;
 		}
 		for (const id of ids) {
 			if (stillOpen[id]) continue;
@@ -273,8 +361,18 @@ export const CustomDex = new class extends PSModel {
 		this.queue = [];
 		// Whose species a battle's belong to depends on who is asking, so they're asked for again.
 		for (const roomid in this.battleDexes) this.releaseBattleDex(roomid);
+		this.releaseForeignDexes();
+		this.liveSearch = null;
+		this.foreignFormats = {};
+		this.askedFormats = {};
+		this.formatPasswords = {};
 		this.registerFormats();
 		this.update();
+	}
+	/** Other owners' species, taken back out: who may see which of them depends on who we are. */
+	releaseForeignDexes() {
+		for (const formatid in this.formatDexes) this.unapply(this.formatDexes[formatid]);
+		this.formatDexes = {};
 	}
 	unapply(ids: ID[]) {
 		for (const id of ids) {
@@ -346,6 +444,7 @@ export const CustomDex = new class extends PSModel {
 		this.registerFormats();
 		// A battle open before the overlay arrived asked as nobody, and got nothing back.
 		for (const roomid in PS.rooms) this.loadBattleDex(roomid);
+		this.learnSavedFormats();
 	}
 	patch(id: ID, changes: AnyObject) {
 		if (!this.overlay?.Pokedex[id]) return;
@@ -368,17 +467,35 @@ export const CustomDex = new class extends PSModel {
 		const id = toID(entry?.id || format);
 		if (!changed && this.legalPending === id) return;
 		this.legalPending = id;
-		PS.send(`/cmd customformatlegal ${target}${this.formatDefaultLegal[id] ? '' : ', default'}`);
+		// `[name], [options], [password]`: the fields the server splits on, however few we need
+		const fields = [target, this.formatDefaultLegal[id] ? '' : 'default', this.formatPasswords[id] || ''];
+		while (fields.length > 1 && !fields[fields.length - 1]) fields.pop();
+		PS.send(`/cmd customformatlegal ${fields.join(', ')}`);
+	}
+	/** The same question about changes the builder hasn't saved: what would this format allow? */
+	loadFormatDraft(format: string, changes: AnyObject, wantDefault?: boolean) {
+		const entry = this.formatEntry(format);
+		if (!entry) return;
+		this.legalPending = toID(entry.id);
+		const fields = [entry.name, wantDefault ? 'default' : '', JSON.stringify(changes)];
+		PS.send(`/cmd customformatdraft ${fields.join(', ')}`);
 	}
 	receiveFormatLegal(response: AnyObject | null) {
 		this.legalPending = null;
-		if (!response || response.actionerror || !response.name) return;
+		if (response?.actionerror) {
+			// The builder undoes the change the server refused, so say so rather than sit still.
+			this.draftError = response.actionerror;
+			this.update();
+			return;
+		}
+		if (!response?.name) return;
 		const id = toID(response.id || response.name);
 		this.formatLegal[id] = toRoster(response.legal);
 		if (response.defaultLegal) this.formatDefaultLegal[id] = toRoster(response.defaultLegal);
 		this.formatRules[id] = (response.rules || []).map(toID);
 		this.formatLockedRules[id] = response.locked || {};
 		this.formatBans[id] = response.bans || { tags: {}, other: [] };
+		this.refreshSearch();
 		this.update();
 	}
 	/** Import can change what an entry inherits from; it lives outside the species overrides. */
@@ -665,25 +782,31 @@ DexSearch.prototype.setType = function (this: DexSearch, searchType, format, spe
 	if (!search || !kind) return;
 
 	const key = toID(entry.id);
+	CustomDex.liveSearch = this;
 	// Asked for once: working one out costs the server a full pass over the dex.
 	if (!CustomDex.formatLegal[key]) CustomDex.loadFormatLegal(entry.id);
+	CustomDex.loadFormatDex(entry.id);
 	const roster = () => CustomDex.formatLegal[key]?.[kind] || null;
+	const foreign = () => CustomDex.formatDexes[key] || null;
 	const baseResults = search.getBaseResults.bind(search);
 	const results = search.getResults.bind(search);
 	let usedRoster = roster();
+	let usedForeign = foreign();
 	search.getBaseResults = () => {
 		// Custom species are in the dex but in none of the tier tables, so they're added by hand.
-		const rows = kind === 'pokemon' && CustomDex.ids.length ? [
+		const custom = [...CustomDex.ids, ...usedForeign || []];
+		const rows = kind === 'pokemon' && custom.length ? [
 			['header', 'Custom'] as SearchRow,
-			...CustomDex.ids.map(id => ['pokemon', id] as SearchRow),
+			...custom.map(id => ['pokemon', id] as SearchRow),
 			...baseResults(),
 		] : baseResults();
 		return usedRoster ? keepLegal(kind, usedRoster, rows) : rows;
 	};
 	search.getResults = (filters, sortCol, reverseSort) => {
-		// The roster comes from the server, so the first list built may well predate it.
-		if (usedRoster !== roster()) {
+		// Both come from the server, so the first list built may well predate either.
+		if (usedRoster !== roster() || usedForeign !== foreign()) {
 			usedRoster = roster();
+			usedForeign = foreign();
 			search.baseResults = search.baseIllegalResults = null;
 		}
 		return results(filters, sortCol, reverseSort);
@@ -727,6 +850,7 @@ TeamEditorState.prototype.setFormat = function (this: TeamEditorState, format: s
 	// by substring - level, forme legality, whether it's Let's Go - has to come from the base.
 	teamEditorSetFormat.call(this, CustomDex.baseFormat(format));
 	this.format = this.team.format = toID(format);
+	CustomDex.loadFormatDex(format);
 };
 
 const INSTAFILTERABLE: SearchType[] = ['type', 'ability', 'move'];
@@ -894,6 +1018,11 @@ export function exportSpecies(id: ID): string {
 	return out.join('\n');
 }
 
+/** The whole collection, in the blank-line-separated form `parseSpeciesList` reads back. */
+export function exportSpeciesList(): string {
+	return CustomDex.ids.map(id => exportSpecies(id)).filter(Boolean).join('\n\n');
+}
+
 export interface ParsedSpecies { name: string; fields: AnyObject; moves: string[] }
 
 function named(table: { get: (name: string) => AnyObject }, value: string, what: string) {
@@ -976,8 +1105,9 @@ export function parseSpecies(text: string): ParsedSpecies | string {
 				fields.eggGroups = parts.map(part => oneOf(part, EGG_GROUPS, 'egg group'));
 				break;
 			case 'inheritsfrom': fields.inheritsFrom = named(Dex.species, value, 'Pokemon'); break;
-			case 'weight': fields.weightkg = number(value, 'Weight', 'weightkg'); break;
-			case 'height': fields.heightm = number(value, 'Height', 'heightm'); break;
+			// export writes the unit these are in, so an exported Pokemon imports back
+			case 'weight': fields.weightkg = number(value.replace(/kg$/i, ''), 'Weight', 'weightkg'); break;
+			case 'height': fields.heightm = number(value.replace(/m$/i, ''), 'Height', 'heightm'); break;
 			case 'forme': fields.forme = capped(value, 'Forme', 'forme'); break;
 			case 'maxhp': fields.maxHP = number(value, 'Max HP', 'maxHP', true); break;
 			case 'cannotdynamax': fields.cannotDynamax = toID(value) !== 'no'; break;
@@ -1017,6 +1147,18 @@ export function parseSpecies(text: string): ParsedSpecies | string {
 	}
 	if (sawAbility) fields.abilities = abilities;
 	return { name, fields, moves };
+}
+
+/** Returns every Pokemon a pasted list holds, or the first error message to show the user. */
+export function parseSpeciesList(text: string): ParsedSpecies[] | string {
+	const parsed: ParsedSpecies[] = [];
+	for (const block of text.split(/\n\s*\n/)) {
+		if (!block.trim()) continue;
+		const one = parseSpecies(block);
+		if (typeof one === 'string') return one;
+		parsed.push(one);
+	}
+	return parsed;
 }
 
 const SPECIES_FIELDS = [

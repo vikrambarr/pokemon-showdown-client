@@ -26,13 +26,14 @@ const PICKERS: { [kind in RosterKind]: { label: string, prefix: string, dex: Nam
 	ability: { label: 'Abilities', prefix: 'ability:', dex: Dex.abilities, all: 'All Abilities' },
 	item: { label: 'Items', prefix: 'item:', dex: Dex.items, all: 'All Items' },
 };
+/** The rule fields a new base format replaces, and the ones the pickers write into. */
+const RULE_LISTS = ['ruleset', 'banlist', 'unbanlist'];
 /** The tags a format can ban, in the order the editor shows them. */
 const TAG_GROUPS = [
 	{ kind: 'pokemon', name: 'Pok\u00e9mon tag' },
 	{ kind: 'move', name: 'Move tag' },
 	{ kind: 'other', name: 'Tag' },
 ];
-/** The rule that turns a list into an allowlist, one per picker. */
 /** How a picker's own entry is spelled, prefixed where a bare name could mean two things. */
 function ruleFor(kind: RosterKind, id: ID) {
 	return `${PICKERS[kind].prefix}${PICKERS[kind].dex.get(id).name}`;
@@ -62,29 +63,60 @@ export class FormatRoom extends TeamRoom {
 	override roomLabel() {
 		return 'Format';
 	}
-	formatEntry() {
+	/** The format as the server holds it, before anything this page is still holding. */
+	savedEntry() {
 		return CustomDex.overlay?.formats?.find(entry => entry.id === this.id.slice(7));
 	}
-	/** Applies an edit locally, then asks what rules it produced. `keepsDefault` is for the pickers. */
-	applyEdit(changes: AnyObject, keepsDefault?: boolean) {
-		const entry = this.formatEntry();
+	formatEntry() {
+		const entry = this.savedEntry();
+		if (!entry || !this.draft) return entry;
+		return { ...entry, ...this.draft } as typeof entry;
+	}
+	/** Holds an edit and asks what it would do, rather than saving it. */
+	applyEdit(changes: AnyObject) {
+		if (!this.savedEntry()) return;
+		this.lastDraft = this.draft;
+		this.draft = { ...this.draft, ...changes };
+		this.preview(RULE_LISTS.some(field => field in changes) || 'base' in changes || 'mod' in changes);
+		this.update(null);
+	}
+	/** What the held edits would allow, asked of the server since only it can build the rules. */
+	preview(newDefault?: boolean) {
+		const entry = this.savedEntry();
 		if (!entry) return;
-		CustomDex.patchFormat(entry.id, changes);
-		if (!keepsDefault) delete CustomDex.formatDefaultLegal[this.legalKey()];
-		void CustomDex.editFormat(entry.name, changes)
-			.then(() => CustomDex.loadFormatLegal(entry.id, true));
+		if (!this.draft) {
+			CustomDex.loadFormatLegal(entry.id, true);
+			return;
+		}
+		CustomDex.loadFormatDraft(entry.id, this.draft, newDefault || !CustomDex.formatDefaultLegal[this.legalKey()]);
+	}
+	/** A refused edit never happened, so the page goes back to the last one the server took. */
+	refuseDraft(error: string) {
+		this.draft = this.lastDraft;
+		this.lastDraft = null;
+		this.preview(true);
+		this.update(null);
+		PS.alert(error);
 	}
 	/** The picker on this page chooses what the custom format is built on, not what it is. */
 	override setFormat(format: string) {
 		this.team.format = toID(format);
 		// `TeamRoom` sets the format on open too, and that isn't an edit.
 		if (toID(this.formatEntry()?.base) === toID(format)) return;
-		// A different base means different rules and a different roster: ask for both again.
+		// A different base means different rules and a different roster: both start over from it.
+		this.pending = {};
+		const draft: AnyObject = { ...this.draft };
+		for (const field of RULE_LISTS) delete draft[field];
+		this.draft = draft;
 		this.applyEdit({ base: format || null });
 	}
 	/** Nothing here belongs to PS.teams; the server is the store. */
 	override save() {}
 
+	/** The format's own fields as edited, until the Save button sends them. */
+	draft: AnyObject | null = null;
+	/** The last draft the server took, to go back to when it refuses the next one. */
+	lastDraft: AnyObject | null = null;
 	/** The lists being edited, where they have diverged from what the server holds. */
 	pending: { [kind in RosterKind]?: ID[] } = {};
 	afterUnsaved: (() => void) | null = null;
@@ -123,8 +155,14 @@ export class FormatRoom extends TeamRoom {
 			return pending && !this.sameRoster(pending, this.savedRoster(kind));
 		});
 	}
+	/** Everything this page is holding: the format's own fields, and what the pickers chose. */
+	changes() {
+		const roster = this.rosterChanges();
+		if (!this.draft && !roster) return null;
+		return { ...this.draft, ...roster };
+	}
 	unsaved() {
-		return !!this.unsavedKinds().length;
+		return !!this.draft || !!this.unsavedKinds().length;
 	}
 	/** Whether a picker is already showing what the format's rules allow on their own. */
 	atDefault(kind: RosterKind) {
@@ -136,12 +174,14 @@ export class FormatRoom extends TeamRoom {
 		this.update(null);
 	}
 	/** Each list is stored as whichever is shorter: the difference, or `-All X` plus an allowlist. */
-	saveRoster() {
+	rosterChanges() {
 		const entry = this.formatEntry();
-		if (!entry) return;
+		if (!entry || !this.unsavedKinds().length) return null;
 		// The pickers' own spellings are ours to rewrite; everything else is the owner's own rule.
 		const banlist = entry.banlist.filter(rule => !pickerRule(rule));
 		const unbanlist = entry.unbanlist.filter(rule => !pickerRule(rule));
+		// `-All Pokemon` has to precede every other rule of theirs, so the emptied lists lead.
+		const emptiedBans: string[] = [];
 		// A `for` loop here compiles to a closure the client's build refuses; `forEach` is one already.
 		ROSTER_KINDS.forEach(kind => {
 			const roster = this.roster(kind);
@@ -152,30 +192,39 @@ export class FormatRoom extends TeamRoom {
 			for (const id of base) inBase[id] = true;
 			const bans = base.filter(id => !inRoster[id]).map(id => ruleFor(kind, id));
 			const unbans = roster.filter(id => !inBase[id]).map(id => ruleFor(kind, id));
-			if (1 + roster.length < bans.length + unbans.length) {
-				// `-All Pokemon` has to precede every other Pokemon rule, tag bans included.
-				banlist.unshift(PICKERS[kind].all);
+			// emptying a picker means `-All X`; the diff would need a default we may not have yet
+			const emptied = !!this.pending[kind] && !roster.length;
+			if (emptied || 1 + roster.length < bans.length + unbans.length) {
+				emptiedBans.push(PICKERS[kind].all);
 				unbanlist.push(...roster.map(id => ruleFor(kind, id)));
 			} else {
 				banlist.push(...bans);
 				unbanlist.push(...unbans);
 			}
 		});
-		this.pending = {};
-		this.applyEdit({ banlist, unbanlist }, true);
+		banlist.unshift(...emptiedBans);
+		return { banlist, unbanlist };
 	}
-	discardRoster() {
+	/** One write for the whole page, so a picker's changes and the rules around them land together. */
+	saveEdits() {
+		const entry = this.savedEntry();
+		const changes = this.changes();
+		if (!entry || !changes) return Promise.resolve(null);
+		this.draft = null;
+		this.lastDraft = null;
 		this.pending = {};
 		this.update(null);
+		return CustomDex.editFormat(entry.name, changes).then(name => {
+			CustomDex.loadFormatLegal(entry.id, true);
+			return name;
+		});
 	}
-	confirmUnsaved(then: () => void, elem?: HTMLElement | null) {
-		if (!this.unsaved()) {
-			then();
-			return true;
-		}
-		this.afterUnsaved = then;
-		PS.join('formatunsaved' as RoomID, { parentElem: elem, parentRoomid: this.id });
-		return false;
+	discardEdits() {
+		this.draft = null;
+		this.lastDraft = null;
+		this.pending = {};
+		this.preview();
+		this.update(null);
 	}
 	override interruptClose(explicit?: boolean, elem?: HTMLElement | null) {
 		if (this.unsaved()) {
@@ -303,6 +352,8 @@ export class FormatPanel extends TeamPanel {
 			{ okButton: 'Reset rules', parentElem: ev.currentTarget as HTMLElement }
 		).then(confirmed => {
 			if (!confirmed) return;
+			room.draft = null;
+			room.lastDraft = null;
 			room.pending = {};
 			delete CustomDex.formatDefaultLegal[room.legalKey()];
 			void CustomDex.resetFormat(entry.name).then(() => CustomDex.loadFormatLegal(entry.id, true));
@@ -354,12 +405,49 @@ export class FormatPanel extends TeamPanel {
 		this.editRoster(kind, () => this.room().defaultRoster(kind).slice());
 	};
 	clearRoster = () => this.editRoster(this.pickerKind(this.room().editor), () => []);
-	saveRoster = () => {
-		this.room().saveRoster();
+	saveEdits = () => {
+		void this.room().saveEdits();
 		this.forceUpdate();
 	};
+	discardEdits = () => {
+		this.room().discardEdits();
+		this.forceUpdate();
+	};
+	/** The name is the one thing an edit can't hold: it names the format every write asks for. */
+	override handleRename = (ev: Event) => {
+		// Only once the box is done being typed in: a rename moves the room to the new name's id.
+		if (ev.type !== 'change') return;
+		const room = this.room();
+		const entry = room.savedEntry();
+		const name = (ev.currentTarget as HTMLInputElement).value.trim();
+		if (!entry || !name || name === entry.name) return;
+		void room.saveEdits()
+			.then(() => CustomDex.editFormat(entry.name, { name }))
+			.then(renamed => {
+				const format = CustomDex.overlay?.formats?.find(candidate => candidate.name === renamed);
+				if (!format) return;
+				// The id a format plays under is its name's, so renaming it moves this room.
+				PS.leave(room.id);
+				PS.join(`format-${format.id}` as RoomID);
+			});
+	};
 
-	/** Picking a species makes it legal or illegal, rather than starting a set. */
+	/** The page's one Save button: the pickers show the same one, so nothing nests inside it. */
+	renderSave() {
+		const unsaved = this.room().unsaved();
+		return <>
+			<button
+				class="option" onClick={this.saveEdits} disabled={!unsaved}
+				title={unsaved ? 'Save changes to the server' : 'No unsaved changes'}
+			>
+				<i class={`fa fa-${unsaved ? 'floppy-o' : 'check'}`} aria-hidden></i> {}
+				{unsaved ? 'Save' : 'Saved'}
+			</button> {}
+			<button class="option" onClick={this.discardEdits} disabled={!unsaved}>
+				<i class="fa fa-times" aria-hidden></i> Discard
+			</button>
+		</>;
+	}
 	/** Everything about the format that isn't one of its four lists. */
 	override renderExtras(): preact.ComponentChildren {
 		const room = this.room();
@@ -370,6 +458,7 @@ export class FormatPanel extends TeamPanel {
 		const bans = CustomDex.formatBans[room.legalKey()];
 		const settings = room.ruleSettings();
 		return <div class="formatsettings">
+			<p style="text-align:right">{this.renderSave()}</p>
 			<p>
 				<label class="label">
 					Base format:{}
@@ -464,24 +553,19 @@ export class FormatPanel extends TeamPanel {
 		},
 		titles: { pokemon: 'Pokemon allowed in this format' },
 		hideOptions: true,
+		/** A picker is a page of this format, not a page of its own: nothing is saved leaving it. */
 		back: (ev?: Event) => {
 			ev?.preventDefault();
 			ev?.stopImmediatePropagation();
 			const room = this.room();
-			room.confirmUnsaved(() => {
-				room.editor!.innerFocus = null;
-				room.update(null);
-			}, ev?.currentTarget as HTMLElement);
+			room.editor!.innerFocus = null;
+			room.update(null);
 		},
 		renderEmptyActions: () => {
 			const room = this.room();
 			const kind = this.pickerKind(room.editor);
-			const unsaved = room.unsaved();
 			return <>
-				<button class="option" onClick={this.saveRoster} disabled={!unsaved}>
-					<i class={`fa fa-${unsaved ? 'floppy-o' : 'check'}`} aria-hidden></i> {}
-					{unsaved ? 'Save' : 'Saved'}
-				</button> {}
+				{this.renderSave()} {}
 				<button class="option" onClick={this.toggleHideSelected}>
 					<i class={`fa fa-${this.hideSelected ? 'eye' : 'eye-slash'}`} aria-hidden></i> {}
 					{this.hideSelected ? 'Show' : 'Hide'} selected
@@ -511,13 +595,21 @@ export class FormatPanel extends TeamPanel {
 
 	/** Which species the rules allow is the server's to work out, so it gets asked. */
 	loadLegal() {
-		const entry = this.room().formatEntry();
+		const room = this.room();
+		// A held edit is asked about as a draft; the stored rules would answer the wrong question.
+		if (room.draft) return room.preview();
+		const entry = room.formatEntry();
 		if (entry) CustomDex.loadFormatLegal(entry.id);
 	}
 
 	override componentDidMount() {
 		super.componentDidMount();
 		this.subscribeTo(CustomDex, () => {
+			if (CustomDex.draftError) {
+				const error = CustomDex.draftError;
+				CustomDex.draftError = null;
+				this.room().refuseDraft(error);
+			}
 			const editor = this.props.room.editor;
 			if (editor) this.syncRoster(editor);
 			this.forceUpdate();
@@ -571,6 +663,26 @@ export class FormatbuilderPanel extends TeambuilderPanel {
 			if (confirmed) void CustomDex.deleteFormat(name);
 		});
 	};
+	renameFormat = (ev: Event) => {
+		// See deleteFormat: an unstopped click reaches PS's outside-click handler and closes the prompt.
+		ev.preventDefault();
+		ev.stopImmediatePropagation();
+		const oldName = (ev.currentTarget as HTMLButtonElement).value;
+		const oldId = CustomDex.overlay?.formats?.find(entry => entry.name === oldName)?.id || '';
+		PS.prompt(`Rename \`\`${oldName}\`\` to?`, {
+			defaultValue: oldName, okButton: 'Rename', parentElem: ev.currentTarget as HTMLElement,
+		}).then(name => {
+			name = name?.trim() || '';
+			if (!name || name === oldName) return;
+			void CustomDex.editFormat(oldName, { name }).then(renamed => {
+				const format = CustomDex.overlay?.formats?.find(entry => entry.name === renamed);
+				// A format plays under its name's id, so an open room for it moves too.
+				if (!format || !PS.rooms[`format-${oldId}` as RoomID]) return;
+				PS.leave(`format-${oldId}` as RoomID);
+				PS.join(`format-${format.id}` as RoomID);
+			});
+		});
+	};
 	createFormat = (ev: Event) => {
 		// Without this the same click reaches PS's outside-click handler and closes the prompt.
 		ev.preventDefault();
@@ -609,6 +721,12 @@ export class FormatbuilderPanel extends TeambuilderPanel {
 						</a> {}
 						<span class="team-controls">
 							<button
+								class="option" onClick={this.renameFormat} value={format.name}
+								aria-label="Rename" title="Rename"
+							>
+								<i class="fa fa-pencil" aria-hidden></i> Rename
+							</button> {}
+							<button
 								class="option" onClick={this.deleteFormat} value={format.name}
 								aria-label="Delete" title="Delete"
 							>
@@ -621,7 +739,10 @@ export class FormatbuilderPanel extends TeambuilderPanel {
 			<p>
 				<button class="button" onClick={this.createFormat}>
 					<i class="fa fa-plus-circle" aria-hidden></i> New format
-				</button>
+				</button> {}
+				<a class="button" href="view-customformats-browse">
+					<i class="fa fa-globe" aria-hidden></i> Browse formats
+				</a>
 			</p>
 		</div>;
 	}
@@ -639,12 +760,15 @@ class FormatUnsavedPanel extends PSRoomPanel {
 	finish(save: boolean) {
 		const room = this.format();
 		if (!room) return;
-		if (save) room.saveRoster();
-		else room.discardRoster();
 		const then = room.afterUnsaved;
 		room.afterUnsaved = null;
 		PS.leave(this.props.room.id);
-		then?.();
+		// Leaving before the write lands would abandon it, so the room goes once the server has it.
+		if (save) void room.saveEdits().then(() => then?.());
+		else {
+			room.discardEdits();
+			then?.();
+		}
 	}
 	saveAndGo = () => this.finish(true);
 	discardAndGo = () => this.finish(false);
@@ -659,8 +783,8 @@ class FormatUnsavedPanel extends PSRoomPanel {
 		const lists = (room?.unsavedKinds() || []).map(kind => PICKERS[kind].label.toLowerCase());
 		return <PSPanelWrapper room={this.props.room} width={480}><div class="pad">
 			<p>
-				You have unsaved changes to which {lists.join(' and ') || 'Pok\u00e9mon'} {}
-				{room?.team?.name || 'this format'} allows.
+				You have unsaved changes to {room?.team?.name || 'this format'}
+				{lists.length ? `, including which ${lists.join(' and ')} it allows` : ''}.
 			</p>
 			<p>
 				<button class="button" onClick={this.saveAndGo}><strong>Save changes</strong></button> {}

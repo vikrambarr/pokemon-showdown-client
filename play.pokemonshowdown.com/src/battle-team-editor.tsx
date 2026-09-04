@@ -1942,7 +1942,8 @@ class TeamTextbox extends preact.Component<{
 						const prevOffset = i === 0 ? 8 : this.setInfo[i - 1].bottomY;
 						const species = editor.dex.species.get(info.species);
 						const num = Dex.getPokemonIconNum(species.id);
-						if (!num) return null;
+						// custom species have no icon number, so their own art is all they get
+						if (!num && !species.exists) return null;
 
 						if (editor.narrow) {
 							return <div style={`top:${prevOffset + 1}px;left:5px;position:absolute;text-align:center;pointer-events:none`}>
