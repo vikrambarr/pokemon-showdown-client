@@ -11,7 +11,8 @@ import { PSPanelWrapper, PSRoomPanel } from "./panels";
 import { BattleLog } from "./battle-log";
 import { Dex, TL, type ID, toID } from "./battle-dex";
 import { TeambuilderPanel, TeambuilderRoom } from "./panel-teambuilder";
-import { SetImportForm, type SetEditor, type TeamEditorState } from "./battle-team-editor";
+import { SetImportForm, type TeamEditorState } from "./battle-team-editor";
+import type { SetEditor } from "./battle-team-editor-hooks";
 import { TeamPanel, TeamRoom } from "./panel-teambuilder-team";
 import {
 	CustomDex, emptyRoster, exportFormat, parseFormat, ROSTER_KINDS, type RosterKind,
@@ -78,7 +79,6 @@ export class FormatRoom extends TeamRoom {
 		if (!entry || !this.draft) return entry;
 		return { ...entry, ...this.draft } as typeof entry;
 	}
-	/** Holds an edit and asks what it would do, rather than saving it. */
 	applyEdit(changes: AnyObject) {
 		if (!this.savedEntry()) return;
 		this.lastDraft = this.draft;
@@ -86,7 +86,6 @@ export class FormatRoom extends TeamRoom {
 		this.preview(RULE_LISTS.some(field => field in changes) || 'base' in changes || 'mod' in changes);
 		this.update(null);
 	}
-	/** What the held edits would allow, asked of the server since only it can build the rules. */
 	preview(newDefault?: boolean) {
 		const entry = this.savedEntry();
 		if (!entry) return;
@@ -96,7 +95,6 @@ export class FormatRoom extends TeamRoom {
 		}
 		CustomDex.loadFormatDraft(entry.id, this.draft, newDefault || !CustomDex.formatDefaultLegal[this.legalKey()]);
 	}
-	/** A refused edit never happened, so the page goes back to the last one the server took. */
 	refuseDraft(error: string) {
 		this.draft = this.lastDraft;
 		this.lastDraft = null;
@@ -317,16 +315,8 @@ export class FormatPanel extends TeamPanel {
 		if (editor) this.syncRoster(editor);
 		this.forceUpdate();
 	};
-	override renderStorage() {
-		return null;
-	}
-	/** Smogon has no teambuilding article about a format that doesn't exist yet. */
-	override usesResources() {
+	override isTeam() {
 		return false;
-	}
-	/** The base format picker moves down into the form, beside the format's other settings. */
-	override renderFormatSelect() {
-		return null;
 	}
 	/** Picking a base format now replaces the format's rules, so it asks first. */
 	override handleChangeFormat = (ev: Event) => {
@@ -335,10 +325,10 @@ export class FormatPanel extends TeamPanel {
 		const entry = room.formatEntry();
 		if (!entry || toID(base) === toID(entry.base)) return;
 		// the dropdown closes every popup after handing over its value, this one included
-		setTimeout(() => void PS.confirm(
+		setTimeout(() => PS.confirm(
 			`Start this format's rules over from ${BattleLog.formatName(base)}? Its rules and legal ` +
 			`Pokémon are replaced by that format's.`,
-			{ okButton: 'Replace rules' }
+			{ okButton: TL`[Replace rules]` }
 		).then(confirmed => {
 			if (confirmed) room.setFormat(base);
 			this.forceUpdate();
@@ -346,23 +336,22 @@ export class FormatPanel extends TeamPanel {
 	};
 	/** Throws away every rule change, back to the base format the rules were copied from. */
 	resetFormat = (ev: Event) => {
-		// Without this the click reaches PS's outside-click handler and closes the question again.
-		ev.preventDefault();
 		ev.stopImmediatePropagation();
+		ev.preventDefault();
 		const room = this.room();
 		const entry = room.formatEntry();
 		if (!entry) return;
-		void PS.confirm(
+		PS.confirm(
 			`Put this format's rules back to ${BattleLog.formatName(entry.base)}'s? Every rule, ban and ` +
 			`list you've changed goes back to how that format has them.`,
-			{ okButton: 'Reset rules', parentElem: ev.currentTarget as HTMLElement }
+			{ okButton: TL`[Reset rules]`, parentElem: ev.currentTarget as HTMLElement }
 		).then(confirmed => {
 			if (!confirmed) return;
 			room.draft = null;
 			room.lastDraft = null;
 			room.pending = {};
 			delete CustomDex.formatDefaultLegal[room.legalKey()];
-			void CustomDex.resetFormat(entry.name).then(() => CustomDex.loadFormatLegal(entry.id, true));
+			CustomDex.resetFormat(entry.name).then(() => CustomDex.loadFormatLegal(entry.id, true));
 		});
 	};
 	changeMod = (ev: Event) => {
@@ -438,7 +427,6 @@ export class FormatPanel extends TeamPanel {
 			});
 	};
 
-	/** The page's one Save button: the pickers show the same one, so nothing nests inside it. */
 	renderSave() {
 		const unsaved = this.room().unsaved();
 		return <>
@@ -561,28 +549,30 @@ export class FormatPanel extends TeamPanel {
 		hideOptions: true,
 		/** A picker is a page of this format, not a page of its own: nothing is saved leaving it. */
 		back: (ev?: Event) => {
-			ev?.preventDefault();
 			ev?.stopImmediatePropagation();
+			ev?.preventDefault();
 			const room = this.room();
 			room.editor!.innerFocus = null;
 			room.update(null);
 		},
-		renderEmptyActions: () => {
-			const room = this.room();
-			const kind = this.pickerKind(room.editor);
-			return <>
-				{this.renderSave()} {}
-				<button class="option" onClick={this.toggleHideSelected}>
-					<i class={`fa fa-${this.hideSelected ? 'eye' : 'eye-slash'}`} aria-hidden></i> {}
-					{this.hideSelected ? 'Show' : 'Hide'} selected
-				</button> {}
-				<button class="option" onClick={this.resetRoster} disabled={room.atDefault(kind)}>
-					<i class="fa fa-undo" aria-hidden></i> Reset to default
-				</button> {}
-				<button class="option" onClick={this.clearRoster} disabled={!room.roster(kind).length}>
-					<i class="fa fa-ban" aria-hidden></i> Remove all
-				</button>
-			</>;
+		render: {
+			emptyActions: () => {
+				const room = this.room();
+				const kind = this.pickerKind(room.editor);
+				return <>
+					{this.renderSave()} {}
+					<button class="option" onClick={this.toggleHideSelected}>
+						<i class={`fa fa-${this.hideSelected ? 'eye' : 'eye-slash'}`} aria-hidden></i> {}
+						{this.hideSelected ? 'Show' : 'Hide'} selected
+					</button> {}
+					<button class="option" onClick={this.resetRoster} disabled={room.atDefault(kind)}>
+						<i class="fa fa-undo" aria-hidden></i> Reset to default
+					</button> {}
+					<button class="option" onClick={this.clearRoster} disabled={!room.roster(kind).length}>
+						<i class="fa fa-ban" aria-hidden></i> Remove all
+					</button>
+				</>;
+			},
 		},
 		/** Every click in every one of these pickers means the same thing: allowed, or not. */
 		selectEntry: (editor, _setIndex, type, name) => {
@@ -599,7 +589,6 @@ export class FormatPanel extends TeamPanel {
 		},
 	};
 
-	/** Which species the rules allow is the server's to work out, so it gets asked. */
 	loadLegal() {
 		const room = this.room();
 		// A held edit is asked about as a draft; the stored rules would answer the wrong question.
@@ -662,28 +651,26 @@ export class FormatbuilderPanel extends TeambuilderPanel {
 	}
 
 	deleteFormat = (ev: Event) => {
-		// Without this the same click reaches PS's outside-click handler and closes the question.
-		ev.preventDefault();
 		ev.stopImmediatePropagation();
+		ev.preventDefault();
 		const name = (ev.currentTarget as HTMLButtonElement).value;
-		void PS.confirm(`Delete "${name}"? Teams built for it stay, but the format is gone.`, {
-			okButton: 'Delete', parentElem: ev.currentTarget as HTMLElement,
+		PS.confirm(`Delete "${name}"? Teams built for it stay, but the format is gone.`, {
+			okButton: TL`[Delete]`, parentElem: ev.currentTarget as HTMLElement,
 		}).then(confirmed => {
-			if (confirmed) void CustomDex.deleteFormat(name);
+			if (confirmed) CustomDex.deleteFormat(name);
 		});
 	};
 	renameFormat = (ev: Event) => {
-		// See deleteFormat: an unstopped click reaches PS's outside-click handler and closes the prompt.
-		ev.preventDefault();
 		ev.stopImmediatePropagation();
+		ev.preventDefault();
 		const oldName = (ev.currentTarget as HTMLButtonElement).value;
 		const oldId = CustomDex.overlay?.formats?.find(entry => entry.name === oldName)?.id || '';
 		PS.prompt(`Rename \`\`${oldName}\`\` to?`, {
-			defaultValue: oldName, okButton: 'Rename', parentElem: ev.currentTarget as HTMLElement,
+			defaultValue: oldName, okButton: TL`[Rename]`, parentElem: ev.currentTarget as HTMLElement,
 		}).then(name => {
-			name = name?.trim() || '';
+			name = (name || '').trim();
 			if (!name || name === oldName) return;
-			void CustomDex.editFormat(oldName, { name }).then(renamed => {
+			CustomDex.editFormat(oldName, { name }).then(renamed => {
 				const format = CustomDex.overlay?.formats?.find(entry => entry.name === renamed);
 				// A format plays under its name's id, so an open room for it moves too.
 				if (!format || !PS.rooms[`format-${oldId}` as RoomID]) return;
@@ -693,13 +680,12 @@ export class FormatbuilderPanel extends TeambuilderPanel {
 		});
 	};
 	createFormat = (ev: Event) => {
-		// Without this the same click reaches PS's outside-click handler and closes the prompt.
-		ev.preventDefault();
 		ev.stopImmediatePropagation();
+		ev.preventDefault();
 		PS.prompt(`Name your new format:`, {
-			okButton: 'Create', parentElem: ev.currentTarget as HTMLElement,
+			okButton: TL`[Create]`, parentElem: ev.currentTarget as HTMLElement,
 		}).then(name => {
-			name = name?.trim() || '';
+			name = (name || '').trim();
 			if (!name) return;
 			CustomDex.createFormat(name, `${Dex.modid}ou`).then(created => {
 				if (!created) return;

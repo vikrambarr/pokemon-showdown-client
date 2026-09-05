@@ -960,12 +960,12 @@ class LoginPanel extends PSRoomPanel {
 		const loginState = room.args as PSLoginState;
 		if (Config.discordlogin && !PS.user.registered) {
 			return <PSPanelWrapper room={room} width={280}><div class="pad">
-				<h3>Log in</h3>
+				<h3>{TL`[Log in]`}</h3>
 				{loginState?.error && <p class="error">{loginState.error}</p>}
-				<p>Log in with Discord to play on this server.</p>
+				<p>{TL`Log in with Discord to play on this server.`}</p>
 				<p class="buttonbar">
 					<DiscordLoginButton /> {}
-					<button type="button" name="closeRoom" class="button">Cancel</button>
+					<button type="button" name="closeRoom" class="button">{TL`[Cancel]`}</button>
 				</p>
 			</div></PSPanelWrapper>;
 		}
@@ -1004,7 +1004,7 @@ class LoginPanel extends PSRoomPanel {
 					<p><GooglePasswordBox name={this.getUsername()} /></p>
 				</>}
 				{loginState?.needsDiscord && <>
-					<p><i class="fa fa-level-up fa-rotate-90" aria-hidden></i> <strong>this name needs a Discord login:</strong></p>
+					<p><i class="fa fa-level-up fa-rotate-90" aria-hidden></i> <strong>{TL`this name needs a Discord login:`}</strong></p>
 					<p class="buttonbar"><DiscordLoginButton /></p>
 				</>}
 				<p class="buttonbar">

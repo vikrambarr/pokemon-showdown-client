@@ -24,6 +24,7 @@ export const translations: UIText = {
 	"[Join chat]": null,
 	"[All tabs]": null,
 	"[Menu]": null,
+	"Log in with Discord": null,
 
 	// #endregion Navigation
 
@@ -92,6 +93,8 @@ export const translations: UIText = {
 	// TRANSLATORS: this is for lists of users specifically
 	// TRANSLATORS: (languages with counters should use the "person" counter)
 	", and {NUMBER} others": null,
+	"[Replace rules]": null,
+	"[Reset rules]": null,
 
 	// #endregion Generic UI
 
@@ -237,6 +240,9 @@ export const translations: UIText = {
 	"Password (confirm)": null,
 	"An Electric-type mouse that is the mascot of the Pokémon franchise.": null,
 	"What is this Pokémon?": null,
+	"Log in with Discord to play on this server.": null,
+	"this name needs a Discord login:": null,
+	"Custom formats": null,
 
 	// #endregion Popups
 
@@ -272,6 +278,8 @@ export const translations: UIText = {
 	"Wait for this countdown to finish first...": null,
 	"You're already searching for a {FORMAT} battle...": null,
 	"You need to go into the Teambuilder and build a team for this format.": null,
+	"Pokébuilder": null,
+	"Formatbuilder": null,
 
 	// #endregion Main Menu
 

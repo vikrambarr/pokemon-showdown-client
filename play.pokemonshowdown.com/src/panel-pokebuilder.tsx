@@ -1,16 +1,16 @@
 /**
  * Pokébuilder panel
  *
- * @author Guangcong Luo <guangcongluo@gmail.com>
  * @license AGPLv3
  */
 
 import { PS, PSRoom, type RoomID, type RoomOptions, type Team } from "./client-main";
 import { PSIcon, PSPanelWrapper, PSRoomPanel } from "./panels";
-import { Dex, toID, type ID } from "./battle-dex";
+import { Dex, TL, toID, type ID } from "./battle-dex";
 import { BattleStatNames } from "./battle-dex-data";
 import { BattleLog } from "./battle-log";
-import { SetImportForm, TeamEditor, type SetEditor, type TeamEditorState } from "./battle-team-editor";
+import { SetImportForm, TeamEditor, type TeamEditorState } from "./battle-team-editor";
+import type { SetEditor } from "./battle-team-editor-hooks";
 import {
 	abilitySlots, COLORS, CustomDex, EGG_GROUPS, EVO_TYPES, exportSpecies, exportSpeciesList,
 	type ParsedSpecies, parseSpecies, parseSpeciesList, PokebuilderDexSearch, speciesAbilities, TAGS,
@@ -27,15 +27,6 @@ class PokebuilderRoom extends PSRoom {
 		key: 'pokebuilder',
 	};
 	editor?: TeamEditorState;
-	override clientCommands = this.parseClientCommands({
-		'validate'(target) {
-			if (this.team.format.length <= 4) {
-				return this.errorReply(`You must select a format first.`);
-			}
-			this.send(`/utm ${this.team.packedTeam}`);
-			this.send(`/vtm ${this.team.format}`);
-		},
-	});
 	constructor(options: RoomOptions) {
 		super(options);
 		this.title = `Pokébuilder`;
@@ -56,7 +47,6 @@ class PokebuilderRoom extends PSRoom {
 	flushAll() {
 		for (const id of this.openIds()) CustomDex.flush(id);
 	}
-	/** What to do once the unsaved-changes popup is answered. */
 	afterUnsaved: (() => void) | null = null;
 	confirmUnsaved(then: () => void, elem?: HTMLElement | null) {
 		if (!this.unsavedIds().length) {
@@ -391,17 +381,16 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		editor.update();
 	};
 	rename = (ev: Event) => {
-		// Without this the same click reaches PS's outside-click handler and closes the prompt.
-		ev.preventDefault();
 		ev.stopImmediatePropagation();
+		ev.preventDefault();
 		const editor = this.props.room.editor;
 		const set = editor?.sets[setIndexOf(ev)];
 		if (!set) return;
 		const oldName = set.species;
 		PS.prompt(`Rename \`\`${oldName}\`\` to?`, {
-			defaultValue: oldName, okButton: 'Rename', parentElem: ev.currentTarget as HTMLElement,
+			defaultValue: oldName, okButton: TL`[Rename]`, parentElem: ev.currentTarget as HTMLElement,
 		}).then(name => {
-			name = name?.trim() || '';
+			name = (name || '').trim();
 			if (!name || name === oldName) return;
 			CustomDex.flush(toID(oldName));
 			CustomDex.rename(oldName, name).then(renamed => {
@@ -412,23 +401,22 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		});
 	};
 	createSpecies = (ev: Event) => {
-		// See rename: an unstopped click reaches PS's outside-click handler and closes the popup.
-		ev.preventDefault();
 		ev.stopImmediatePropagation();
+		ev.preventDefault();
 		const max = CustomDex.limits.species?.max;
 		if (max !== undefined && CustomDex.ids.length >= max) {
 			return PS.alert(`You already have ${max} custom Pokémon, which is the limit. Delete one first.`);
 		}
 		PS.prompt(`Name your new Pokémon:`, {
-			okButton: 'Create', parentElem: ev.currentTarget as HTMLElement,
+			okButton: TL`[Create]`, parentElem: ev.currentTarget as HTMLElement,
 		}).then(name => {
-			name = name?.trim() || '';
+			name = (name || '').trim();
 			if (!name) return;
 			CustomDex.create(name).then(created => this.openSpecies(created || undefined));
 		});
 	};
 	removeSpecies(name: string, parentElem: HTMLElement, setIndex: number) {
-		PS.confirm(`Delete \`\`${name}\`\`? This can't be undone.`, { okButton: 'Delete', parentElem }).then(ok => {
+		PS.confirm(`Delete \`\`${name}\`\`? This can't be undone.`, { okButton: TL`[Delete]`, parentElem }).then(ok => {
 			if (!ok) return;
 			// Ahead of the delete in the same serial queue, so a pending edit can't outlive it.
 			CustomDex.flush(toID(name));
@@ -446,9 +434,8 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		});
 	}
 	deleteSpecies = (ev: Event) => {
-		// See rename: an unstopped click reaches PS's outside-click handler and closes the popup.
-		ev.preventDefault();
 		ev.stopImmediatePropagation();
+		ev.preventDefault();
 		const setIndex = Number((ev.currentTarget as HTMLButtonElement).value);
 		const set = this.props.room.editor?.sets[setIndex];
 		if (set) this.removeSpecies(set.species, ev.currentTarget as HTMLElement, setIndex);
@@ -467,7 +454,6 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		this.openPicker(setIndex, 'move');
 		editor.update();
 	}
-	/** Applies a pasted species to this slot, renaming it if the paste gives another name. */
 	importSpecies(setIndex: number, text: string): string {
 		const parsed = parseSpecies(text);
 		if (typeof parsed === 'string') return parsed;
@@ -513,9 +499,8 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		this.props.room.editor?.update();
 	}
 	back = (ev?: Event) => {
-		// See rename: an unstopped click reaches PS's outside-click handler and closes the popup.
-		ev?.preventDefault();
 		ev?.stopImmediatePropagation();
+		ev?.preventDefault();
 		this.props.room.confirmUnsaved(() => this.clearEditor(), ev?.currentTarget as HTMLElement);
 	};
 	clearEditor() {
@@ -583,15 +568,246 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		back: this.back,
 		hideCopy: true,
 		hideSampleSets: true,
-		renderActions: () => {
-			const unsaved = this.props.room.unsavedIds().length;
-			return <><button
-				class="option" onClick={this.saveEdits} disabled={!unsaved}
-				title={unsaved ? 'Save changes to the server' : 'No unsaved changes'}
-			>
-				<i class={`fa fa-${unsaved ? 'floppy-o' : 'check'}`} aria-hidden></i> {}
-				{unsaved ? 'Save' : 'Saved'}
-			</button> {}</>;
+		render: {
+			actions: () => {
+				const unsaved = this.props.room.unsavedIds().length;
+				return <><button
+					class="option" onClick={this.saveEdits} disabled={!unsaved}
+					title={unsaved ? 'Save changes to the server' : 'No unsaved changes'}
+				>
+					<i class={`fa fa-${unsaved ? 'floppy-o' : 'check'}`} aria-hidden></i> {}
+					{unsaved ? 'Save' : 'Saved'}
+				</button> {}</>;
+			},
+			abilities: (editor, setIndex) => {
+				const abilities = this.abilitiesFor(setIndex);
+				const slots = this.abilitySlotsFor(setIndex);
+				const focus = editor.innerFocus;
+				const cur = focus?.type === 'ability' && focus.setIndex === setIndex ? ' cur' : '';
+				return <td class="set-abilities" colSpan={2}><div class="border-collapse">
+					<label class="label">Abilities</label>
+					<div
+						class={`textbox chipbox${cur}`} data-set-index={setIndex} onClick={this.openAbilities}
+						onDragOver={this.dragOverAbility} onDrop={this.dropAbility}
+						title="Change abilities"
+					>
+						{abilities.map((ability, index) => <span
+							class="chip" draggable data-index={index} onDragStart={this.dragAbility}
+						>
+							<small>{slots[index]}:</small> {ability} <button
+								class="chipx" data-set-index={setIndex} data-ability={ability} onClick={this.removeAbility}
+							>×</button>
+						</span>)}
+						{!abilities.length && <span class="chipnote">(choose up to 3 abilities)</span>}
+					</div>
+				</div></td>;
+			},
+			types: (_editor, setIndex) => {
+				const types = this.typesFor(setIndex);
+				if (!this.speciesId(setIndex)) return <div />;
+				return <div class="typeselects">{[0, 1].map(typeIndex => (
+					<span class="typeslot" title={typeIndex ? 'Change secondary type' : 'Change primary type'}>
+						{types[typeIndex] ? <PSIcon type={types[typeIndex]} new /> : <span class="typeicon-blank" />}
+						<select
+							name="type" class="typearrow base-select" data-set-index={setIndex} data-type-index={typeIndex}
+							onChange={this.changeType} value={types[typeIndex] || ''}
+						>
+							<button></button>
+							{!!typeIndex && <option value="">—</option>}
+							{Dex.types.all().map(type => type.name !== types[1 - typeIndex] &&
+								<option value={type.name}><PSIcon type={type.name} new /></option>)}
+						</select>
+						<svg class="typecaret" width="14" height="9" viewBox="0 0 14 9" onClick={this.openTypePicker}>
+							<path d="M1 1H13L7 8Z" fill="#fff" stroke="#000" stroke-width="1.5" stroke-linejoin="round" />
+						</svg>
+					</span>
+				))}</div>;
+			},
+			moves: (editor, setIndex) => {
+				const moves = this.movesFor(setIndex);
+				const focus = editor.innerFocus;
+				const here = focus?.setIndex === setIndex;
+				const cur = here && focus?.type === 'move' ? ' cur' : '';
+				const picking = (kind: 'prevo' | 'evos') =>
+					here && focus?.type === 'pokemon' && this.speciesPicker === kind ? ' cur' : '';
+				const prevo = this.prevoFor(setIndex);
+				const evos = this.evosFor(setIndex);
+				return <div class="border-collapse movescell">
+					<label class="label">Evolves from</label>
+					<div
+						class={`textbox chipbox${picking('prevo')}`} data-set-index={setIndex} onClick={this.openPrevo}
+						title="Change pre-evolution"
+					>
+						{prevo ? <>
+							<span class="chipvalue">{prevo}</span> <button
+								class="chipx" data-set-index={setIndex} onClick={this.removePrevo}
+							>×</button>
+						</> : <span class="chipnote">(none)</span>}
+					</div>
+					<label class="label">Evolves into</label>
+					<div
+						class={`textbox chipbox${picking('evos')}`} data-set-index={setIndex} onClick={this.openEvos}
+						title="Change evolutions"
+					>
+						{evos.map(evo => <span class="chip">
+							{evo} <button
+								class="chipx" data-set-index={setIndex} data-evo={evo} onClick={this.removeEvo}
+							>×</button>
+						</span>)}
+						{!evos.length && <span class="chipnote">(no evolutions)</span>}
+					</div>
+					<label class="label">Learnset</label>
+					<div
+						class={`textbox chipbox${cur}`} data-set-index={setIndex} onClick={this.openMoves}
+						title="Change learnset"
+					>
+						<span class="chipnote">{moves.length} move{moves.length === 1 ? '' : 's'}</span>
+					</div>
+				</div>;
+			},
+			stats: (_editor, setIndex) => {
+				const stats = this.statsFor(setIndex);
+				if (!stats) return null;
+				const { min = 1, max = MAX_BASE_STAT } = statLimit();
+				return <div style="font-size:10pt" role="dialog" aria-label="Stats"><div class="pad"><table>
+					<tr><th></th><th>Base</th><th class="setstatbar"></th></tr>
+					{Dex.statNames.map(statID => {
+						const value = stats[statID];
+						const width = Math.floor(value * STAT_BAR_WIDTH / max);
+						const hue = Math.min(width, 360);
+						return <tr>
+							<th style="text-align:right;font-weight:normal">{BattleStatNames[statID]}</th>
+							<td><input
+								type="number" min={min} max={max} step={1} name={statID} value={value}
+								data-set-index={setIndex} class="textbox stat-input" style="width:52px"
+								onInput={this.changeBaseStat} title={`Change base ${BattleStatNames[statID]}`}
+							/></td>
+							<td class="setstatbar"><label
+								class="statslider" title={`Change base ${BattleStatNames[statID]}`}
+							>
+								<span style={`width:${width}px;background:hsl(${hue},85%,45%);border-color:hsl(${hue},85%,35%)`}></span>
+								<input
+									type="range" name={statID} min={min} max={max} value={value}
+									data-set-index={setIndex} onInput={this.changeBaseStat}
+								/>
+							</label></td>
+						</tr>;
+					})}
+				</table></div></div>;
+			},
+			statCell: (_editor, setIndex) => {
+				const stats = this.statsFor(setIndex);
+				if (!stats) return null;
+				return Dex.statNames.map(statID => {
+					const value = stats[statID];
+					const hue = Math.min(Math.floor(value * 180 / statLimit().max!), 360);
+					return <span class="statrow">
+						<em>{BattleStatNames[statID]}</em> {}
+						<span class="statgraph">
+							<span style={`width:${value * 75 / statLimit().max!}px;` +
+								`background:hsl(${hue},40%,75%);border-color:hsl(${hue},40%,45%)`}
+							></span>
+						</span> {}
+						<strong>{value}</strong>
+					</span>;
+				});
+			},
+			rename: (_editor, setIndex) => (
+				<button
+					type="button" class="button rename" data-set-index={setIndex}
+					onClick={this.rename} aria-label="Rename" title="Change name"
+				>
+					<i class="fa fa-pencil" aria-hidden></i>
+				</button>
+			),
+			detailCell: (_editor, setIndex) => {
+				const data = CustomDex.overlay?.Pokedex[this.speciesId(setIndex)];
+				if (!data) return null;
+				return <>
+					<span class="detailcell"><label>Egg</label> {(data.eggGroups || ['—']).join(', ')}</span>
+					<span class="detailcell"><label>Weight</label> {data.weightkg ?? '—'}kg</span>
+					<span class="detailcell"><label>Height</label> {data.heightm ?? '—'}m</span>
+				</>;
+			},
+			details: (_editor, setIndex) => {
+				const data = CustomDex.overlay?.Pokedex[this.speciesId(setIndex)];
+				if (!data) return null;
+				const eggGroups = data.eggGroups || [];
+				const eighths = data.genderRatio ? Math.round(data.genderRatio.M * 8) : 4;
+				const field = (label: string, control: preact.ComponentChildren) => (
+					<tr><th>{label}</th><td>{control}</td></tr>
+				);
+				const text = (name: string, value: any, title: string, width = 60) => <input
+					type={NUMBER_FIELDS.includes(name) ? 'number' : 'text'} name={name} value={value ?? ''}
+					min={CustomDex.limits[name]?.min} max={CustomDex.limits[name]?.max}
+					maxLength={CustomDex.limits[name]?.maxLength}
+					step={INT_FIELDS.includes(name) ? 1 : 'any'} data-set-index={setIndex}
+					class="textbox stat-input" style={`width:${width}px`} onChange={this.detail} title={title}
+				/>;
+				const select = (name: string, value: any, options: string[], title: string, blank = true) => <select
+					name={name} value={value || ''} data-set-index={setIndex} class="select"
+					onChange={this.detail} title={title}
+				>
+					{blank && <option value="">—</option>}
+					{options.map(option => <option value={option}>{option}</option>)}
+				</select>;
+				return <div style="font-size:10pt" role="dialog" aria-label="Details"><div class="pad">
+					<table class="detailtable">
+						{field('Weight', <>{text('weightkg', data.weightkg, 'Change weight in kilograms')} kg</>)}
+						{field('Height', <>{text('heightm', data.heightm, 'Change height in metres')} m</>)}
+						{field('Gender', select('gender', data.gender, ['M', 'F', 'N'], 'Change gender lock'))}
+						{field('Gender ratio', <span class="genderratio">
+							<input
+								type="range" name="genderRatio" min="0" max="8" step="1"
+								class={data.genderRatio ? 'ratioset' : ''} style={`--fill:${9 + eighths * 12}px`}
+								value={eighths} data-set-index={setIndex} onInput={this.detail}
+								title="Change chance of being male"
+							/>
+							{!!data.genderRatio && <button
+								class="chipx" data-set-index={setIndex} onClick={this.clearRatio}
+							>×</button>}
+						</span>)}
+						{field('Egg Groups', <>
+							{select('eggGroup0', eggGroups[0], EGG_GROUPS, 'Change egg group')} {}
+							{select('eggGroup1', eggGroups[1], EGG_GROUPS, 'Change second egg group')}
+						</>)}
+						<tr class="divider"><td colSpan={2}><hr /></td></tr>
+						{field('Tags', <span class="tagpicker" title="Change tags">{[
+							...TAGS, ...(data.tags || []).filter((tag: string) => !TAGS.includes(tag)),
+						].map(tag => <button
+							class={`button${(data.tags || []).includes(tag) ? ' cur' : ''}`}
+							data-set-index={setIndex} data-tag={tag} onClick={this.toggleTag}
+						>{tag}</button>)}</span>)}
+						<tr class="divider"><td colSpan={2}><hr /></td></tr>
+						{field('Evo type', select('evoType', data.evoType, EVO_TYPES, 'Change how it evolves'))}
+						{field('Evo level', text('evoLevel', data.evoLevel, 'Change evolution level', 40))}
+						{field('Evo condition',
+							text('evoCondition', data.evoCondition, 'Change evolution condition', 160))}
+						<tr class="divider"><td colSpan={2}><hr /></td></tr>
+						{field('Color', select('color', data.color, COLORS, 'Change Pokedex colour'))}
+						{field('Category', <>The {text('category', data.category, 'Change category', 120)} Pokémon</>)}
+						{field('Dex entry', <textarea
+							name="dexEntry" data-set-index={setIndex} class="textbox dexentry"
+							maxLength={CustomDex.limits.dexEntry?.maxLength} title="Change Pokedex entry"
+							rows={3} onChange={this.detail} value={data.dexEntry || ''}
+						/>)}
+					</table>
+				</div></div>;
+			},
+			nickname: (_editor, setIndex) => {
+				const stored = CustomDex.sprites[this.speciesId(setIndex)] || {};
+				return <label class="label">
+					<span>Sprites</span>
+					<div class="textbox spritebox" title="Change sprites">
+						{SPRITES.map((sprite, kindIndex) => (
+							<button
+								class={`spritecell ${stored[sprite.kind] ? 'has' : 'missing'}`}
+								data-href={`pbsprite-${setIndex}-${kindIndex}`}
+							>{sprite.label}</button>
+						))}
+					</div>
+				</label>;
+			},
 		},
 		/** The tab's text is the Pokemon being edited; the team paste behind it means nothing here. */
 		textTab: editor => <SetImportForm
@@ -617,139 +833,6 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 			details: 'Change details',
 			stats: 'Change stats',
 		},
-		renderAbilities: (editor, setIndex) => {
-			const abilities = this.abilitiesFor(setIndex);
-			const slots = this.abilitySlotsFor(setIndex);
-			const focus = editor.innerFocus;
-			const cur = focus?.type === 'ability' && focus.setIndex === setIndex ? ' cur' : '';
-			return <td class="set-abilities" colSpan={2}><div class="border-collapse">
-				<label class="label">Abilities</label>
-				<div
-					class={`textbox chipbox${cur}`} data-set-index={setIndex} onClick={this.openAbilities}
-					onDragOver={this.dragOverAbility} onDrop={this.dropAbility}
-					title="Change abilities"
-				>
-					{abilities.map((ability, index) => <span
-						class="chip" draggable data-index={index} onDragStart={this.dragAbility}
-					>
-						<small>{slots[index]}:</small> {ability} <button
-							class="chipx" data-set-index={setIndex} data-ability={ability} onClick={this.removeAbility}
-						>×</button>
-					</span>)}
-					{!abilities.length && <span class="chipnote">(choose up to 3 abilities)</span>}
-				</div>
-			</div></td>;
-		},
-		renderTypes: (_editor, setIndex) => {
-			const types = this.typesFor(setIndex);
-			if (!this.speciesId(setIndex)) return <div />;
-			return <div class="typeselects">{[0, 1].map(typeIndex => (
-				<span class="typeslot" title={typeIndex ? 'Change secondary type' : 'Change primary type'}>
-					{types[typeIndex] ? <PSIcon type={types[typeIndex]} new /> : <span class="typeicon-blank" />}
-					<select
-						name="type" class="typearrow base-select" data-set-index={setIndex} data-type-index={typeIndex}
-						onChange={this.changeType} value={types[typeIndex] || ''}
-					>
-						<button></button>
-						{!!typeIndex && <option value="">—</option>}
-						{Dex.types.all().map(type => type.name !== types[1 - typeIndex] &&
-							<option value={type.name}><PSIcon type={type.name} new /></option>)}
-					</select>
-					<svg class="typecaret" width="14" height="9" viewBox="0 0 14 9" onClick={this.openTypePicker}>
-						<path d="M1 1H13L7 8Z" fill="#fff" stroke="#000" stroke-width="1.5" stroke-linejoin="round" />
-					</svg>
-				</span>
-			))}</div>;
-		},
-		renderMoves: (editor, setIndex) => {
-			const moves = this.movesFor(setIndex);
-			const focus = editor.innerFocus;
-			const here = focus?.setIndex === setIndex;
-			const cur = here && focus?.type === 'move' ? ' cur' : '';
-			const picking = (kind: 'prevo' | 'evos') =>
-				here && focus?.type === 'pokemon' && this.speciesPicker === kind ? ' cur' : '';
-			const prevo = this.prevoFor(setIndex);
-			const evos = this.evosFor(setIndex);
-			return <div class="border-collapse movescell">
-				<label class="label">Evolves from</label>
-				<div
-					class={`textbox chipbox${picking('prevo')}`} data-set-index={setIndex} onClick={this.openPrevo}
-					title="Change pre-evolution"
-				>
-					{prevo ? <>
-						<span class="chipvalue">{prevo}</span> <button
-							class="chipx" data-set-index={setIndex} onClick={this.removePrevo}
-						>×</button>
-					</> : <span class="chipnote">(none)</span>}
-				</div>
-				<label class="label">Evolves into</label>
-				<div
-					class={`textbox chipbox${picking('evos')}`} data-set-index={setIndex} onClick={this.openEvos}
-					title="Change evolutions"
-				>
-					{evos.map(evo => <span class="chip">
-						{evo} <button
-							class="chipx" data-set-index={setIndex} data-evo={evo} onClick={this.removeEvo}
-						>×</button>
-					</span>)}
-					{!evos.length && <span class="chipnote">(no evolutions)</span>}
-				</div>
-				<label class="label">Learnset</label>
-				<div
-					class={`textbox chipbox${cur}`} data-set-index={setIndex} onClick={this.openMoves}
-					title="Change learnset"
-				>
-					<span class="chipnote">{moves.length} move{moves.length === 1 ? '' : 's'}</span>
-				</div>
-			</div>;
-		},
-		renderStats: (_editor, setIndex) => {
-			const stats = this.statsFor(setIndex);
-			if (!stats) return null;
-			const { min = 1, max = MAX_BASE_STAT } = statLimit();
-			return <div style="font-size:10pt" role="dialog" aria-label="Stats"><div class="pad"><table>
-				<tr><th></th><th>Base</th><th class="setstatbar"></th></tr>
-				{Dex.statNames.map(statID => {
-					const value = stats[statID];
-					const width = Math.floor(value * STAT_BAR_WIDTH / max);
-					const hue = Math.min(width, 360);
-					return <tr>
-						<th style="text-align:right;font-weight:normal">{BattleStatNames[statID]}</th>
-						<td><input
-							type="number" min={min} max={max} step={1} name={statID} value={value}
-							data-set-index={setIndex} class="textbox stat-input" style="width:52px"
-							onInput={this.changeBaseStat} title={`Change base ${BattleStatNames[statID]}`}
-						/></td>
-						<td class="setstatbar"><label
-							class="statslider" title={`Change base ${BattleStatNames[statID]}`}
-						>
-							<span style={`width:${width}px;background:hsl(${hue},85%,45%);border-color:hsl(${hue},85%,35%)`}></span>
-							<input
-								type="range" name={statID} min={min} max={max} value={value}
-								data-set-index={setIndex} onInput={this.changeBaseStat}
-							/>
-						</label></td>
-					</tr>;
-				})}
-			</table></div></div>;
-		},
-		renderStatCell: (_editor, setIndex) => {
-			const stats = this.statsFor(setIndex);
-			if (!stats) return null;
-			return Dex.statNames.map(statID => {
-				const value = stats[statID];
-				const hue = Math.min(Math.floor(value * 180 / statLimit().max!), 360);
-				return <span class="statrow">
-					<em>{BattleStatNames[statID]}</em> {}
-					<span class="statgraph">
-						<span style={`width:${value * 75 / statLimit().max!}px;` +
-							`background:hsl(${hue},40%,75%);border-color:hsl(${hue},40%,45%)`}
-						></span>
-					</span> {}
-					<strong>{value}</strong>
-				</span>;
-			});
-		},
 		deleteSet: this.deleteSpecies,
 		restoreFocus: editor => {
 			this.resetSpeciesPicker();
@@ -761,102 +844,6 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 				<i class="fa fa-plus" aria-hidden></i> <strong>New Pokémon</strong>
 			</button>
 		)),
-		renderRename: (_editor, setIndex) => (
-			<button
-				type="button" class="button rename" data-set-index={setIndex}
-				onClick={this.rename} aria-label="Rename" title="Change name"
-			>
-				<i class="fa fa-pencil" aria-hidden></i>
-			</button>
-		),
-		renderDetailCell: (_editor, setIndex) => {
-			const data = CustomDex.overlay?.Pokedex[this.speciesId(setIndex)];
-			if (!data) return null;
-			return <>
-				<span class="detailcell"><label>Egg</label> {(data.eggGroups || ['—']).join(', ')}</span>
-				<span class="detailcell"><label>Weight</label> {data.weightkg ?? '—'}kg</span>
-				<span class="detailcell"><label>Height</label> {data.heightm ?? '—'}m</span>
-			</>;
-		},
-		renderDetails: (_editor, setIndex) => {
-			const data = CustomDex.overlay?.Pokedex[this.speciesId(setIndex)];
-			if (!data) return null;
-			const eggGroups = data.eggGroups || [];
-			const eighths = data.genderRatio ? Math.round(data.genderRatio.M * 8) : 4;
-			const field = (label: string, control: preact.ComponentChildren) => (
-				<tr><th>{label}</th><td>{control}</td></tr>
-			);
-			const text = (name: string, value: any, title: string, width = 60) => <input
-				type={NUMBER_FIELDS.includes(name) ? 'number' : 'text'} name={name} value={value ?? ''}
-				min={CustomDex.limits[name]?.min} max={CustomDex.limits[name]?.max}
-				maxLength={CustomDex.limits[name]?.maxLength}
-				step={INT_FIELDS.includes(name) ? 1 : 'any'} data-set-index={setIndex}
-				class="textbox stat-input" style={`width:${width}px`} onChange={this.detail} title={title}
-			/>;
-			const select = (name: string, value: any, options: string[], title: string, blank = true) => <select
-				name={name} value={value || ''} data-set-index={setIndex} class="select"
-				onChange={this.detail} title={title}
-			>
-				{blank && <option value="">—</option>}
-				{options.map(option => <option value={option}>{option}</option>)}
-			</select>;
-			return <div style="font-size:10pt" role="dialog" aria-label="Details"><div class="pad">
-				<table class="detailtable">
-					{field('Weight', <>{text('weightkg', data.weightkg, 'Change weight in kilograms')} kg</>)}
-					{field('Height', <>{text('heightm', data.heightm, 'Change height in metres')} m</>)}
-					{field('Gender', select('gender', data.gender, ['M', 'F', 'N'], 'Change gender lock'))}
-					{field('Gender ratio', <span class="genderratio">
-						<input
-							type="range" name="genderRatio" min="0" max="8" step="1"
-							class={data.genderRatio ? 'ratioset' : ''} style={`--fill:${9 + eighths * 12}px`}
-							value={eighths} data-set-index={setIndex} onInput={this.detail}
-							title="Change chance of being male"
-						/>
-						{!!data.genderRatio && <button
-							class="chipx" data-set-index={setIndex} onClick={this.clearRatio}
-						>×</button>}
-					</span>)}
-					{field('Egg Groups', <>
-						{select('eggGroup0', eggGroups[0], EGG_GROUPS, 'Change egg group')} {}
-						{select('eggGroup1', eggGroups[1], EGG_GROUPS, 'Change second egg group')}
-					</>)}
-					<tr class="divider"><td colSpan={2}><hr /></td></tr>
-					{field('Tags', <span class="tagpicker" title="Change tags">{[
-						...TAGS, ...(data.tags || []).filter((tag: string) => !TAGS.includes(tag)),
-					].map(tag => <button
-						class={`button${(data.tags || []).includes(tag) ? ' cur' : ''}`}
-						data-set-index={setIndex} data-tag={tag} onClick={this.toggleTag}
-					>{tag}</button>)}</span>)}
-					<tr class="divider"><td colSpan={2}><hr /></td></tr>
-					{field('Evo type', select('evoType', data.evoType, EVO_TYPES, 'Change how it evolves'))}
-					{field('Evo level', text('evoLevel', data.evoLevel, 'Change evolution level', 40))}
-					{field('Evo condition',
-						text('evoCondition', data.evoCondition, 'Change evolution condition', 160))}
-					<tr class="divider"><td colSpan={2}><hr /></td></tr>
-					{field('Color', select('color', data.color, COLORS, 'Change Pokedex colour'))}
-					{field('Category', <>The {text('category', data.category, 'Change category', 120)} Pokémon</>)}
-					{field('Dex entry', <textarea
-						name="dexEntry" data-set-index={setIndex} class="textbox dexentry"
-						maxLength={CustomDex.limits.dexEntry?.maxLength} title="Change Pokedex entry"
-						rows={3} onChange={this.detail} value={data.dexEntry || ''}
-					/>)}
-				</table>
-			</div></div>;
-		},
-		renderNickname: (_editor, setIndex) => {
-			const stored = CustomDex.sprites[this.speciesId(setIndex)] || {};
-			return <label class="label">
-				<span>Sprites</span>
-				<div class="textbox spritebox" title="Change sprites">
-					{SPRITES.map((sprite, kindIndex) => (
-						<button
-							class={`spritecell ${stored[sprite.kind] ? 'has' : 'missing'}`}
-							data-href={`pbsprite-${setIndex}-${kindIndex}`}
-						>{sprite.label}</button>
-					))}
-				</div>
-			</label>;
-		},
 		selectSpecies: (_editor, setIndex, name) => {
 			if (!this.speciesPicker) return false;
 			const id = this.speciesId(setIndex);
@@ -1012,6 +999,4 @@ class SpritePanel extends PSRoomPanel {
 	}
 }
 
-PS.addRoomType(PokebuilderPanel);
-PS.addRoomType(PokebuilderUnsavedPanel);
-PS.addRoomType(SpritePanel);
+PS.addRoomType(PokebuilderPanel, PokebuilderUnsavedPanel, SpritePanel);

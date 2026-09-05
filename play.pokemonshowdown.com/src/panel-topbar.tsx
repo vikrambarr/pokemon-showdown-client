@@ -29,7 +29,7 @@ const handleDiscordLogin = (ev: Event) => {
 };
 export function DiscordLoginButton() {
 	return <button type="button" class="button" onClick={handleDiscordLogin}>
-		<strong>Log in with Discord</strong>
+		<strong>{TL`Log in with Discord`}</strong>
 	</button>;
 }
 

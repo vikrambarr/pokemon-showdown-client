@@ -29,8 +29,8 @@ describe('PSSearchResults', () => {
 		const renderer = Object.create(PSSearchResults.prototype);
 		renderer.props = {search};
 		renderer.URL_ROOT = '//dex.pokemonshowdown.com/';
-		renderer.itemIds = {};
-		renderer.abilityIds = {};
+		renderer.itemIds = [];
+		renderer.abilityIds = [];
 
 		assert.match(renderer.renderItemRowHTML(0, '', 0, 0), /<i>\(localized no item\)<\/i>/);
 		assert.match(renderer.renderAbilityRowHTML(0, '', 0, 0), /<i>\(localized no ability\)<\/i>/);
@@ -56,7 +56,7 @@ describe('PSSearchResults', () => {
 			const renderer = Object.create(PSSearchResults.prototype);
 			renderer.props = {search};
 			renderer.URL_ROOT = '//dex.pokemonshowdown.com/';
-			renderer.speciesIds = {};
+			renderer.speciesIds = [];
 			return renderer.renderPokemonRowHTML(0, pokemon.id, 0, 0);
 		};
 

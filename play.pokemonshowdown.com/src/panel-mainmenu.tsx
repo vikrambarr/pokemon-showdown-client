@@ -475,33 +475,6 @@ export class MainMenuRoom extends PSRoom {
 				}
 			}
 			break;
-		case 'customdex':
-			CustomDex.receive(response);
-			break;
-		case 'custompokemon':
-		case 'customformat':
-			CustomDex.receiveWrite(response);
-			break;
-		case 'battledex':
-			CustomDex.receiveBattleDex(response);
-			break;
-
-		case 'customformatinfo':
-			CustomDex.receiveFormatInfo(response);
-			break;
-
-		case 'customformatlegal':
-		case 'customformatdraft':
-			CustomDex.receiveFormatLegal(response);
-			break;
-
-		case 'customformatbuild':
-			CustomDex.receiveFormatBuild(response);
-			break;
-
-		case 'customformatdex':
-			CustomDex.receiveFormatDex(response);
-			break;
 		case 'teamupload':
 			if (PS.teams.uploading) {
 				const team = PS.teams.uploading;
@@ -531,6 +504,8 @@ export class MainMenuRoom extends PSRoom {
 				}
 			}
 			break;
+		default:
+			CustomDex.receiveQuery(id, response);
 		}
 		for (const callback of this.listeners[fullid] || []) callback(response);
 		delete this.listeners[fullid];
@@ -791,10 +766,10 @@ class MainMenuPanel extends PSRoomPanel<MainMenuRoom> {
 
 					<div class="menugroup">
 						<p><a class="mainmenu2 mainmenu button" href="teambuilder">{TL`Teambuilder`}</a></p>
-						<p><a class="mainmenu2 mainmenu button" href="pokebuilder">Pokébuilder</a></p>
-						<p><a class="mainmenu2 mainmenu button" href="formatbuilder">Formatbuilder</a></p>
-						<p><a class={"mainmenu3 mainmenu" + onlineButton} href="ladder">{TL`Ladder`}</a></p>
-						<p><a class={"mainmenu4 mainmenu" + onlineButton} href="view-tournaments-all">{TL`Tournaments`}</a></p>
+						<p><a class="mainmenu3 mainmenu button" href="pokebuilder">{TL`Pokébuilder`}</a></p>
+						<p><a class="mainmenu4 mainmenu button" href="formatbuilder">{TL`Formatbuilder`}</a></p>
+						<p><a class={"mainmenu5 mainmenu" + onlineButton} href="ladder">{TL`Ladder`}</a></p>
+						<p><a class={"mainmenu6 mainmenu" + onlineButton} href="view-tournaments-all">{TL`Tournaments`}</a></p>
 					</div>
 
 					<div class="menugroup">

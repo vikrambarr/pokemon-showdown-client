@@ -17,51 +17,9 @@ import { BattleStatGuesser, BattleStatOptimizer, BattleTooltips } from "./battle
 import { PSModel } from "./client-core";
 import { Net } from "./client-connection";
 import { PSIcon, PSView } from "./panels";
+import type { SetEditor } from "./battle-team-editor-hooks";
 
-type InnerFocusType = 'pokemon' | 'ability' | 'item' | 'move' | 'stats' | 'details' | 'import';
-
-export interface SetEditor {
-	renderAbilities?: (editor: TeamEditorState, setIndex: number) => preact.ComponentChildren;
-	renderTypes?: (editor: TeamEditorState, setIndex: number) => preact.ComponentChildren;
-	renderMoves?: (editor: TeamEditorState, setIndex: number) => preact.ComponentChildren;
-	renderStats?: (editor: TeamEditorState, setIndex: number) => preact.ComponentChildren;
-	renderStatCell?: (editor: TeamEditorState, setIndex: number) => preact.ComponentChildren;
-	renderNickname?: (editor: TeamEditorState, setIndex: number) => preact.ComponentChildren;
-	renderDetails?: (editor: TeamEditorState, setIndex: number) => preact.ComponentChildren;
-	renderDetailCell?: (editor: TeamEditorState, setIndex: number) => preact.ComponentChildren;
-	renderRename?: (editor: TeamEditorState, setIndex: number) => preact.ComponentChildren;
-	deleteSet?: (ev: Event) => void;
-	renderSearchBottom?: (editor: TeamEditorState, setIndex: number, type: InnerFocusType) => preact.ComponentChildren;
-	/** Called before the team view would render, for editors that only ever show one set. */
-	restoreFocus?: (editor: TeamEditorState) => void;
-	/** Tooltips for the shared set-form controls, keyed by control name. */
-	titles?: { [control: string]: string };
-	/** Editors whose sets aren't team members have nowhere to copy them to. */
-	hideCopy?: boolean;
-	/** Sample and saved competitive sets don't apply to every kind of set. */
-	hideSampleSets?: boolean;
-	/** Extra buttons at the start of the set form's action row. */
-	renderActions?: (editor: TeamEditorState, setIndex: number) => preact.ComponentChildren;
-	/** Replaces the action row of the empty set form, where Import normally sits. */
-	renderEmptyActions?: (editor: TeamEditorState, setIndex: number) => preact.ComponentChildren;
-	hideOptions?: boolean;
-	/** What the Import/Export tab shows, for an editor whose text isn't a team's. */
-	textTab?: (editor: TeamEditorState) => preact.ComponentChildren;
-	/** Import/export of whatever this editor considers a "set", in place of PokePaste sets. */
-	importExport?: {
-		/** The heading, where the text isn't a set's. */
-		label?: string,
-		export: (editor: TeamEditorState, setIndex: number) => string,
-		/** Applies the text, returning an error message to show, or '' on success. */
-		import: (editor: TeamEditorState, setIndex: number, text: string) => string,
-	};
-	back?: (ev?: Event) => void;
-	selectAbility?: (editor: TeamEditorState, setIndex: number, name: string) => void;
-	/** Return true to claim the click, for pickers that aren't choosing the set's own species. */
-	selectSpecies?: (editor: TeamEditorState, setIndex: number, name: string) => boolean;
-	/** The same for every other kind of result, for a picker that isn't building a set at all. */
-	selectEntry?: (editor: TeamEditorState, setIndex: number, type: string, name: string) => boolean;
-}
+export type InnerFocusType = 'pokemon' | 'ability' | 'item' | 'move' | 'stats' | 'details' | 'import';
 type TeamEditorMode = 'form' | 'import';
 
 interface FocusState {
@@ -2296,10 +2254,10 @@ class TeamEditorForm extends preact.Component<{
 				</div>}
 			</div>
 			{type === 'stats' ? (
-				editor.setEditor?.renderStats ? editor.setEditor.renderStats(editor, setIndex) :
+				editor.setEditor?.render?.stats ? editor.setEditor.render.stats(editor, setIndex) :
 				<StatForm editor={editor} set={set!} onChange={this.handleSetChange} />
 			) : type === 'details' ? (
-				editor.setEditor?.renderDetails ? editor.setEditor.renderDetails(editor, setIndex) :
+				editor.setEditor?.render?.details ? editor.setEditor.render.details(editor, setIndex) :
 				<DetailsForm editor={editor} set={set!} onChange={this.handleSetChange} />
 			) : type === 'import' ? (
 				<SetImportForm
@@ -2987,7 +2945,7 @@ class TeamEditorForm extends preact.Component<{
 		if (!set) {
 			return <div class="set-form" data-set-index={i}>
 				<div style="text-align:right">
-					{setEditor?.renderEmptyActions ? setEditor.renderEmptyActions(editor, i) : <>
+					{setEditor?.render?.emptyActions ? setEditor.render.emptyActions(editor, i) : <>
 						{editor.deletedSet ? (
 							<button onClick={this.undeleteSet} class="option">
 								<i class="fa fa-undo" aria-hidden></i> {TL`[Undo delete]`}
@@ -3032,7 +2990,7 @@ class TeamEditorForm extends preact.Component<{
 		const overfull = set.moves.length > 5 ? ' overfull' : set.moves.length > 4 ? ' overfull overfull5' : '';
 		return <div class={`set-form${isCur}`} data-set-index={i}>
 			<div style="text-align:right">
-				{setEditor?.renderActions?.(editor, i)}
+				{setEditor?.render?.actions?.(editor, i)}
 				{!setEditor?.hideCopy && <button
 					class="option" onClick={this.copySet} value={i} title={setEditor?.titles?.copy}
 				>
@@ -3061,7 +3019,7 @@ class TeamEditorForm extends preact.Component<{
 					<td rowSpan={2} class="set-pokemon"><div class="border-collapse">
 						<span class="sprite-inner">
 							<label class="label">
-								<span>{TL.term.pokemon}</span> {setEditor?.renderRename?.(editor, i)}
+								<span>{TL.term.pokemon}</span> {setEditor?.render?.rename?.(editor, i)}
 								{this.renderInput(i, 'pokemon', set.species)}
 							</label>
 						</span>
@@ -3074,7 +3032,7 @@ class TeamEditorForm extends preact.Component<{
 								onKeyDown={this.keyDownPanelButton} name="details"
 								value={`set-${i}-details`} title={setEditor?.titles?.details}
 							>
-								{setEditor?.renderDetailCell ? setEditor.renderDetailCell(editor, i) : <>
+								{setEditor?.render?.detailCell ? setEditor.render.detailCell(editor, i) : <>
 									<span class="detailcell">
 										<label>{TL.term.level}</label> {}
 										{set.level || editor.defaultLevel}
@@ -3100,12 +3058,12 @@ class TeamEditorForm extends preact.Component<{
 								</>}
 							</button>
 						</label>
-						{setEditor?.renderTypes ? setEditor.renderTypes(editor, i) : <div>
+						{setEditor?.render?.types ? setEditor.render.types(editor, i) : <div>
 							{species.types.map(type => <><PSIcon type={type} new={!editor.narrow} /> </>)}
 						</div>}
 					</div></td>
-					<td rowSpan={2} class={`set-moves${overfull}`}>{setEditor?.renderMoves ?
-						setEditor.renderMoves(editor, i) : <div class="border-collapse">
+					<td rowSpan={2} class={`set-moves${overfull}`}>{setEditor?.render?.moves ?
+						setEditor.render.moves(editor, i) : <div class="border-collapse">
 							<label class={`label ${this.cur('move', i)}`}>
 								{TL.term.moves} <button
 									class={`button ${this.cur('move', i)}`} onClick={this.setFocus} value={`set-${i}-move`}
@@ -3123,14 +3081,14 @@ class TeamEditorForm extends preact.Component<{
 								onKeyDown={this.keyDownPanelButton} name="stats"
 								value={`set-${i}-stats`} title={setEditor?.titles?.stats}
 							>
-								{setEditor?.renderStatCell ? setEditor.renderStatCell(editor, i) :
+								{setEditor?.render?.statCell ? setEditor.render.statCell(editor, i) :
 								StatForm.renderStatGraph(set, this.props.editor, true)}
 							</button>
 						</label>
 					</td>
 				</tr>
 				<tr>
-					{setEditor?.renderAbilities ? setEditor.renderAbilities(editor, i) : <>
+					{setEditor?.render?.abilities ? setEditor.render.abilities(editor, i) : <>
 						<td class="set-ability"><div class="border-collapse">
 							{editor.showAbility(set) && <label class="label">
 								{TL.term.ability} {}
@@ -3153,7 +3111,7 @@ class TeamEditorForm extends preact.Component<{
 				</tr>
 			</table>
 			<div class={`set-nickname${tintClass}`}>
-				{setEditor?.renderNickname ? setEditor.renderNickname(editor, i) : <label class="label">
+				{setEditor?.render?.nickname ? setEditor.render.nickname(editor, i) : <label class="label">
 					<span>{TL.term.nickname}</span>
 					{this.renderNicknameInput(i)}
 				</label>}

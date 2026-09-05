@@ -62,7 +62,6 @@ export interface CustomDexOverlay {
 
 interface FieldLimit { min?: number; max?: number; maxLength?: number }
 
-/** The name a custom format plays under; `toID` of it is the id the server registers it by. */
 /** Which folder a team sorts into. A custom format's id has no gen in it, so they share one. */
 export function formatFolder(format: string) {
 	return format.startsWith('custom') ? 'custom' : format.slice(0, 4);
@@ -149,6 +148,18 @@ export const CustomDex = new class extends PSModel {
 
 	has(id: ID) {
 		return !!this.overlay?.Pokedex[id];
+	}
+	/** Every `/cmd` answered here, dispatched from `MainMenuRoom.handleQueryResponse`. */
+	receiveQuery(id: ID, response: AnyObject | null) {
+		switch (id) {
+		case 'customdex': this.receive(response as CustomDexOverlay | null); break;
+		case 'custompokemon': case 'customformat': this.receiveWrite(response); break;
+		case 'battledex': this.receiveBattleDex(response); break;
+		case 'customformatinfo': this.receiveFormatInfo(response); break;
+		case 'customformatlegal': case 'customformatdraft': this.receiveFormatLegal(response); break;
+		case 'customformatbuild': this.receiveFormatBuild(response); break;
+		case 'customformatdex': this.receiveFormatDex(response); break;
+		}
 	}
 	formatEntry(format: string | undefined) {
 		return this.formatsById[toID(format)] || null;
