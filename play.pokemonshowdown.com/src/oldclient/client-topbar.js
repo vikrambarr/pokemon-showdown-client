@@ -495,7 +495,7 @@
 				buf += '<p><input name="statustext" />';
 				buf += '<button class="button" name="editstatus"><i class="fa fa-pencil"></i></button></p>';
 			}
-			if (app.user.get('named')) {
+			if (app.user.get('named') && !Config.discordlogin) {
 				var registered = app.user.get('registered');
 				if (registered && (registered.userid === app.user.get('userid'))) {
 					buf += '<p><button class="button" name="changepassword">Password...</button></p>';
@@ -987,6 +987,14 @@
 					this.$el.html(buf);
 					return;
 				}
+			}
+
+			if (Config.discordlogin && !app.user.get('registered')) {
+				buf += '<p>Log in with Discord to play on this server.</p>';
+				buf += '<p class="buttonbar"><button type="button" name="discord" class="button"><strong>Discord login</strong></button> <button type="button" name="challengeOnly" class="button"><strong>Challenge-only</strong></button> <button type="button" name="close" class="button">Cancel</button></p>';
+				buf += '</form>';
+				this.$el.html(buf);
+				return;
 			}
 
 			var name = (data.name || '');
