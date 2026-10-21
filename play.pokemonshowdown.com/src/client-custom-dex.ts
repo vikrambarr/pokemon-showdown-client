@@ -1117,7 +1117,7 @@ export function parseSpecies(text: string): ParsedSpecies | string {
 			case 'egggroups':
 				fields.eggGroups = parts.map(part => oneOf(part, EGG_GROUPS, 'egg group'));
 				break;
-			case 'inheritsfrom': fields.inheritsFrom = named(Dex.species, value, 'Pokemon'); break;
+			case 'inheritsfrom': fields.inheritsFrom = named(Dex.species, value, 'Pokémon'); break;
 			// export writes the unit these are in, so an exported Pokemon imports back
 			case 'weight': fields.weightkg = number(value.replace(/kg$/i, ''), 'Weight', 'weightkg'); break;
 			case 'height': fields.heightm = number(value.replace(/m$/i, ''), 'Height', 'heightm'); break;
@@ -1131,15 +1131,15 @@ export function parseSpecies(text: string): ParsedSpecies | string {
 				fields.genderRatio = { M: eighths / 8, F: 1 - eighths / 8 };
 				break;
 			}
-			case 'evolvesfrom': fields.prevo = named(Dex.species, value, 'Pokemon'); break;
+			case 'evolvesfrom': fields.prevo = named(Dex.species, value, 'Pokémon'); break;
 			case 'evolvesinto':
-				fields.evos = parts.map(part => named(Dex.species, part, 'Pokemon'));
+				fields.evos = parts.map(part => named(Dex.species, part, 'Pokémon'));
 				break;
 			case 'evotype': fields.evoType = oneOf(value, EVO_TYPES, 'evolution type'); break;
 			case 'evolevel': fields.evoLevel = number(value, 'Evo Level', 'evoLevel', true); break;
 			case 'evocondition': fields.evoCondition = capped(value, 'Evo Condition', 'evoCondition'); break;
 			case 'tags': fields.tags = parts.map(part => oneOf(part, TAGS, 'tag')); break;
-			case 'color': fields.color = oneOf(value, COLORS, 'colour'); break;
+			case 'color': fields.color = oneOf(value, COLORS, 'color'); break;
 			case 'category': fields.category = capped(value, 'Category', 'category'); break;
 			case 'dexentry': fields.dexEntry = capped(value, 'Dex Entry', 'dexEntry'); break;
 			default:
@@ -1149,7 +1149,7 @@ export function parseSpecies(text: string): ParsedSpecies | string {
 	} catch (err: any) {
 		return err.message;
 	}
-	if (!name) return `Start with the Pokemon's name on the first line.`;
+	if (!name) return `Start with the Pokémon's name on the first line.`;
 	const maxName = CustomDex.limits.name?.maxLength;
 	if (maxName !== undefined && name.length > maxName) {
 		return `Names can be at most ${maxName} characters.`;

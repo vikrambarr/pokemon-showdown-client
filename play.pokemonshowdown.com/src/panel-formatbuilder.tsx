@@ -22,7 +22,7 @@ import {
 /** What each picker edits: the label on its button, and how a rule names one of its entries. */
 type NamedTable = { get: (name: string) => { id: ID, name: string, exists: boolean } };
 const PICKERS: { [kind in RosterKind]: { label: string, prefix: string, dex: NamedTable, all: string } } = {
-	pokemon: { label: 'Pok\u00e9mon', prefix: '', dex: Dex.species, all: 'All Pokemon' },
+	pokemon: { label: 'Pokémon', prefix: '', dex: Dex.species, all: 'All Pokemon' },
 	move: { label: 'Moves', prefix: 'move:', dex: Dex.moves, all: 'All Moves' },
 	ability: { label: 'Abilities', prefix: 'ability:', dex: Dex.abilities, all: 'All Abilities' },
 	item: { label: 'Items', prefix: 'item:', dex: Dex.items, all: 'All Items' },
@@ -31,7 +31,7 @@ const PICKERS: { [kind in RosterKind]: { label: string, prefix: string, dex: Nam
 const RULE_LISTS = ['ruleset', 'banlist', 'unbanlist'];
 /** The tags a format can ban, in the order the editor shows them. */
 const TAG_GROUPS = [
-	{ kind: 'pokemon', name: 'Pok\u00e9mon tag' },
+	{ kind: 'pokemon', name: 'Pokémon tag' },
 	{ kind: 'move', name: 'Move tag' },
 	{ kind: 'other', name: 'Tag' },
 ];
@@ -545,7 +545,7 @@ export class FormatPanel extends TeamPanel {
 				return '';
 			},
 		},
-		titles: { pokemon: 'Pokemon allowed in this format' },
+		titles: { pokemon: 'Pokémon allowed in this format' },
 		hideOptions: true,
 		/** A picker is a page of this format, not a page of its own: nothing is saved leaving it. */
 		back: (ev?: Event) => {

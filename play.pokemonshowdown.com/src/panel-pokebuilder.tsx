@@ -784,11 +784,11 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 						{field('Evo condition',
 							text('evoCondition', data.evoCondition, 'Change evolution condition', 160))}
 						<tr class="divider"><td colSpan={2}><hr /></td></tr>
-						{field('Color', select('color', data.color, COLORS, 'Change Pokedex colour'))}
+						{field('Color', select('color', data.color, COLORS, 'Change Pokédex color'))}
 						{field('Category', <>The {text('category', data.category, 'Change category', 120)} Pokémon</>)}
 						{field('Dex entry', <textarea
 							name="dexEntry" data-set-index={setIndex} class="textbox dexentry"
-							maxLength={CustomDex.limits.dexEntry?.maxLength} title="Change Pokedex entry"
+							maxLength={CustomDex.limits.dexEntry?.maxLength} title="Change Pokédex entry"
 							rows={3} onChange={this.detail} value={data.dexEntry || ''}
 						/>)}
 					</table>
@@ -817,7 +817,7 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 		/>,
 		// no Pokemon is open on the list screen, where the text is the whole collection instead
 		importExport: {
-			label: 'Import/Export Pok\u00e9mon',
+			label: 'Import/Export Pokémon',
 			export: (_editor, setIndex) => (
 				this.speciesId(setIndex) ? exportSpecies(this.speciesId(setIndex)) : exportSpeciesList()
 			),
@@ -826,10 +826,10 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 			),
 		},
 		titles: {
-			back: 'Save and return to your Pokemon list',
-			import: 'Import or export this Pokemon as text',
-			delete: 'Delete this custom Pokemon',
-			pokemon: 'Switch to another Pokemon',
+			back: 'Save and return to your Pokémon list',
+			import: 'Import or export this Pokémon as text',
+			delete: 'Delete this custom Pokémon',
+			pokemon: 'Switch to another Pokémon',
 			details: 'Change details',
 			stats: 'Change stats',
 		},
@@ -840,7 +840,7 @@ class PokebuilderPanel extends PSRoomPanel<PokebuilderRoom> {
 			this.openPicker(setIndex, editor.sets[setIndex] ? 'move' : 'pokemon');
 		},
 		renderSearchBottom: (editor, setIndex, type) => (type === 'pokemon' && !editor.sets[setIndex] && (
-			<button class="newmon" onClick={this.createSpecies} title="Create a new custom Pokemon">
+			<button class="newmon" onClick={this.createSpecies} title="Create a new custom Pokémon">
 				<i class="fa fa-plus" aria-hidden></i> <strong>New Pokémon</strong>
 			</button>
 		)),
