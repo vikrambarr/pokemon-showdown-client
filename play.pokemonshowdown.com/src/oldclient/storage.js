@@ -866,12 +866,15 @@ Storage.packTeam = function (team) {
 			buf += '|';
 		}
 
-		if (set.pokeball || (set.hpType && !hasHP) || set.gigantamax || (set.dynamaxLevel !== undefined && set.dynamaxLevel !== 10) || set.teraType) {
+		if (set.pokeball || (set.hpType && !hasHP) || set.gigantamax || (set.dynamaxLevel !== undefined && set.dynamaxLevel !== 10) || set.teraType || set.fusion || set.altsprite || set.ability2) {
 			buf += ',' + (set.hpType || '');
 			buf += ',' + toID(set.pokeball);
 			buf += ',' + (set.gigantamax ? 'G' : '');
 			buf += ',' + (set.dynamaxLevel !== undefined && set.dynamaxLevel !== 10 ? set.dynamaxLevel : '');
 			buf += ',' + (set.teraType || '');
+			buf += ',' + (set.fusion || '');
+			buf += ',' + (set.altsprite || '');
+			buf += ',' + (set.ability2 || '');
 		}
 	}
 
@@ -981,9 +984,9 @@ Storage.fastUnpackTeam = function (buf) {
 		j = buf.indexOf(']', i);
 		var misc = undefined;
 		if (j < 0) {
-			if (i < buf.length) misc = buf.substring(i).split(',', 6);
+			if (i < buf.length) misc = buf.substring(i).split(',', 9);
 		} else {
-			if (i !== j) misc = buf.substring(i, j).split(',', 6);
+			if (i !== j) misc = buf.substring(i, j).split(',', 9);
 		}
 		if (misc) {
 			set.happiness = (misc[0] ? Number(misc[0]) : 255);
@@ -992,6 +995,9 @@ Storage.fastUnpackTeam = function (buf) {
 			set.gigantamax = !!misc[3];
 			set.dynamaxLevel = (misc[4] ? Number(misc[4]) : 10);
 			set.teraType = misc[5];
+			set.fusion = misc[6];
+			set.altsprite = misc[7];
+			set.ability2 = misc[8];
 		}
 		if (j < 0) break;
 		i = j + 1;
@@ -1104,9 +1110,9 @@ Storage.unpackTeam = function (buf) {
 		j = buf.indexOf(']', i);
 		var misc = undefined;
 		if (j < 0) {
-			if (i < buf.length) misc = buf.substring(i).split(',', 6);
+			if (i < buf.length) misc = buf.substring(i).split(',', 9);
 		} else {
-			if (i !== j) misc = buf.substring(i, j).split(',', 6);
+			if (i !== j) misc = buf.substring(i, j).split(',', 9);
 		}
 		if (misc) {
 			set.happiness = (misc[0] ? Number(misc[0]) : 255);
@@ -1115,6 +1121,9 @@ Storage.unpackTeam = function (buf) {
 			set.gigantamax = !!misc[3];
 			set.dynamaxLevel = (misc[4] ? Number(misc[4]) : 10);
 			set.teraType = misc[5];
+			set.fusion = misc[6];
+			set.altsprite = misc[7];
+			set.ability2 = misc[8];
 		}
 		if (j < 0 || buf.indexOf('|', j) < 0) break;
 		i = j + 1;
@@ -1276,10 +1285,22 @@ Storage.importTeam = function (buffer, teams) {
 			}
 		} else if (line.substr(0, 7) === 'Trait: ') {
 			line = line.substr(7);
-			curSet.ability = line;
+			if (line.includes(' / ')) {
+				var split = line.split(' / ');
+				curSet.ability = split[0];
+				curSet.ability2 = split[1];
+			} else {
+				curSet.ability = line;
+			}
 		} else if (line.substr(0, 9) === 'Ability: ') {
 			line = line.substr(9);
-			curSet.ability = line;
+			if (line.includes(' / ')) {
+				var split = line.split(' / ');
+				curSet.ability = split[0];
+				curSet.ability2 = split[1];
+			} else {
+				curSet.ability = line;
+			}
 		} else if (line === 'Shiny: Yes') {
 			curSet.shiny = true;
 		} else if (line.substr(0, 7) === 'Level: ') {
@@ -1297,6 +1318,12 @@ Storage.importTeam = function (buffer, teams) {
 		} else if (line.substr(0, 11) === 'Tera Type: ') {
 			line = line.substr(11);
 			curSet.teraType = line;
+		} else if (line.substr(0, 8) === 'Fusion: ') {
+			line = line.substr(8);
+			curSet.fusion = line;
+		} else if (line.substr(0, 5) === 'Alt: ') {
+			line = line.substr(5);
+			curSet.altsprite = line;
 		} else if (line.substr(0, 15) === 'Dynamax Level: ') {
 			line = line.substr(15);
 			curSet.dynamaxLevel = +line;
@@ -1404,7 +1431,7 @@ Storage.exportTeam = function (team, hidestats, shownature) {
 		}
 		text += "  \n";
 		if (curSet.ability) {
-			text += 'Ability: ' + curSet.ability + "  \n";
+			text += 'Ability: ' + curSet.ability + (curSet.ability2 ? ' / ' + curSet.ability2 : '') + "  \n";
 		}
 		if (curSet.level && curSet.level !== 100) {
 			text += 'Level: ' + curSet.level + "  \n";
@@ -1429,6 +1456,12 @@ Storage.exportTeam = function (team, hidestats, shownature) {
 		}
 		if (curSet.teraType) {
 			text += 'Tera Type: ' + curSet.teraType + '  \n';
+		}
+		if (curSet.fusion) {
+			text += 'Fusion: ' + curSet.fusion + '  \n';
+		}
+		if (curSet.altsprite) {
+			text += 'Alt: ' + curSet.altsprite + '  \n';
 		}
 		if (!hidestats) {
 			var first = true;
