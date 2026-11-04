@@ -21,6 +21,9 @@
 			Storage.whenPrefsLoaded(function () {
 				self.savedCreateRooms = [];
 			});
+			$(document).one('mousedown keydown', function () {
+				self.userActed = true;
+			});
 		},
 		switchWorkspace: function (workspace, id) {
 			if (workspace === this.workspace) return;
@@ -29,7 +32,7 @@
 			this.workspaces[this.workspace] = _.pick(this, WORKSPACE_STATE);
 			_.extend(this, this.workspaces[workspace]);
 			this.workspace = workspace;
-			this.rooms[''].$('[data-workspace]').hide().filter('[data-workspace="' + workspace + '"]').show();
+			$('[data-workspace]').hide().filter('[data-workspace="' + workspace + '"]').show();
 			if (!this.curRoom) this.curRoom = this.rooms[''];
 			if (!this.sideRoom) this.updateSideRoom();
 			window.room = this.curRoom;
@@ -39,7 +42,7 @@
 			this.navigate(id);
 			this.updateTitle(this.rooms[id]);
 		},
-		_addRoom: function (id) {
+		_addRoom: function (id, type, nojoin) {
 			var oldRoom = this.rooms[id];
 			var workspace = this.workspace;
 			if (oldRoom) {
@@ -48,6 +51,8 @@
 				workspace = '';
 			} else if (this.savedCreateRooms.indexOf(id) >= 0) {
 				workspace = 'create';
+			} else if (nojoin && !this.userActed) {
+				workspace = 'battle';
 			}
 			var active = workspace && workspace !== this.workspace && _.pick(this, WORKSPACE_STATE);
 			if (active) _.extend(this, this.workspaces[workspace]);
@@ -61,7 +66,10 @@
 		},
 		focusRoom: function (id) {
 			var room = this.rooms[id];
-			if (room && room.workspace && room.workspace !== this.workspace) this.switchWorkspace(room.workspace, id);
+			if (room && room.workspace && room.workspace !== this.workspace) {
+				if (!this.userActed && id !== this.initialFragment) return false;
+				this.switchWorkspace(room.workspace, id);
+			}
 			return baseApp.focusRoom.apply(this, arguments);
 		},
 		removeRoom: function (id, alreadyLeft) {
@@ -138,7 +146,14 @@
 	_.extend(MainMenuRoom.prototype, {
 		initialize: function () {
 			baseMainMenuRoom.initialize.apply(this, arguments);
-			this.$('.mainmenu').attr('data-workspace', 'battle').after('<div class="createmenu" data-workspace="create" style="display:none;padding-bottom:51px"><div class="menugroup"><p><strong>Create</strong></p><p>Custom dexes and formats will be made here.</p></div></div>');
+			var buf = '<div class="menugroup"><form class="battleform">';
+			buf += '<p><label class="label">Format:</label>' + this.renderFormats() + '</p>';
+			buf += '<p><label class="label">Team:</label>' + this.renderTeams() + '</p>';
+			buf += '<p style="margin-top:94px"><button class="button mainmenu1 big" name="openDexBuilder"><strong>Create!</strong><br /><small>Make and edit your dexes</small></button></p></form></div>';
+			this.$('.mainmenu').attr('data-workspace', 'battle').after('<div class="createmenu" data-workspace="create" style="display:none;padding-bottom:51px">' + buf + '</div>');
+		},
+		openDexBuilder: function () {
+			app.joinRoom('dexbuilder', DexBuilderRoom);
 		}
 	});
 

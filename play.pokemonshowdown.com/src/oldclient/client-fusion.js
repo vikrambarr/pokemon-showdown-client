@@ -95,7 +95,7 @@
 		spriteData.y = 0;
 		spriteData.gen = 5;
 		spriteData.pixelated = true;
-		if (!spriteData.isFrontSprite) spriteData.flip = true;
+		if (!spriteData.isFrontSprite) spriteData.url += '#flip';
 		return spriteData;
 	};
 
