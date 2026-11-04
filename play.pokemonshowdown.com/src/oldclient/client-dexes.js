@@ -241,6 +241,7 @@
 			if (!search) return search;
 			search.dex = view.dex;
 			search.dexView = view;
+			search.dexid = summary.id;
 			return search;
 		};
 
@@ -379,7 +380,8 @@
 			info[0].getDefaultResults = function () {
 				var results = getDefaultResults.apply(this, arguments);
 				var view = this.dexView;
-				var summary = view && DexViews.list.filter(function (dex) { return dex.id === view.dexid; })[0];
+				var dexid = this.dexid;
+				var summary = view && DexViews.list.filter(function (dex) { return dex.id === dexid; })[0];
 				var count = summary && summary.counts.filter(function (entry) { return entry.table === info[1]; })[0];
 				if (!count || !count.customIds) return results;
 				var dexRows = [];
@@ -575,16 +577,18 @@
 			this.dexFormatId = '';
 			this.dexFormatSearch = null;
 
+			var dexid = this.dexid;
 			var search = this.dexSearch = new BattleSearch(this.$('.dexpokemon'), this.$el);
 			search.engine.getTypedSearch = function (searchType, format, speciesOrSet) {
 				var typedSearch = DexSearch.prototype.getTypedSearch.call(this, searchType, 'gen' + view.gen, speciesOrSet);
 				if (!typedSearch) return typedSearch;
 				typedSearch.dex = view.dex;
 				typedSearch.dexView = view;
+				typedSearch.dexid = dexid;
 				if (searchType === 'pokemon') return typedSearch;
 				typedSearch.getBaseResults = function () {
 					var table = { move: 'Moves', ability: 'Abilities', item: 'Items' }[searchType];
-					var shown = DexViews.entries[view.dexid];
+					var shown = DexViews.entries[dexid];
 					var seen = {};
 					var results = this.getDefaultResults().filter(function (row) {
 						if (row[0] !== searchType) return true;
@@ -979,7 +983,7 @@
 			this.$('.dexsearchpage, .dexpage').hide();
 			this.$('.dexmonpage').show();
 			this.$el.scrollTop(0);
-			app.send('/crq dexmove ' + view.dexid + ',' + move.id);
+			app.send('/crq dexmove ' + this.dexid + ',' + move.id);
 
 			var buf = '<div class="pad">';
 			buf += HIDE_BUTTON + '<button name="closeDexMove" class="button"><i class="fa fa-chevron-left"></i> ' + BattleLog.escapeHTML(from || 'Dex') + '</button></div>';
@@ -1056,7 +1060,7 @@
 			this.scaleDexPokemon();
 		},
 		renderDexMove: function (data) {
-			if (!this.dexMove || data.id !== this.dexMove.id || data.dexid !== this.dexView.dexid) return;
+			if (!this.dexMove || data.id !== this.dexMove.id || data.dexid !== this.dexid) return;
 			this.dexMoveData = data;
 			this.$('.dexmovebase').val(data.base || '—').attr('title', data.base);
 			if (this.dexMoveList === 'code') this.showDexMoveList('code');
@@ -1233,6 +1237,7 @@
 				if (!typedSearch) return typedSearch;
 				typedSearch.dex = view.dex;
 				typedSearch.dexView = view;
+				typedSearch.dexid = room.dexid;
 				typedSearch.isNatDex = details.rules.includes('natdexmod');
 				typedSearch.isDoubles = details.gameType !== 'singles';
 				var getBaseResults = typedSearch.getBaseResults;
