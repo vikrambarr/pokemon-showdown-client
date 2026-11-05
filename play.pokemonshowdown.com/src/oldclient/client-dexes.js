@@ -52,7 +52,7 @@
 	function loadEntries(dexid) {
 		if (DexViews.entries[dexid] || !dexid) return;
 		request('dexentries', dexid).then(function (data) {
-			var entries = { custom: data.custom, edited: data.edited };
+			var entries = { custom: data.custom, modified: data.modified };
 			$.each(['Moves', 'Abilities', 'Items'], function (i, table) {
 				var ids = entries[table] = {};
 				for (var j = 0; j < data[table].length; j++) ids[data[table][j]] = 1;
@@ -422,7 +422,7 @@
 				if (!entries) return results;
 				var dexRows = [];
 				var listed = {};
-				$.each([[entries.custom[info[1]], " custom "], [entries.edited[info[1]], " modified "]], function (j, group) {
+				$.each([[entries.custom[info[1]], " custom "], [entries.modified[info[1]], " modified "]], function (j, group) {
 					var ids = group[0].filter(function (id) { return view[info[1]][id] && !view[info[1]][id].isPokeball; }).sort();
 					for (var k = 0; k < ids.length; k++) listed[ids[k]] = 1;
 					if (ids.length) dexRows.push(['header', view.name + group[1] + info[3]]);
@@ -608,7 +608,7 @@
 			if (summary.editors && summary.editors.length) buf += '<br /><strong>Edited by:</strong> ' + BattleLog.escapeHTML(summary.editors.join(', '));
 			buf += '<br /><strong>World:</strong> ' + BattleLog.escapeHTML(summary.base) + ' (Gen ' + view.gen + ')';
 			buf += '<br /><small>' + summary.counts.map(function (count) {
-				return '<strong>' + count.name + ':</strong> ' + count.total + ' total, ' + count.custom + ' custom, ' + count.edited + ' edited';
+				return '<strong>' + count.name + ':</strong> ' + count.total + ' total, ' + count.custom + ' custom, ' + count.modified + ' modified';
 			}).join(' &middot; ') + '</small>';
 			buf += '</p><p><button class="button" name="worldDex"><i class="fa fa-globe"></i> Use as world</button>' +
 				(canEdit(summary) ?

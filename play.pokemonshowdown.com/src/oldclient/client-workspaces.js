@@ -3,16 +3,46 @@
 	var WORKSPACE_STATE = ['roomList', 'sideRoomList', 'curRoom', 'curSideRoom', 'sideRoom'];
 
 	var baseApp = _.pick(this.App.prototype, ['initialize', '_addRoom', 'focusRoom', 'removeRoom', 'updateSideRoom', 'updateAutojoin']);
-	var baseTopbar = _.pick(Topbar.prototype, ['initialize', 'renderRoomTab', 'updateTabbar']);
+	var baseTopbar = _.pick(Topbar.prototype, ['renderRoomTab', 'updateTabbarMini', 'click']);
 	var baseMainMenuRoom = _.pick(MainMenuRoom.prototype, ['initialize']);
+	var baseTabListPopup = _.pick(TabListPopup.prototype, ['click']);
+
+	var WORKSPACE_TABS = [['battle', 'gamepad', "Play"], ['create', 'wrench', "Create"]];
+
+	function renderWorkspaceTabs(homeTab, mini) {
+		var notifying = {};
+		for (var id in app.rooms) {
+			var room = app.rooms[id];
+			if (room.workspace && room.notificationClass === ' notifying') notifying[room.workspace] = true;
+		}
+		return WORKSPACE_TABS.map(function (tab) {
+			var label = '<i class="fa fa-' + tab[1] + '"></i> <span>' + tab[2] + '</span>';
+			if (app.workspace === tab[0]) return homeTab.replace('<i class="fa fa-home"></i> <span>Home</span>', label);
+			if (mini) return '';
+			return '<li><a class="button' + (notifying[tab[0]] ? ' notifying' : '') + '" href="' + app.root + '" data-switchto="' + tab[0] + '">' +
+				label + '</a></li>';
+		}).join('');
+	}
+
+	function clickWorkspaceTab(e) {
+		var workspace = $(e.currentTarget).attr('data-switchto');
+		if (!workspace) return false;
+		e.preventDefault();
+		e.stopPropagation();
+		app.switchWorkspace(workspace);
+		app.curRoom.focus();
+		return true;
+	}
 
 	_.extend(this.App.prototype, {
 		workspace: 'battle',
 		savedCreateRooms: [],
 		initialize: function () {
 			var self = this;
-			this.workspaces = {
-				create: { roomList: [], sideRoomList: [], curRoom: null, curSideRoom: null, sideRoom: null }
+			if (/[?&]workspace=create(&|$)/.test(location.search)) this.workspace = 'create';
+			this.workspaces = {};
+			this.workspaces[this.workspace === 'create' ? 'battle' : 'create'] = {
+				roomList: [], sideRoomList: [], curRoom: null, curSideRoom: null, sideRoom: null
 			};
 			Storage.whenPrefsLoaded(function () {
 				self.savedCreateRooms = ((Dex.prefs('createrooms') || {})[Config.server.id] || '').split(',');
@@ -119,27 +149,26 @@
 	});
 
 	_.extend(Topbar.prototype, {
-		initialize: function () {
-			baseTopbar.initialize.apply(this, arguments);
-			this.$('.logo').removeClass('logo').wrap('<button class="logo" name="switchWorkspace" style="padding:0;border:0;background:none;line-height:0;cursor:pointer"></button>');
-			this.updateTabbar();
-		},
 		renderRoomTab: function (room) {
 			if (room && room.workspace && room.workspace !== app.workspace) return '';
-			return baseTopbar.renderRoomTab.apply(this, arguments);
+			var buf = baseTopbar.renderRoomTab.apply(this, arguments);
+			if (room !== app.rooms['']) return buf;
+			return renderWorkspaceTabs(buf, this.mini) + (this.mini ? '' : '</ul><ul>');
 		},
-		updateTabbar: function () {
-			baseTopbar.updateTabbar.apply(this, arguments);
-			var notifying = false;
-			for (var id in app.rooms) {
-				var room = app.rooms[id];
-				if (room.workspace && room.workspace !== app.workspace && room.notificationClass === ' notifying') notifying = true;
-			}
-			this.$('button.logo').attr('title', app.workspace === 'create' ? "Go to the battle page" : "Go to the creation page").css('filter', notifying ? 'drop-shadow(0 0 6px #ffcc00)' : '');
+		updateTabbarMini: function () {
+			this.mini = true;
+			baseTopbar.updateTabbarMini.apply(this, arguments);
+			this.mini = false;
 		},
-		switchWorkspace: function () {
-			app.switchWorkspace(app.workspace === 'create' ? 'battle' : 'create');
-			app.curRoom.focus();
+		click: function (e) {
+			if (!clickWorkspaceTab(e)) baseTopbar.click.apply(this, arguments);
+		}
+	});
+
+	_.extend(TabListPopup.prototype, {
+		click: function (e) {
+			if (!clickWorkspaceTab(e)) return baseTabListPopup.click.apply(this, arguments);
+			this.close();
 		}
 	});
 
@@ -150,7 +179,8 @@
 			buf += '<p><label class="label">Format:</label>' + this.renderFormats() + '</p>';
 			buf += '<p><label class="label">Team:</label>' + this.renderTeams() + '</p>';
 			buf += '<p style="margin-top:94px"><button class="button mainmenu1 big" name="openDexBuilder"><strong>Create!</strong><br /><small>Make and edit your dexes</small></button></p></form></div>';
-			this.$('.mainmenu').attr('data-workspace', 'battle').after('<div class="createmenu" data-workspace="create" style="display:none;padding-bottom:51px">' + buf + '</div>');
+			this.$('.mainmenu').attr('data-workspace', 'battle').after('<div class="createmenu" data-workspace="create" style="padding-bottom:51px">' + buf + '</div>');
+			this.$('[data-workspace]').hide().filter('[data-workspace="' + app.workspace + '"]').show();
 		},
 		openDexBuilder: function () {
 			app.joinRoom('dexbuilder', DexBuilderRoom);
