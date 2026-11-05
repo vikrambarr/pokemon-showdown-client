@@ -524,24 +524,6 @@
 .dexstatresults .evcol {
 	margin-left: 8px;
 }
-.dexmonchart .dexdetailscol {
-	display: flex;
-	flex-direction: column;
-	width: 97px;
-}
-.dexmonchart .dexdetailscol .setcell-details {
-	height: auto;
-}
-.dexmonchart .dexdetailscol .setdetails {
-	width: 93px;
-}
-.dexmonchart .dexdetailscol .setdetails:focus,
-.dexmonchart .dexdetailscol .setdetails:active {
-	width: 95px;
-}
-.dexmonchart .dexdetailscol .detailcell {
-	float: none;
-}
 .dexeditorlist {
 	list-style-type: none;
 	margin: 0 0 6px 0;
@@ -685,9 +667,8 @@
 }
 .dexmonchart .dextypeselects {
 	display: flex;
-	flex: 1;
-	justify-content: center;
 	align-items: center;
+	margin-top: 2px;
 }
 .dexmonchart .dextypeslot {
 	position: relative;
@@ -709,8 +690,8 @@
 	left: 0;
 	top: 0;
 	display: block;
-	width: 32px;
-	height: 14px;
+	width: 100%;
+	height: 100%;
 	min-width: 0;
 	min-height: 0;
 	margin: 0;
@@ -722,8 +703,8 @@
 }
 .dexmonchart select.dextypearrow > button {
 	display: block;
-	width: 32px;
-	height: 14px;
+	width: 100%;
+	height: 100%;
 	margin: 0;
 	padding: 0;
 	border: 0;
@@ -862,4 +843,13 @@
 	box-shadow: none;
 	color: inherit;
 	outline: 0 none;
+}
+.dexmonchart .dexabilitybox {
+	width: 228px;
+}
+.dexmonchart .dexabilitybox .dexchip {
+	cursor: grab;
+}
+.dexmonchart .dexchip small {
+	opacity: 0.6;
 }

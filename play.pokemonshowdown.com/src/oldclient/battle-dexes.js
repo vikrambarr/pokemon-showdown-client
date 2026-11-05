@@ -183,9 +183,15 @@
 				hash: layer.hash, dexid: layer.dexid, name: layer.name, mod: layer.mod, gen: gen,
 				modid: 'gen' + gen + 'dex' + layer.hash, species: {},
 				Pokedex: {}, Learnsets: {}, FormatsData: {}, Moves: {}, Abilities: {}, Items: {}, TypeChart: {},
-				sprites: {}, itemSprites: {}, images: {}
+				sprites: {}, itemSprites: {}, images: {}, origins: {}
 			};
 			for (var i = parents.length - 1; i >= 0; i--) merge(view, parents[i], true);
+			for (var j = parents.length - 1; j >= 0; j--) $.extend(view.origins, parents[j].origins);
+			for (var id in layer.Pokedex) {
+				var standard = window.BattlePokedex && BattlePokedex[id] && !DexViews.custom.Pokedex[id];
+				if (layer.origins && layer.origins[id]) view.origins[id] = layer.origins[id];
+				else if (!view.origins[id] && !standard) view.origins[id] = layer.name;
+			}
 			if (gen === 9 && parents.length > 1) view.FormatsData = mergeTiers(parents);
 			merge(view, layer, false);
 			for (var i = 0; i < layer.species.length; i++) view.species[layer.species[i]] = 1;

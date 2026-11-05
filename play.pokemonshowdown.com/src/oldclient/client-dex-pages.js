@@ -32,6 +32,12 @@
 			(placeholder ? ' placeholder="' + placeholder + '"' : '') + ' autocomplete="off" />';
 	}
 
+	function abilitySlotsOf(species) {
+		return ['0', '1', 'H', 'S'].filter(function (slot) {
+			return species.abilities[slot] && species.abilities[slot] !== 'No Ability';
+		}).map(function (slot) { return [slot, species.abilities[slot]]; });
+	}
+
 	function hasStandardSprites(id) {
 		return !!(window.BattlePokedex && BattlePokedex[id]) && !DexViews.custom.Pokedex[id];
 	}
@@ -54,6 +60,8 @@
 			this.callback(data.target);
 		}
 	});
+
+	DexViews.ui.abilitySlotsOf = abilitySlotsOf;
 
 	_.extend(RoomsRoom.prototype, {
 		openDexPokemon: function (name) {
@@ -146,31 +154,18 @@
 			buf += '<div class="setcell setcell-pokemon"><label>Pok&eacute;mon</label>' + fieldHTML(BattleLog.escapeHTML(species.name)) + '</div></div>';
 
 			var ratio = species.genderRatio;
-			var abilities = species.abilities;
-			if (editable) {
-				var slots = [['0', 'Ability 1'], ['1', 'Ability 2'], ['H', 'Hidden ability'], ['S', 'Special ability']];
-				buf += '<div class="setcol setcol-moves"><div class="setcell"><label>Abilities</label>';
-				for (var a = 0; a < slots.length; a++) {
-					if (a) buf += '<div class="setcell">';
-					buf += inputHTML(abilities[slots[a][0]] || '', 'ability' + slots[a][0], slots[a][1]) + '</div>';
-				}
-				buf += '</div>';
-			}
-			buf += '<div class="setcol setcol-details' + (editable ? ' dexdetailscol' : '') + '"><div class="setrow">';
+			buf += '<div class="setcol setcol-details"><div class="setrow">';
 			buf += '<div class="setcell setcell-details"><label>Details</label><button class="textbox setdetails" tabindex="-1" name="showDexDetails">';
-			if (!editable) {
-				buf += '<span class="detailcell detailcell-first"><label>Gender</label>' +
-					(species.gender ? { M: 'Male', F: 'Female', N: '&mdash;' }[species.gender] : ratio ? (ratio.M * 100) + '% M' : '50% M') + '</span>';
-			}
-			buf += '<span class="detailcell' + (editable ? ' detailcell-first' : '') + '"><label>Weight</label>' + (species.weightkg || '&mdash;') + ' kg</span>';
-			if (!editable) {
-				buf += '<span class="detailcell"><label>Height</label>' + (species.heightm || '&mdash;') + ' m</span>';
-				buf += '<span class="detailcell"><label>Egg</label>' + BattleLog.escapeHTML((species.eggGroups || [])[0] || '\u2014') + '</span>';
-			}
+			buf += '<span class="detailcell detailcell-first"><label>Gender</label>' +
+				(species.gender ? { M: 'Male', F: 'Female', N: '&mdash;' }[species.gender] : ratio ? (ratio.M * 100) + '% M' : '50% M') + '</span>';
+			buf += '<span class="detailcell"><label>Weight</label>' + (species.weightkg || '&mdash;') + ' kg</span>';
+			buf += '<span class="detailcell"><label>Height</label>' + (species.heightm || '&mdash;') + ' m</span>';
+			var origin = view.origins[species.id];
+			buf += '<span class="detailcell"><label>' + (origin ? 'Origin' : 'Egg') + '</label>' + BattleLog.escapeHTML(origin || (species.eggGroups || [])[0] || '\u2014') + '</span>';
 			buf += '</button></div></div>';
+			buf += '<div class="setrow setrow-icons"><div class="setcell"><span class="itemicon"></span></div><div class="setcell setcell-typeicons' + (editable ? ' dextypeselects' : '') + '">';
 			if (editable) {
 				var typeNames = view.dex.types.names().filter(function (name) { return view.dex.types.get(name).exists !== false; });
-				buf += '<div class="setrow setrow-icons dextypeselects">';
 				for (var t = 0; t < 2; t++) {
 					var current = species.types[t] || '';
 					var other = species.types[1 - t];
@@ -184,28 +179,28 @@
 					}
 					buf += '</select><svg class="dextypecaret" width="10" height="7" viewBox="0 0 14 9"><path d="M1 1H13L7 8Z" fill="#fff" stroke="#000" stroke-width="1.5" stroke-linejoin="round" /></svg></span>';
 				}
-				buf += '</div>';
 			} else {
-				buf += '<div class="setrow setrow-icons"><div class="setcell"><span class="itemicon"></span></div><div class="setcell setcell-typeicons">';
 				for (var k = 0; k < species.types.length; k++) buf += Dex.getTypeIcon(species.types[k]);
-				buf += '</div></div>';
 			}
-			if (!editable) {
+			buf += '</div></div>';
+			var abilities = species.abilities;
+			buf += '<div class="setrow setrow-abilities">';
+			if (editable) {
+				buf += '<div class="setcell"><label>Abilities</label><div class="textbox dexchipbox dexabilitybox">' + this.dexAbilityChipsHTML(abilitySlotsOf(species)) + '</div></div>';
+			} else {
 				var abilityCells = [['Ability 1', abilities['0']], ['Ability 2', abilities['1']], ['Hidden', abilities['H']]];
 				if (abilities['S']) abilityCells.push(['Special', abilities['S']]);
-				buf += '<div class="setrow setrow-abilities">';
 				for (var c = 0; c < abilityCells.length; c++) {
 					buf += '<div class="setcell"><label>' + abilityCells[c][0] + '</label>' + fieldHTML(BattleLog.escapeHTML(abilityCells[c][1] || '')) + '</div>';
 				}
-				buf += '</div>';
 			}
-			buf += '</div>';
+			buf += '</div></div>';
 
 			var rows = [
 				'From: ' + (species.prevo || '\u2014'),
 				'Into: ' + ((species.evos || []).join(', ') || '\u2014')
 			];
-			if (editable) rows = [inputHTML(species.prevo || '', 'prevo', 'From'), '<div class="textbox dexchipbox">' + this.dexEvoChipsHTML(species.evos || []) + '</div>'];
+			if (editable) rows = [inputHTML(species.prevo || '', 'prevo', 'From'), '<div class="textbox dexchipbox dexevobox">' + this.dexEvoChipsHTML(species.evos || []) + '</div>'];
 			buf += '<div class="setcol setcol-moves"><div class="setcell"><label>Evolves</label>';
 			for (var m = 0; m < rows.length; m++) {
 				if (m) buf += '<div class="setcell">';
@@ -240,6 +235,12 @@
 			search.setType('move', 'gen' + view.gen + 'ag', { species: species.name, moves: [] });
 			this.updateDexLearnsetCount();
 			this.scaleDexPokemon();
+		},
+		dexAbilityChipsHTML: function (entries) {
+			return entries.map(function (entry, i) {
+				return '<span class="dexchip" draggable="true" data-index="' + i + '"><small>' + entry[0] + ':</small> ' + BattleLog.escapeHTML(entry[1]) +
+					' <button class="dexchipx" name="removeDexAbility" value="' + BattleLog.escapeHTML(entry[1]) + '" tabindex="-1">&times;</button></span>';
+			}).join('') + '<input type="text" class="chartinput dexchipinput" name="abilities"' + (entries.length ? '' : ' placeholder="Abilities"') + ' autocomplete="off" />';
 		},
 		dexEvoChipsHTML: function (evos) {
 			return evos.map(function (evo) {
@@ -441,6 +442,7 @@
 			buf += field('Gender', species.gender);
 			buf += field('Gender ratio', ratio && (ratio.M * 100) + '% male, ' + (ratio.F * 100) + '% female');
 			buf += field('Egg Groups', BattleLog.escapeHTML((species.eggGroups || []).join(', ')));
+			buf += field('Origin', BattleLog.escapeHTML(this.dexView.origins[species.id] || ''));
 			buf += divider;
 			buf += field('Tags', BattleLog.escapeHTML((species.tags || []).join(', ')));
 			buf += divider;

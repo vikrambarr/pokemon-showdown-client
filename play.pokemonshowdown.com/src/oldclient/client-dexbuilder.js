@@ -9,7 +9,7 @@
 	var TAB_ICONS = { Pokedex: 'paw', Moves: 'bolt', Abilities: 'star', Items: 'shopping-bag', Conditions: 'cloud', TypeChart: 'th' };
 	var VIEW_METHODS = [
 		'setupDexSearch', 'createDexList', 'showDexTab', 'renderDexTypes', 'scaleDexList', 'updateDexScroll', 'searchPokemon', 'searchPokemonKey', 'clickDexEntry',
-		'openDexPokemon', 'dexEvoChipsHTML', 'updateDexLearnsetCount', 'scaleDexPokemon', 'closeDexPokemon', 'clickDexMove', 'openDexMove', 'renderDexMove', 'showDexMoveList',
+		'openDexPokemon', 'dexAbilityChipsHTML', 'dexEvoChipsHTML', 'updateDexLearnsetCount', 'scaleDexPokemon', 'closeDexPokemon', 'clickDexMove', 'openDexMove', 'renderDexMove', 'showDexMoveList',
 		'showDexMoveDetails', 'closeDexMove', 'dexStatsHTML', 'showDexStats', 'showDexLearnset', 'selectDexFormat', 'scaleDexFormat',
 		'openDexFormat', 'renderDexFormat', 'showDexFormatList', 'renderDexFormatTree', 'renderDexFormatBans', 'searchDexFormat'
 	];
@@ -260,7 +260,7 @@
 				if (['weightkg', 'heightm', 'evoLevel'].includes(key)) {
 					edit[key] = value ? Number(value) : null;
 				} else if (['eggGroups', 'tags'].includes(key)) {
-					edit[key] = value ? listValue(value) : null;
+					edit[key] = value ? listValue(value) : key === 'eggGroups' ? [] : null;
 				} else {
 					edit[key] = value || null;
 				}
@@ -370,8 +370,7 @@
 		},
 		saveChanges: function () {
 			this.close();
-			this.room.saveDexDraft();
-			this.callback();
+			if (this.room.saveDexDraft()) this.callback();
 		},
 		discardChanges: function () {
 			this.close();
@@ -447,8 +446,10 @@
 			'input .dexmonpage input[type=number][name^=stat-]': 'typeDexStat',
 			'change .dexmonpage input[name^=stat]': 'saveDexStats',
 			'change .dexmonpage select[name=dextype]': 'changeDexType',
-			'click .dexmonpage .dexchipbox': 'focusDexEvos',
-			'click .dexmonpage .dextypecaret': 'openDexTypePicker',
+			'click .dexmonpage .dexchipbox': 'focusDexChips',
+			'dragstart .dexmonpage .dexabilitybox .dexchip': 'dragDexAbility',
+			'dragover .dexmonpage .dexabilitybox': 'dragOverDexAbility',
+			'drop .dexmonpage .dexabilitybox': 'dropDexAbility',
 			'change input[name=formatname]': 'renameDexFormat'
 		},
 		initialize: function () {
@@ -938,7 +939,7 @@
 			this.dexEditField = name;
 			this.$('.dexmonpage .dexstatresults').hide();
 			this.$('.dexmonpage .teambuilder-results').show();
-			var type = name.startsWith('ability') ? 'ability' : 'pokemon';
+			var type = name === 'abilities' ? 'ability' : 'pokemon';
 			var dexView = this.dexView;
 			DexViews.ui.viewSearch(this.dexPokemonSearch, dexView);
 			this.dexPokemonSearch.setType(type, 'gen' + dexView.gen + 'ag', undefined, this.dexRelativeIds(name));
@@ -948,13 +949,70 @@
 		},
 		dexRelativeIds: function (field) {
 			var species = this.dexView.dex.species.get(this.dexSpecies.id);
-			var names = field === 'evos' ? species.evos || [] : field === 'prevo' && species.prevo ? [species.prevo] : [];
+			var names = field === 'evos' ? species.evos || [] : field === 'prevo' && species.prevo ? [species.prevo] :
+				field === 'abilities' ? DexViews.ui.abilitySlotsOf(species).map(function (entry) { return entry[1]; }) : [];
 			var ids = {};
 			for (var i = 0; i < names.length; i++) ids[toID(names[i])] = 1;
 			return ids;
 		},
-		focusDexEvos: function (e) {
-			if (!$(e.target).closest('button').length) this.$('.dexmonpage input[name=evos]').focus();
+		focusDexChips: function (e) {
+			if (!$(e.target).closest('button').length) $(e.currentTarget).find('input').focus();
+		},
+		dexAbilitySlots: function () {
+			return DexViews.ui.abilitySlotsOf(this.dexView.dex.species.get(this.dexSpecies.id));
+		},
+		removeDexAbility: function (name) {
+			this.toggleDexAbility(name);
+		},
+		toggleDexAbility: function (name) {
+			var entries = this.dexAbilitySlots();
+			var index = entries.findIndex(function (entry) { return toID(entry[1]) === toID(name); });
+			if (index >= 0) {
+				entries.splice(index, 1);
+				if (entries.length && entries[0][0] !== '0') entries[0] = ['0', entries[0][1]];
+			} else {
+				var used = entries.map(function (entry) { return entry[0]; });
+				var slot = ['0', '1', 'H', 'S'].filter(function (free) { return !used.includes(free); })[0];
+				if (!slot) return app.addPopup(Popup, { message: "A Pok\u00e9mon can have at most four abilities." });
+				entries.push([slot, name]);
+			}
+			this.setDexAbilities(entries);
+		},
+		setDexAbilities: function (entries) {
+			var abilities = {};
+			for (var i = 0; i < entries.length; i++) abilities[entries[i][0]] = entries[i][1];
+			this.saveDexPokemon({ abilities: abilities });
+			this.$('.dexmonpage .dexabilitybox').html(this.dexAbilityChipsHTML(this.dexAbilitySlots()));
+			if (this.dexEditField !== 'abilities') return;
+			this.listDexRelatives('abilities');
+			this.$('.dexmonpage input[name=abilities]').focus();
+		},
+		dragDexAbility: function (e) {
+			var transfer = e.originalEvent.dataTransfer;
+			transfer.effectAllowed = 'move';
+			transfer.setData('text/plain', e.currentTarget.dataset.index);
+		},
+		dragOverDexAbility: function (e) {
+			e.preventDefault();
+			e.originalEvent.dataTransfer.dropEffect = 'move';
+		},
+		dropDexAbility: function (e) {
+			e.preventDefault();
+			var from = Number(e.originalEvent.dataTransfer.getData('text/plain'));
+			var chips = $(e.currentTarget).find('.dexchip');
+			if (isNaN(from) || !chips[from]) return;
+			var to = chips.length - 1;
+			for (var i = 0; i < chips.length; i++) {
+				if (e.originalEvent.clientX < chips[i].getBoundingClientRect().right) {
+					to = i;
+					break;
+				}
+			}
+			if (to === from) return;
+			var entries = this.dexAbilitySlots();
+			var names = entries.map(function (entry) { return entry[1]; });
+			names.splice(to, 0, names.splice(from, 1)[0]);
+			this.setDexAbilities(entries.map(function (entry, j) { return [entry[0], names[j]]; }));
 		},
 		removeDexEvo: function (name) {
 			this.toggleDexEvo(name);
@@ -965,14 +1023,14 @@
 			if (index >= 0) evos.splice(index, 1);
 			else evos.push(name);
 			this.saveDexPokemon({ evos: evos.length ? evos : null });
-			this.$('.dexmonpage .dexchipbox').html(this.dexEvoChipsHTML(evos));
+			this.$('.dexmonpage .dexevobox').html(this.dexEvoChipsHTML(evos));
 			if (this.dexEditField !== 'evos') return;
 			this.listDexRelatives('evos');
 			this.$('.dexmonpage input[name=evos]').focus();
 		},
 		listDexRelatives: function (field) {
 			DexViews.ui.viewSearch(this.dexPokemonSearch, this.dexView);
-			this.dexPokemonSearch.setType('pokemon', 'gen' + this.dexView.gen + 'ag', undefined, this.dexRelativeIds(field));
+			this.dexPokemonSearch.setType(field === 'abilities' ? 'ability' : 'pokemon', 'gen' + this.dexView.gen + 'ag', undefined, this.dexRelativeIds(field));
 		},
 		clickDexMonEntry: function (e) {
 			e.preventDefault();
@@ -985,8 +1043,9 @@
 				return;
 			}
 			var $input = field && this.$('.dexmonpage input[name="' + field + '"]');
-			if (entry[0] === 'ability' && field && field.startsWith('ability')) {
-				$input.val(dexView.dex.abilities.get(entry[1]).name);
+			if (entry[0] === 'ability' && field === 'abilities') {
+				this.toggleDexAbility(dexView.dex.abilities.get(entry[1]).name);
+				return;
 			} else if (entry[0] === 'pokemon' && field === 'evos') {
 				this.toggleDexEvo(dexView.dex.species.get(entry[1]).name);
 				return;
@@ -1001,25 +1060,10 @@
 		},
 		saveDexField: function (e) {
 			var name = e.currentTarget.name;
-			if (name === 'evos') return;
+			if (name === 'evos' || name === 'abilities') return;
 			var dex = this.dexView.dex;
 			var $input = $(e.currentTarget).removeClass('incomplete');
 			var value = $.trim($input.val());
-			if (name.startsWith('ability')) {
-				var abilities = {};
-				var bad = false;
-				this.$('.dexmonpage input[name^=ability]').each(function () {
-					var ability = $.trim(this.value);
-					if (!ability) return;
-					if (!dex.abilities.get(ability).exists) {
-						$(this).addClass('incomplete');
-						bad = true;
-					}
-					abilities[this.name.slice(7)] = ability;
-				});
-				if (!bad) this.saveDexPokemon({ abilities: abilities });
-				return;
-			}
 			if (value && !dex.species.get(value).exists) {
 				$input.addClass('incomplete');
 				return;
@@ -1074,9 +1118,6 @@
 			var types = this.dexSpecies.types.slice();
 			types[Number(e.currentTarget.dataset.index)] = e.currentTarget.value;
 			this.saveDexPokemon({ types: types.filter(Boolean) }, true);
-		},
-		openDexTypePicker: function (e) {
-			$(e.currentTarget).siblings('select')[0].showPicker();
 		},
 		showDexDetails: function (value, button) {
 			app.addPopup(DexDetailsPopup, { room: this, sourceEl: button, maxWidth: 320 });
@@ -1309,8 +1350,19 @@
 		},
 		saveDexDraft: function () {
 			var draft = this.dexDraft;
-			if (!draft || this.dexSaving) return;
+			if (!draft || this.dexSaving) return false;
 			var room = this;
+			var problems = [];
+			$.each(draft.pokemon, function (id, fields) {
+				if (fields.abilities && $.isEmptyObject(fields.abilities)) problems.push(fields.name + ": A Pok\u00e9mon needs at least one ability.");
+			});
+			if (problems.length) {
+				app.addPopup(Popup, {
+					message: (problems.length === 1 ? "Your changes weren't saved for the following reason:" : "Your changes weren't saved for the following reasons:") +
+						"\n\n- " + problems.join('\n- ')
+				});
+				return false;
+			}
 			this.dexSaving = draft;
 			this.dexDraft = null;
 			$.each(draft.pokemon, function (id, fields) {
@@ -1323,6 +1375,7 @@
 				room.editDex({ format: fields }, fields.name, ['formats', id, fields]);
 			});
 			this.updateDexDraftBar();
+			return true;
 		},
 		resetDexDraft: function () {
 			this.dexDraft = null;
