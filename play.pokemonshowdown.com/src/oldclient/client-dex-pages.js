@@ -4,11 +4,11 @@
 	var request = DexViews.ui.request;
 	var DexConfirmPopup = DexViews.ui.DexConfirmPopup;
 	var HIDE_BUTTON = DexViews.ui.HIDE_BUTTON;
+	var viewSearch = DexViews.ui.viewSearch;
 
 	function editableDexes() {
-		var userid = app.user.get('userid');
 		return DexViews.list.filter(function (summary) {
-			return !summary.official && [summary.owner].concat(summary.editors || []).some(function (name) { return toID(name) === userid; });
+			return !summary.official && DexViews.ui.canEdit(summary);
 		});
 	}
 
@@ -178,14 +178,7 @@
 
 			var $results = this.$('.teambuilder-results');
 			var search = new BattleSearch($results, $results);
-			search.engine.getTypedSearch = function (searchType, format, speciesOrSet) {
-				var typedSearch = DexSearch.prototype.getTypedSearch.call(this, searchType, format, speciesOrSet);
-				if (typedSearch) {
-					typedSearch.dex = view.dex;
-					typedSearch.dexView = view;
-				}
-				return typedSearch;
-			};
+			viewSearch(search, view);
 			$results.on('scroll', function () {
 				search.updateScroll();
 			});
@@ -289,21 +282,14 @@
 
 			var $results = this.$('.teambuilder-results').first();
 			var search = this.dexMoveSearch = new BattleSearch($results, $results);
-			search.engine.getTypedSearch = function (searchType, format, speciesOrSet) {
-				var typedSearch = DexSearch.prototype.getTypedSearch.call(this, searchType, format, speciesOrSet);
-				if (!typedSearch) return typedSearch;
-				typedSearch.dex = view.dex;
-				typedSearch.dexView = view;
+			viewSearch(search, view, function (typedSearch) {
 				var getBaseResults = typedSearch.getBaseResults;
 				typedSearch.getBaseResults = function () {
-					return getBaseResults.call(this).filter(function (row) {
+					return DexViews.ui.dropEmptyHeaders(getBaseResults.call(this).filter(function (row) {
 						return row[0] !== 'pokemon' || this.canLearn(row[1], move.id);
-					}, this).filter(function (row, index, rows) {
-						return row[0] !== 'header' || (rows[index + 1] && rows[index + 1][0] === 'pokemon');
-					});
+					}, this), 'pokemon');
 				};
-				return typedSearch;
-			};
+			});
 			$results.on('scroll', function () {
 				search.updateScroll();
 			});

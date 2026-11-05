@@ -1,6 +1,8 @@
 (function ($) {
 
 	var request = window.DexViews.ui.request;
+	var viewSearch = window.DexViews.ui.viewSearch;
+	var dropEmptyHeaders = window.DexViews.ui.dropEmptyHeaders;
 
 	var DexFormatPopup = FormatPopup.extend({
 		initialize: function (data) {
@@ -158,11 +160,7 @@
 					return room.dexScroller()[0].clientHeight / room.dexFormatZoom;
 				}
 			};
-			search.engine.getTypedSearch = function (searchType, format, speciesOrSet) {
-				var typedSearch = DexSearch.prototype.getTypedSearch.call(this, searchType, format, speciesOrSet);
-				if (!typedSearch) return typedSearch;
-				typedSearch.dex = view.dex;
-				typedSearch.dexView = view;
+			viewSearch(search, view, function (typedSearch, searchType) {
 				typedSearch.dexid = room.dexid;
 				typedSearch.isNatDex = details.rules.includes('natdexmod');
 				typedSearch.isDoubles = details.gameType !== 'singles';
@@ -170,16 +168,14 @@
 				typedSearch.getBaseResults = function () {
 					var seen = {};
 					var bannedRows = [];
-					var results = getBaseResults.call(this).filter(function (row) {
+					var results = dropEmptyHeaders(getBaseResults.call(this).filter(function (row) {
 						if (row[0] !== searchType) return true;
 						if (seen[row[1]] || !legal[row[1]] && !banned[row[1]]) return false;
 						seen[row[1]] = 1;
 						if (!onTop[row[1]]) return true;
 						bannedRows.push(row);
 						return false;
-					}).filter(function (row, index, rows) {
-						return row[0] !== 'header' || (rows[index + 1] && rows[index + 1][0] === searchType);
-					});
+					}), searchType);
 					for (var id in legal) {
 						if (!seen[id]) results.push([searchType, id]);
 					}
@@ -191,8 +187,7 @@
 					bannedRows.unshift(['header', "Banned " + picker[2]]);
 					return bannedRows.concat(results);
 				};
-				return typedSearch;
-			};
+			});
 			$page.find('.dexformatsearch').show().find('input').val('').attr('placeholder', 'Search legal ' + picker[2]);
 			search.setType(kind, 'gen' + view.gen + 'ag');
 		},

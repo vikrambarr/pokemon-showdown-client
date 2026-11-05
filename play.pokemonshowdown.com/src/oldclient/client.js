@@ -374,7 +374,6 @@ function toId() {
 				act: 'logout',
 				userid: this.get('userid')
 			});
-			Storage.prefs('challengeonly', null);
 			app.send('/logout');
 			app.trigger('init:socketclosed', "You have been logged out and disconnected.<br /><br />If you wanted to change your name while staying connected, use the 'Change Name' button or the '/nick' command.", false);
 			app.socket.close();

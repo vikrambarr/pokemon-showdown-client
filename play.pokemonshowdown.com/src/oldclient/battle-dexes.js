@@ -77,7 +77,6 @@
 			itemSprites: {},
 			types: {},
 			current: null,
-			within: within,
 			query: null,
 			genOf: genOf,
 			load: loadDex,

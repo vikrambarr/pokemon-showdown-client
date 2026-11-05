@@ -80,9 +80,7 @@
 		update: function () {
 			if (!this.$('.folderpane').length) this.$el.html('<div class="folderpane"></div><div class="teampane"></div>');
 			var userid = app.user.get('userid');
-			var dexes = DexViews.list.filter(function (summary) {
-				return [summary.owner].concat(summary.editors || []).some(function (name) { return toID(name) === userid; });
-			});
+			var dexes = DexViews.list.filter(DexViews.ui.canEdit);
 			var official = dexes.filter(function (summary) { return summary.official; });
 			var slots = dexes.filter(function (summary) { return !summary.official && toID(summary.owner) === userid; });
 			var shared = dexes.filter(function (summary) { return !summary.official && toID(summary.owner) !== userid; });

@@ -201,6 +201,96 @@
 		}
 	});
 
+	var EXTRAS = ['fusion', 'altsprite', 'ability2'];
+	var importing = null;
+	var packTeam = Storage.packTeam;
+	Storage.packTeam = function (team) {
+		if (importing && team) {
+			for (var k = 0; k < team.length && importing.length; k++) _.extend(team[k], importing.shift());
+		}
+		var sets = packTeam.call(this, team).split(']');
+		for (var i = 0; i < sets.length && team[i]; i++) {
+			var set = team[i];
+			if (!set.fusion && !set.altsprite && !set.ability2) continue;
+			var fields = sets[i].split('|');
+			var misc = fields[11].split(',');
+			while (misc.length < 6) misc.push('');
+			fields[11] = misc.concat(EXTRAS.map(function (key) { return set[key] || ''; })).join(',');
+			sets[i] = fields.join('|');
+		}
+		return sets.join(']');
+	};
+	_.each(['unpackTeam', 'fastUnpackTeam'], function (name) {
+		var unpack = Storage[name];
+		Storage[name] = function (buf) {
+			var team = unpack.call(this, buf);
+			if (!buf) return team;
+			var sets = buf.split(']');
+			for (var i = 0; i < team.length; i++) {
+				var misc = (sets[i].split('|')[11] || '').split(',');
+				for (var j = 0; j < EXTRAS.length; j++) {
+					if (misc[6 + j]) team[i][EXTRAS[j]] = misc[6 + j];
+				}
+			}
+			return team;
+		};
+	});
+	var importTeam = Storage.importTeam;
+	Storage.importTeam = function (buffer, teams) {
+		var extras = [];
+		var cur = null;
+		var lines = buffer.split('\n').filter(function (line) {
+			line = $.trim(line);
+			if (!line || line === '---' || line.includes('|') || (line.startsWith('===') && teams)) {
+				cur = null;
+			} else if (!cur) {
+				extras.push(cur = {});
+			} else if (line.startsWith('Fusion: ') || line.startsWith('Alt: ')) {
+				cur[line.startsWith('Fusion: ') ? 'fusion' : 'altsprite'] = line.slice(line.indexOf(' ') + 1);
+				return false;
+			} else if (/^(Ability|Trait): .* \/ /.test(line)) {
+				cur.ability2 = line.slice(line.indexOf(' / ') + 3);
+			}
+			return true;
+		}).map(function (line) {
+			return /^\s*(Ability|Trait): .* \/ /.test(line) ? line.slice(0, line.indexOf(' / ')) : line;
+		});
+		importing = extras;
+		try {
+			var team = importTeam.call(this, lines.join('\n'), teams);
+		} finally {
+			importing = null;
+		}
+		if (team) {
+			for (var i = 0; i < team.length && extras.length; i++) _.extend(team[i], extras.shift());
+		}
+		return team;
+	};
+	var exportTeam = Storage.exportTeam;
+	Storage.exportTeam = function (team, hidestats, shownature) {
+		var text = exportTeam.call(this, team, hidestats, shownature);
+		if (typeof team === 'string') {
+			if (team.indexOf('\n') >= 0) return text;
+			team = Storage.unpackTeam(team);
+		}
+		var sets = text.split('\n\n');
+		if (!team) return text;
+		for (var i = 0; i < team.length; i++) {
+			var set = team[i];
+			var lines = sets[i].split('\n');
+			for (var j = 0; j < lines.length; j++) {
+				if (set.ability2 && lines[j].startsWith('Ability: ')) lines[j] = $.trim(lines[j]) + ' / ' + set.ability2 + '  ';
+				if (/^(EVs: |IVs: |[A-Za-z]+ Nature|- )/.test(lines[j]) || j === lines.length - 1) {
+					if (set.altsprite) lines.splice(j, 0, 'Alt: ' + set.altsprite + '  ');
+					if (set.fusion) lines.splice(j, 0, 'Fusion: ' + set.fusion + '  ');
+					break;
+				}
+			}
+			sets[i] = lines.join('\n');
+		}
+		return sets.join('\n\n');
+	};
+
 	$('<style>').text(
 		':where([style*="--picon-head"]) { position: relative; }\n' +
 		'[style*="--picon-head"] { background: none !important; }\n' +

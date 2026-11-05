@@ -436,6 +436,28 @@
 		});
 	});
 
+	function canEdit(summary) {
+		return [summary.owner].concat(summary.editors || []).some(function (name) { return toID(name) === app.user.get('userid'); });
+	}
+
+	function viewSearch(search, view, extend) {
+		search.engine.getTypedSearch = function (searchType, format, speciesOrSet) {
+			var typedSearch = DexSearch.prototype.getTypedSearch.call(this, searchType, format, speciesOrSet);
+			if (!typedSearch) return typedSearch;
+			typedSearch.dex = view.dex;
+			typedSearch.dexView = view;
+			if (extend) extend(typedSearch, searchType);
+			return typedSearch;
+		};
+	}
+
+	function dropEmptyHeaders(rows, type) {
+		return rows.filter(function (row, index) {
+			var next = rows[index + 1];
+			return row[0] !== 'header' || (next && (type ? next[0] === type : next[0] !== 'header'));
+		});
+	}
+
 	function dexButton(summary) {
 		var details = '[Gen ' + DexViews.genOf(summary.mod) + '] ' + summary.species + ' Pok&eacute;mon';
 		if (summary.formats.length) details += ', ' + summary.formats.length + (summary.formats.length === 1 ? ' format' : ' formats');
@@ -589,7 +611,7 @@
 				return '<strong>' + count.name + ':</strong> ' + count.total + ' total, ' + count.custom + ' custom, ' + count.edited + ' edited';
 			}).join(' &middot; ') + '</small>';
 			buf += '</p><p><button class="button" name="worldDex"><i class="fa fa-globe"></i> Use as world</button>' +
-				([summary.owner].concat(summary.editors || []).some(function (name) { return toID(name) === app.user.get('userid'); }) ?
+				(canEdit(summary) ?
 					' <button class="button" name="editDex"><i class="fa fa-pencil"></i> Edit</button>' : '') + '</p>';
 			if (sameView && this.dexSearch) {
 				this.$('.dexheader').html(buf);
@@ -613,32 +635,25 @@
 
 			var dexid = this.dexid;
 			var search = this.dexSearch = new BattleSearch(this.$('.dexpokemon'), this.dexScroller());
-			search.engine.getTypedSearch = function (searchType, format, speciesOrSet) {
-				var typedSearch = DexSearch.prototype.getTypedSearch.call(this, searchType, 'gen' + view.gen, speciesOrSet);
-				if (!typedSearch) return typedSearch;
-				typedSearch.dex = view.dex;
-				typedSearch.dexView = view;
+			viewSearch(search, view, function (typedSearch, searchType) {
 				typedSearch.dexid = dexid;
-				if (searchType === 'pokemon') return typedSearch;
+				if (searchType === 'pokemon') return;
 				typedSearch.getBaseResults = function () {
 					var table = { move: 'Moves', ability: 'Abilities', item: 'Items' }[searchType];
 					var shown = DexViews.entries[dexid];
 					var seen = {};
-					var results = this.getDefaultResults().filter(function (row) {
+					var results = dropEmptyHeaders(this.getDefaultResults().filter(function (row) {
 						if (row[0] !== searchType) return true;
 						seen[row[1]] = 1;
 						return !!shown && !!shown[table][row[1]];
-					}).filter(function (row, index, rows) {
-						return row[0] !== 'header' || (rows[index + 1] && rows[index + 1][0] !== 'header');
-					});
+					}));
 					var others = Object.keys(shown ? shown[table] : {}).filter(function (id) { return !seen[id]; }).sort();
 					if (!others.length) return results;
 					return results.concat([['header', "Other " + table.toLowerCase()]], others.map(function (id) {
 						return [searchType, id];
 					}));
 				};
-				return typedSearch;
-			};
+			});
 			var room = this;
 			search.$viewport = {
 				scrollTop: function () {
@@ -804,7 +819,8 @@
 
 	DexViews.ui = {
 		request: request, compareFormats: compareFormats, openDexPage: openDexPage, DexConfirmPopup: DexConfirmPopup,
-		HIDE_BUTTON: HIDE_BUTTON, OFFICIAL_BADGE: OFFICIAL_BADGE
+		HIDE_BUTTON: HIDE_BUTTON, OFFICIAL_BADGE: OFFICIAL_BADGE, canEdit: canEdit, viewSearch: viewSearch,
+		dropEmptyHeaders: dropEmptyHeaders
 	};
 
 })(window.jQuery);
