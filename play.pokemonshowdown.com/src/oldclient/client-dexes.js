@@ -52,8 +52,10 @@
 		}
 	}
 
+	var missingEntries = {};
+
 	function loadEntries(dexid) {
-		if (DexViews.entries[dexid] || !dexid) return;
+		if (DexViews.entries[dexid] || !dexid || missingEntries[dexid]) return;
 		request('dexentries', dexid).then(function (data) {
 			var entries = { custom: data.custom, modified: data.modified };
 			$.each(['Moves', 'Abilities', 'Items'], function (i, table) {
@@ -61,13 +63,19 @@
 				for (var j = 0; j < data[table].length; j++) ids[data[table][j]] = 1;
 			});
 			DexViews.entries[dexid] = entries;
+			var summary = DexViews.list.filter(function (other) { return other.id === dexid; })[0];
+			var view = summary && DexViews.views[summary.hash];
+			if (view && view.dexid) DexViews.entries[view.dexid] = entries;
 			$.each([app.rooms.rooms, app.rooms.dexbuilder], function (j, room) {
-				if (!room || room.dexid !== dexid) return;
+				if (!room || room.dexid !== dexid && !(room.dexView && room.dexView.dexid === dexid)) return;
 				var typedSearch = room.dexSearch && room.dexSearch.engine.typedSearch;
 				if (typedSearch && typedSearch.searchType !== 'pokemon') room.dexSearch.setType(typedSearch.searchType, 'gen' + room.dexView.gen);
 				if (room.dexFormatSearch && room.dexFormatKind) room.showDexFormatList(room.dexFormatKind);
+				if (room.dexSpecies) room.updateDexLearnsetCount(true);
 			});
-		}, function () {});
+		}, function () {
+			missingEntries[dexid] = true;
+		});
 	}
 
 	DexViews.loadEntries = loadEntries;
@@ -297,8 +305,9 @@
 		});
 		app.on('response:dexcreate response:dexedit', function (data) {
 			if (!data) return;
+			if (app.rooms.dexbuilder && app.rooms.dexbuilder.answerDexEdit(data)) return;
 			if (data.error) {
-				app.addPopup(Popup, { message: data.error });
+				app.addPopup(Popup, { message: "Your change wasn't saved for the following reason:\n\n- " + data.error });
 			} else if (data.stale) {
 				app.addPopup(Popup, {
 					htmlMessage: "These don't work in the new world and are skipped until you fix them or clear the dex:<br />" +

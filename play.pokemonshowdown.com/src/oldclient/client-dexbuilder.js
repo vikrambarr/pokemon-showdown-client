@@ -9,7 +9,7 @@
 	var TAB_ICONS = { Pokedex: 'paw', Moves: 'bolt', Abilities: 'star', Items: 'shopping-bag', Conditions: 'cloud', TypeChart: 'th' };
 	var VIEW_METHODS = [
 		'setupDexSearch', 'createDexList', 'showDexTab', 'renderDexTypes', 'scaleDexList', 'updateDexScroll', 'searchPokemon', 'searchPokemonKey', 'clickDexEntry',
-		'openDexPokemon', 'scaleDexPokemon', 'closeDexPokemon', 'clickDexMove', 'openDexMove', 'renderDexMove', 'showDexMoveList',
+		'openDexPokemon', 'dexEvoChipsHTML', 'updateDexLearnsetCount', 'scaleDexPokemon', 'closeDexPokemon', 'clickDexMove', 'openDexMove', 'renderDexMove', 'showDexMoveList',
 		'showDexMoveDetails', 'closeDexMove', 'dexStatsHTML', 'showDexStats', 'showDexLearnset', 'selectDexFormat', 'scaleDexFormat',
 		'openDexFormat', 'renderDexFormat', 'showDexFormatList', 'renderDexFormatTree', 'renderDexFormatBans', 'searchDexFormat'
 	];
@@ -205,30 +205,14 @@
 		}
 	});
 
+	function mergeFields(target, fields) {
+		for (var key in fields) target[key] = key === 'learnset' ? $.extend({}, target.learnset, fields.learnset) : fields[key];
+		return target;
+	}
+
 	function listValue(text) {
 		return text.split(',').map(function (part) { return $.trim(part); }).filter(Boolean);
 	}
-
-	var DexTypesPopup = Popup.extend({
-		initialize: function (data) {
-			this.room = data.room;
-			var dex = this.room.dexView.dex;
-			var types = this.room.dexSpecies.types;
-			var names = dex.types.names().filter(function (name) { return dex.types.get(name).exists !== false; });
-			var select = function (name, value, blank) {
-				return '<select name="' + name + '" class="button">' + (blank ? '<option value="">(none)</option>' : '') + names.map(function (type) {
-					return '<option value="' + BattleLog.escapeHTML(type) + '"' + (type === value ? ' selected' : '') + '>' + BattleLog.escapeHTML(type) + '</option>';
-				}).join('') + '</select>';
-			};
-			this.$el.html('<form><p><label class="label">Type 1:<br />' + select('type1', types[0]) + '</label></p>' +
-				'<p><label class="label">Type 2:<br />' + select('type2', types[1], true) + '</label></p>' +
-				'<p class="buttonbar"><button type="submit" class="button"><strong>Save</strong></button> <button type="button" name="close" class="button">Cancel</button></p></form>');
-		},
-		submit: function (data) {
-			this.close();
-			this.room.saveDexPokemon({ types: [data.type1].concat(data.type2 && data.type2 !== data.type1 ? [data.type2] : []) });
-		}
-	});
 
 	var DexDetailsPopup = Popup.extend({
 		initialize: function (data) {
@@ -291,7 +275,7 @@
 				}
 			}
 			this.close();
-			if (Object.keys(edit).length) this.room.saveDexPokemon(edit);
+			if (Object.keys(edit).length) this.room.saveDexPokemon(edit, true);
 		}
 	});
 
@@ -357,7 +341,7 @@
 			var base = '';
 			if (room.tierDetails && this.names.length === 1) {
 				var overrides = typedSearch.tierOverrides;
-				typedSearch.tierOverrides = null;
+				typedSearch.tierOverrides = room.tierBaseOverrides;
 				base = typedSearch.getTier(dex.species.get(this.names[0]));
 				typedSearch.tierOverrides = overrides;
 			}
@@ -372,6 +356,28 @@
 		pickTier: function (tier) {
 			this.close();
 			this.room.saveDexTiers(this.names, tier || null);
+		}
+	});
+
+	var DexUnsavedPopup = Popup.extend({
+		type: 'semimodal',
+		initialize: function (data) {
+			this.room = data.room;
+			this.callback = data.callback;
+			this.$el.html('<p>' + BattleLog.escapeHTML(data.name) + ' has unsaved changes.</p>' +
+				'<p class="buttonbar"><button type="button" class="button" name="saveChanges"><strong>Save</strong></button> ' +
+				'<button type="button" class="button" name="discardChanges">Discard</button> <button type="button" name="close" class="button">Cancel</button></p>');
+		},
+		saveChanges: function () {
+			this.close();
+			this.room.saveDexDraft();
+			this.callback();
+		},
+		discardChanges: function () {
+			this.close();
+			this.room.dexDraft = null;
+			this.room.applyDexDraft();
+			this.callback();
 		}
 	});
 
@@ -440,6 +446,9 @@
 			'input .dexmonpage input[name^=statslider]': 'slideDexStat',
 			'input .dexmonpage input[type=number][name^=stat-]': 'typeDexStat',
 			'change .dexmonpage input[name^=stat]': 'saveDexStats',
+			'change .dexmonpage select[name=dextype]': 'changeDexType',
+			'click .dexmonpage .dexchipbox': 'focusDexEvos',
+			'click .dexmonpage .dextypecaret': 'openDexTypePicker',
 			'change input[name=formatname]': 'renameDexFormat'
 		},
 		initialize: function () {
@@ -452,7 +461,7 @@
 		},
 		update: function () {
 			if (!this.$('.folderpane').length) {
-				this.$el.html('<div class="folderpane"></div><div class="teampane"></div>');
+				this.$el.html('<div class="folderpane"></div><div class="teampane"></div><div class="dexdraftbar"></div>');
 				this.$('.teampane').on('scroll', this.updateDexScroll.bind(this));
 			}
 			var userid = app.user.get('userid');
@@ -469,7 +478,7 @@
 			var key = JSON.stringify([userid, summary, this.free]);
 			this.dexOptions = this.dexOptionsHTML(slots, shared, official);
 			this.$('select[name=dexpicker]').html(this.dexOptions);
-			if (key === this.teamListKey) return;
+			if (key === this.teamListKey) return this.settleDexSave();
 			this.teamListKey = key;
 			this.updateTeamList(summary);
 		},
@@ -507,6 +516,7 @@
 		updateTeamList: function (summary) {
 			var sameDex = summary && this.curSummary && this.curSummary.id === summary.id && this.$('.dexheading').length;
 			this.curSummary = summary;
+			if (!sameDex) this.resetDexDraft();
 			if (!summary) {
 				this.$el.removeClass('dexsubpage');
 				if (this.settingsPopup) this.settingsPopup.dismiss();
@@ -522,6 +532,7 @@
 			if (sameDex) {
 				this.$('.dexheading').html(this.dexHeadingHTML());
 				if (this.dexKey(summary) !== this.dexKey(this.dexSummary)) this.loadDex(summary);
+				else this.settleDexSave();
 				return;
 			}
 			this.saveState = '';
@@ -553,10 +564,13 @@
 			DexViews.loadEntries(summary.id);
 			this.dexSummary = summary;
 			this.$('.dexbuildertabs').html(this.dexTabsHTML(summary));
+			this.dexLoading = true;
 			DexViews.load(summary).then(function (loadedView) {
 				if (self.dexid !== summary.id || self.dexSummary !== summary) return;
+				self.dexLoading = false;
 				self.renderBuilderDex(summary, loadedView);
 			}, function (err) {
+				self.dexLoading = false;
 				if (self.dexid === summary.id) self.$('.dextabempty').show().html('<p>' + BattleLog.escapeHTML(err.message) + '</p>');
 			});
 		},
@@ -572,8 +586,11 @@
 			return buf + '<button class="button dexbuildertab" name="showDexTab" value="formats"><i class="fa fa-trophy"></i>Formats</button>';
 		},
 		renderBuilderDex: function (summary, loadedView) {
-			var sameView = this.dexView === loadedView && this.dexSearch;
-			this.dexView = DexViews.current = loadedView;
+			var sameView = this.dexBaseView === loadedView && this.dexSearch;
+			this.settleDexSave();
+			this.dexBaseView = loadedView;
+			this.applyDexDraft();
+			var dexView = this.dexView;
 			var formats = summary.formats.map(function (format) { return format.id; });
 			var oldFormat = this.dexFormat;
 			if (!formats.includes(this.dexFormat)) this.dexFormat = formats[0] || '';
@@ -585,16 +602,15 @@
 			var statsOpen = this.$('.dexmonpage .dexstatresults').is(':visible');
 			this.dexFormatId = '';
 			this.dexFormatSearch = null;
-			this.setupDexSearch(loadedView);
+			this.setupDexSearch(dexView);
 			var pending = this.pendingSpecies;
 			this.pendingSpecies = null;
 			var species = this.dexSpecies;
-			if (pending && loadedView.species[toID(pending)]) {
+			if (pending && dexView.species[toID(pending)]) {
 				this.openDexPokemon(pending);
 			} else if (species) {
-				if (loadedView.species[species.id]) {
-					this.openDexPokemon(species.name);
-					if (statsOpen) this.showDexLearnset(true);
+				if (dexView.species[species.id]) {
+					this.reopenDexPokemon(species.name, statsOpen);
 				} else {
 					this.closeDexPokemon();
 				}
@@ -610,7 +626,7 @@
 			if (!this.dexSummary.formats.some(function (format) { return format.id === formatid; })) formatid = this.tierFormat = '';
 			this.tierSelected = this.tierSelected || {};
 			if (!formatid) return this.renderDexTierPage(null);
-			DexViews.ui.request('dexformat', formatid).then(function (details) {
+			DexViews.ui.request('dexformat', this.dexFormatTarget(formatid)).then(function (details) {
 				if (self.tierFormat === formatid && self.dexTab === 'tiers') self.renderDexTierPage(details);
 			}, function (err) {
 				if (self.tierFormat === formatid) self.$('.dextierpage').html('<p>' + BattleLog.escapeHTML(err.message) + '</p>');
@@ -627,14 +643,32 @@
 				style = probe.isVGC ? 'vgc' : probe.isDoubles ? 'doubles' : probe.isNatDex ? 'natdex' : 'singles';
 			}
 			var info = TIER_STYLES.filter(function (entry) { return entry[0] === style; })[0];
-			var overrides = details ? details.tiers : {};
+			var formatid = details ? details.id : '';
+			var base = {};
+			var own = $.extend(true, {}, details ? details.tiers : {});
+			$.each(this.dexTierOps(), function (i, op) {
+				if (op.reset) {
+					if (op.format === formatid) own = {};
+					return;
+				}
+				var target = !op.format ? base : op.format === formatid ? own : null;
+				if (!target) return;
+				$.each(op.species, function (j, name) {
+					var entry = target[toID(name)] || (target[toID(name)] = {});
+					if (op.tier) entry[op.field] = op.tier;
+					else delete entry[op.field];
+				});
+			});
+			var overrides = $.extend(true, {}, base, own);
+			var overridden = Object.keys(own).some(function (id) { return !$.isEmptyObject(own[id]); });
+			this.tierBaseOverrides = base;
 			this.tierDetails = details;
 			this.tierActiveStyle = style;
 			var buf = '<p><label class="label">Format:</label><button class="select formatselect" name="selectTierFormat" value="' + BattleLog.escapeHTML(this.tierFormat || '') + '">' +
 				(this.tierFormat ? BattleLog.escapeFormat(this.tierFormat) : '(All formats)') + '</button></p>';
 			if (details) {
 				buf += '<p><small>' + BattleLog.escapeFormat(details.id) + ' uses <strong>' + info[1] + '</strong> tiers. Changes here only affect this format.</small>' +
-					(info[2] && Object.keys(overrides).length ? ' <button class="button" name="resetDexTiers">Reset to All formats</button>' : '') + '</p>';
+					(info[2] && overridden ? ' <button class="button" name="resetDexTiers">Reset to All formats</button>' : '') + '</p>';
 			} else {
 				buf += '<p><label class="label">Tiers: <select name="tierstyle" class="button">' + TIER_STYLES.map(function (entry) {
 					return '<option value="' + entry[0] + '"' + (entry[0] === style ? ' selected' : '') + '>' + entry[1] + '</option>';
@@ -654,7 +688,7 @@
 			search.renderRow = function (id, type, matchStart, matchLength, errorMessage, attrs) {
 				if (type === 'pokemon') {
 					var speciesid = toID(id);
-					var classes = (overrides[speciesid] && overrides[speciesid][info[2]] ? ' dextieroverride' : '') + (room.tierSelected[speciesid] ? ' cur' : '');
+					var classes = (own[speciesid] && own[speciesid][info[2]] ? ' dextieroverride' : '') + (room.tierSelected[speciesid] ? ' cur' : '');
 					if (classes) attrs = (attrs || '') + ' class="' + classes.slice(1) + '"';
 				}
 				return BattleSearch.prototype.renderRow.call(this, id, type, matchStart, matchLength, errorMessage, attrs);
@@ -663,7 +697,7 @@
 				typedSearch.isNatDex = style === 'natdex';
 				typedSearch.isDoubles = style === 'doubles' || style === 'vgc';
 				typedSearch.isVGC = style === 'vgc';
-				typedSearch.tierOverrides = details ? overrides : null;
+				typedSearch.tierOverrides = overrides;
 			});
 			search.setType('pokemon', 'gen' + this.dexView.gen);
 			this.updateTierSelection();
@@ -750,7 +784,8 @@
 		saveDexTiers: function (names, tier) {
 			var field = TIER_STYLES.filter(function (entry) { return entry[0] === this.tierActiveStyle; }, this)[0][2];
 			this.tierSelected = {};
-			this.editDex({ tiers: { format: this.tierFormat || undefined, field: field, species: names, tier: tier } });
+			this.draftDex('tiers', '', { format: this.tierFormat || undefined, field: field, species: names, tier: tier });
+			this.renderDexTierPage(this.tierDetails);
 		},
 		resetDexTiers: function (value, button) {
 			var self = this;
@@ -758,7 +793,10 @@
 				message: 'Put every Pok&eacute;mon in ' + BattleLog.escapeFormat(this.tierFormat) + ' back on its All formats tier?',
 				button: "Reset tiers",
 				sourceEl: button,
-				callback: function () { self.editDex({ tiers: { format: self.tierFormat, field: 'tier', reset: true } }); }
+				callback: function () {
+					self.draftDex('tiers', '', { format: self.tierFormat, field: 'tier', reset: true });
+					self.renderDexTierPage(self.tierDetails);
+				}
 			});
 		},
 		refreshDexFormat: function (changed) {
@@ -769,15 +807,17 @@
 			}
 			var self = this;
 			var formatid = this.dexFormat;
-			DexViews.ui.request('dexformat', formatid).then(function (details) {
-				if (self.dexFormat !== formatid || self.dexTab !== 'formats') return;
-				var scroller = self.dexScroller();
-				var top = scroller.scrollTop();
-				var query = self.$('input[name=formatsearch]').val();
-				self.renderDexFormat(details);
-				if (query) self.$('input[name=formatsearch]').val(query).trigger('input');
-				scroller.scrollTop(top);
+			DexViews.ui.request('dexformat', this.dexFormatTarget(formatid)).then(function (details) {
+				if (self.dexFormat === formatid && self.dexTab === 'formats') self.showDexFormatDetails(details);
 			});
+		},
+		showDexFormatDetails: function (details) {
+			var scroller = this.dexScroller();
+			var top = scroller.scrollTop();
+			var query = this.$('input[name=formatsearch]').val();
+			this.renderDexFormat(details);
+			if (query) this.$('input[name=formatsearch]').val(query).trigger('input');
+			scroller.scrollTop(top);
 		},
 		dexScroller: function () {
 			return this.$('.teampane');
@@ -815,13 +855,42 @@
 			this.$('.dexformatpage').html('<div class="pad"><p><em>This dex has no formats yet.</em></p>' +
 				'<p><button class="button" name="newDexFormat"><i class="fa fa-plus"></i> New format</button></p></div>');
 		},
+		setupDexSearch: function (dexView) {
+			this.dexSearchView = dexView;
+			view.setupDexSearch.call(this, dexView);
+		},
 		openDexPokemon: function (name) {
 			view.openDexPokemon.call(this, name);
 			if (this.dexSpecies) this.setDexLearnsetList();
 		},
+		closeDexPokemon: function () {
+			view.closeDexPokemon.call(this);
+			if (!this.dexSearch || this.dexSearchView === this.dexView) return;
+			this.setupDexSearch(this.dexView);
+			this.dexScroller().scrollTop(this.dexScrollTop || 0);
+		},
+		reopenDexPokemon: function (name, statsOpen) {
+			var self = this;
+			if (this.$('.dexmonpage input[type=range]:active').length) {
+				$(document).one('mouseup', function () {
+					setTimeout(function () {
+						if (self.dexSpecies && self.dexSpecies.name === name) self.reopenDexPokemon(name, statsOpen);
+					});
+				});
+				return;
+			}
+			var focused = this.$('.dexmonpage input:focus').attr('name');
+			this.openDexPokemon(name);
+			if (statsOpen) this.showDexLearnset(true);
+			if (focused) this.$('.dexmonpage input[name="' + focused + '"]').focus();
+		},
 		showDexLearnset: function (stats) {
 			view.showDexLearnset.call(this, stats);
 			if (stats !== true) this.setDexLearnsetList();
+		},
+		updateDexLearnsetCount: function (entriesLoaded) {
+			view.updateDexLearnsetCount.call(this);
+			if (entriesLoaded && !this.dexEditField) this.setDexLearnsetList();
 		},
 		setDexLearnsetList: function () {
 			var search = this.dexPokemonSearch;
@@ -837,20 +906,21 @@
 				if (searchType !== 'move') return;
 				var getBaseResults = typedSearch.getBaseResults;
 				typedSearch.getBaseResults = function () {
+					var entries = DexViews.entries[dexView.dexid];
 					var learned = [];
 					var inherited = [];
 					var others = [];
 					var seen = {};
 					var rows = getBaseResults.call(this);
 					for (var i = 0; i < rows.length; i++) {
-						if (rows[i][0] !== 'move' || seen[rows[i][1]]) continue;
+						if (rows[i][0] !== 'move' || seen[rows[i][1]] || entries && !entries.Moves[rows[i][1]]) continue;
 						seen[rows[i][1]] = 1;
 						(own[rows[i][1]] ? learned : inherited).push(rows[i]);
 					}
 					var ids = Object.keys(BattleMovedex).concat(Object.keys(dexView.Moves));
 					for (var j = 0; j < ids.length; j++) {
 						var move = this.dex.moves.get(ids[j]);
-						if (!move.exists || move.isMax || move.isZ || seen[move.id]) continue;
+						if (!move.exists || move.isMax || move.isZ || seen[move.id] || entries && !entries.Moves[move.id]) continue;
 						seen[move.id] = 1;
 						others.push(['move', move.id]);
 					}
@@ -871,13 +941,38 @@
 			var type = name.startsWith('ability') ? 'ability' : 'pokemon';
 			var dexView = this.dexView;
 			DexViews.ui.viewSearch(this.dexPokemonSearch, dexView);
-			this.dexPokemonSearch.setType(type, 'gen' + dexView.gen + 'ag');
-			this.searchDexField(e);
+			this.dexPokemonSearch.setType(type, 'gen' + dexView.gen + 'ag', undefined, this.dexRelativeIds(name));
 		},
 		searchDexField: function (e) {
-			var value = e.currentTarget.value;
-			if (e.currentTarget.name === 'evos') value = value.split(',').pop();
-			this.dexPokemonSearch.find($.trim(value));
+			this.dexPokemonSearch.find($.trim(e.currentTarget.value));
+		},
+		dexRelativeIds: function (field) {
+			var species = this.dexView.dex.species.get(this.dexSpecies.id);
+			var names = field === 'evos' ? species.evos || [] : field === 'prevo' && species.prevo ? [species.prevo] : [];
+			var ids = {};
+			for (var i = 0; i < names.length; i++) ids[toID(names[i])] = 1;
+			return ids;
+		},
+		focusDexEvos: function (e) {
+			if (!$(e.target).closest('button').length) this.$('.dexmonpage input[name=evos]').focus();
+		},
+		removeDexEvo: function (name) {
+			this.toggleDexEvo(name);
+		},
+		toggleDexEvo: function (name) {
+			var evos = (this.dexView.dex.species.get(this.dexSpecies.id).evos || []).slice();
+			var index = evos.findIndex(function (evo) { return toID(evo) === toID(name); });
+			if (index >= 0) evos.splice(index, 1);
+			else evos.push(name);
+			this.saveDexPokemon({ evos: evos.length ? evos : null });
+			this.$('.dexmonpage .dexchipbox').html(this.dexEvoChipsHTML(evos));
+			if (this.dexEditField !== 'evos') return;
+			this.listDexRelatives('evos');
+			this.$('.dexmonpage input[name=evos]').focus();
+		},
+		listDexRelatives: function (field) {
+			DexViews.ui.viewSearch(this.dexPokemonSearch, this.dexView);
+			this.dexPokemonSearch.setType('pokemon', 'gen' + this.dexView.gen + 'ag', undefined, this.dexRelativeIds(field));
 		},
 		clickDexMonEntry: function (e) {
 			e.preventDefault();
@@ -885,23 +980,28 @@
 			var field = this.dexEditField;
 			var dexView = this.dexView;
 			if (entry[0] === 'move' && !field) {
-				if (!this.canLearnFromPrevo(entry[1])) this.toggleDexLearnset(entry[1]);
+				var moveid = toID(entry[1]);
+				if (!this.canLearnFromPrevo(moveid)) this.toggleDexLearnset(moveid);
 				return;
 			}
 			var $input = field && this.$('.dexmonpage input[name="' + field + '"]');
 			if (entry[0] === 'ability' && field && field.startsWith('ability')) {
 				$input.val(dexView.dex.abilities.get(entry[1]).name);
-			} else if (entry[0] === 'pokemon' && (field === 'prevo' || field === 'evos')) {
-				var name = dexView.dex.species.get(entry[1]).name;
-				$input.val(field === 'evos' ? listValue($input.val()).slice(0, -1).concat([name]).join(', ') : name);
+			} else if (entry[0] === 'pokemon' && field === 'evos') {
+				this.toggleDexEvo(dexView.dex.species.get(entry[1]).name);
+				return;
+			} else if (entry[0] === 'pokemon' && field === 'prevo') {
+				$input.val(dexView.dex.species.get(entry[1]).name);
 			} else {
 				if (this.dexPokemonSearch.addFilter(e.currentTarget)) this.dexPokemonSearch.find('');
 				return;
 			}
 			this.saveDexField({ currentTarget: $input[0] });
+			if (field === 'prevo') this.listDexRelatives('prevo');
 		},
 		saveDexField: function (e) {
 			var name = e.currentTarget.name;
+			if (name === 'evos') return;
 			var dex = this.dexView.dex;
 			var $input = $(e.currentTarget).removeClass('incomplete');
 			var value = $.trim($input.val());
@@ -920,12 +1020,11 @@
 				if (!bad) this.saveDexPokemon({ abilities: abilities });
 				return;
 			}
-			var names = name === 'evos' ? listValue(value) : value ? [value] : [];
-			if (names.some(function (species) { return !dex.species.get(species).exists; })) {
+			if (value && !dex.species.get(value).exists) {
 				$input.addClass('incomplete');
 				return;
 			}
-			this.saveDexPokemon(name === 'evos' ? { evos: names.length ? names : null } : { prevo: value || null });
+			this.saveDexPokemon({ prevo: value || null });
 		},
 		canLearnFromPrevo: function (moveid) {
 			var typedSearch = this.dexPokemonSearch.engine.typedSearch;
@@ -934,7 +1033,13 @@
 		toggleDexLearnset: function (moveid) {
 			var learnset = {};
 			learnset[moveid] = this.dexLearnset[moveid] ? null : [this.dexView.gen + 'M'];
+			var $results = this.$('.dexmonpage .teambuilder-results');
+			var top = $results.scrollTop();
 			this.saveDexPokemon({ learnset: learnset });
+			this.setDexLearnsetList();
+			this.updateDexLearnsetCount();
+			$results.scrollTop(top);
+			this.dexPokemonSearch.updateScroll();
 		},
 		slideDexStat: function (e) {
 			var stat = e.currentTarget.name.slice(11);
@@ -961,11 +1066,17 @@
 			});
 			this.saveDexPokemon({ baseStats: baseStats });
 		},
-		saveDexPokemon: function (fields) {
-			this.editDex({ pokemon: $.extend({ name: this.dexSpecies.name }, fields) });
+		saveDexPokemon: function (fields, refresh) {
+			this.draftDex('pokemon', this.dexSpecies.id, $.extend({ name: this.dexSpecies.name }, fields));
+			if (refresh) this.refreshDexPage();
 		},
-		editDexTypes: function (value, button) {
-			app.addPopup(DexTypesPopup, { room: this, sourceEl: button });
+		changeDexType: function (e) {
+			var types = this.dexSpecies.types.slice();
+			types[Number(e.currentTarget.dataset.index)] = e.currentTarget.value;
+			this.saveDexPokemon({ types: types.filter(Boolean) }, true);
+		},
+		openDexTypePicker: function (e) {
+			$(e.currentTarget).siblings('select')[0].showPicker();
 		},
 		showDexDetails: function (value, button) {
 			app.addPopup(DexDetailsPopup, { room: this, sourceEl: button, maxWidth: 320 });
@@ -979,16 +1090,40 @@
 		deleteDexPokemon: function (name, button) {
 			var self = this;
 			var custom = DexViews.custom.Pokedex[toID(name)];
+			var message = custom ? 'Delete ' + BattleLog.escapeHTML(name) + ' from this dex?' :
+				'Reset ' + BattleLog.escapeHTML(name) + ' to its base data? Every edit to it in this dex is removed.';
 			app.addPopup(DexConfirmPopup, {
-				message: custom ? 'Delete ' + BattleLog.escapeHTML(name) + ' from this dex?' : 'Undo every edit to ' + BattleLog.escapeHTML(name) + ' in this dex?',
-				button: custom ? "Delete" : "Undo edits",
+				message: message,
+				button: custom ? "Delete" : "Reset to base",
 				sourceEl: button,
-				callback: function () { self.editDex({ deletepokemon: name }); }
+				callback: function () {
+					if (self.dexDraft) delete self.dexDraft.pokemon[toID(name)];
+					self.applyDexDraft();
+					self.editDex({ deletepokemon: name });
+				}
 			});
 		},
-		saveDexFormat: function (fields) {
+		saveDexFormat: function (fields, tweak) {
+			var room = this;
 			var details = this.dexFormatDetails;
-			this.editDex({ format: $.extend({ id: details.id, name: details.name }, fields) });
+			var formatid = details.id;
+			var before = this.dexDraft && this.dexDraft.formats[formatid];
+			if (before) before = $.extend({}, before);
+			this.draftDex('formats', formatid, $.extend({ id: formatid, name: details.name }, fields));
+			var local = $.extend($.extend(true, {}, details), fields);
+			if (tweak) tweak(local);
+			this.showDexFormatDetails(local);
+			var target = this.dexFormatTarget(formatid);
+			DexViews.ui.request('dexformat', target).then(function (preview) {
+				if (room.dexFormatTarget(formatid) === target && room.dexFormat === formatid) room.showDexFormatDetails(preview);
+			}, function (err) {
+				if (room.dexFormatTarget(formatid) !== target) return;
+				if (before) room.dexDraft.formats[formatid] = before;
+				else delete room.dexDraft.formats[formatid];
+				room.applyDexDraft();
+				if (room.dexFormat === formatid) room.showDexFormatDetails(details);
+				app.addPopup(Popup, { message: "That change doesn't work for the following reason:\n\n- " + err.message });
+			});
 		},
 		renameDexFormat: function (e) {
 			var name = $.trim(e.currentTarget.value);
@@ -999,14 +1134,17 @@
 			var rule = this.dexFormatTree.byId[ruleid];
 			var ruleset = details.ruleset.slice();
 			var index = ruleset.findIndex(function (spec) { return !spec.includes('=') && toID(spec.replace(/^[!^]/, '')) === ruleid; });
+			var on = index >= 0 ? ruleset[index].charAt(0) === '!' : !details.rules.includes(ruleid);
 			if (index >= 0) {
 				ruleset.splice(index, 1);
 			} else {
 				ruleset.push((details.rules.includes(ruleid) ? '!' : '') + rule.name);
 			}
-			this.saveDexFormat({ ruleset: ruleset });
+			this.saveDexFormat({ ruleset: ruleset }, function (local) {
+				local.rules = local.rules.filter(function (other) { return other !== ruleid; }).concat(on ? [ruleid] : []);
+			});
 		},
-		toggleDexBan: function (name, button, banned) {
+		toggleDexBan: function (name, button, banned, kind) {
 			var details = this.dexFormatDetails;
 			var id = toID(name);
 			var banlist = details.banlist.slice();
@@ -1020,7 +1158,18 @@
 				if (banned === undefined) banned = !!$(button).hasClass('ruleoff');
 				(banned ? unbanlist : banlist).push(name);
 			}
-			this.saveDexFormat({ banlist: banlist, unbanlist: unbanlist });
+			var nowBanned = banlist.some(matches) || !unbanlist.some(matches) && !banned;
+			this.saveDexFormat({ banlist: banlist, unbanlist: unbanlist }, function (local) {
+				var state = nowBanned ? 'banned' : 'unbanned';
+				for (var list in local.banned) {
+					local.banned[list] = local.banned[list].filter(function (other) { return other !== id; });
+				}
+				if (nowBanned && kind) local.banned[kind].push(id);
+				if (local.bans.tags[id] || local.tags.some(function (tag) { return tag.id === id; })) local.bans.tags[id] = { state: state };
+				$.each(local.bans.other, function (i, other) {
+					if (toID(other.name) === id) local.bans.other[i] = $.extend({}, other, { state: state, source: '' });
+				});
+			});
 		},
 		clickDexFormatEntry: function (e) {
 			e.preventDefault();
@@ -1028,7 +1177,7 @@
 			if (['pokemon', 'move', 'ability', 'item'].includes(entry[0])) {
 				var table = { pokemon: 'species', move: 'moves', ability: 'abilities', item: 'items' }[entry[0]];
 				var name = this.dexView.dex[table].get(entry[1]).name;
-				this.toggleDexBan(name, null, this.dexFormatDetails.banned[entry[0]].includes(entry[1]));
+				this.toggleDexBan(name, null, this.dexFormatDetails.banned[entry[0]].includes(entry[1]), entry[0]);
 				return;
 			}
 			if (!this.dexFormatSearch.addFilter(e.currentTarget)) return;
@@ -1045,7 +1194,11 @@
 				message: 'Delete the format ' + BattleLog.escapeFormat(details.id) + '?',
 				button: "Delete format",
 				sourceEl: button,
-				callback: function () { self.editDex({ deleteformat: details.id }); }
+				callback: function () {
+					if (self.dexDraft) delete self.dexDraft.formats[details.id];
+					self.applyDexDraft();
+					self.editDex({ deleteformat: details.id });
+				}
 			});
 		},
 		openDexSettings: function (value, target) {
@@ -1070,8 +1223,16 @@
 				this.$('select[name=dexpicker]').val(this.curFolder);
 				return;
 			}
-			this.curFolder = value;
-			this.update();
+			if (value === this.curFolder) return;
+			this.$('select[name=dexpicker]').val(this.curFolder);
+			this.leaveDex(e.currentTarget, function () {
+				this.curFolder = value;
+				this.update();
+			});
+		},
+		leaveDex: function (sourceEl, callback) {
+			if (!this.dexDraft) return callback.call(this);
+			app.addPopup(DexUnsavedPopup, { room: this, name: this.curSummary.name, sourceEl: sourceEl, callback: callback.bind(this) });
 		},
 		newDex: function (sourceEl) {
 			if (!app.user.get('named')) {
@@ -1084,9 +1245,168 @@
 			}
 			app.addPopup(DexCreatePopup, { sourceEl: sourceEl });
 		},
-		editDex: function (edit) {
+		draftDex: function (kind, key, fields) {
+			var draft = this.dexDraft || (this.dexDraft = { pokemon: {}, tiers: [], formats: {} });
+			if (kind === 'tiers') draft.tiers.push(fields);
+			else mergeFields(draft[kind][key] || (draft[kind][key] = {}), fields);
+			this.applyDexDraft();
+		},
+		applyDexDraft: function () {
+			var draft = this.dexDraft;
+			if (draft && $.isEmptyObject(draft.pokemon) && !draft.tiers.length && $.isEmptyObject(draft.formats)) this.dexDraft = null;
+			var pokemon = {};
+			$.each([this.dexSaving, this.dexDraft], function (i, layer) {
+				if (!layer) return;
+				for (var id in layer.pokemon) mergeFields(pokemon[id] || (pokemon[id] = {}), layer.pokemon[id]);
+			});
+			var base = this.dexBaseView;
+			if (base) this.dexView = DexViews.current = $.isEmptyObject(pokemon) ? base : DexViews.draft(base, pokemon, this.dexView);
+			this.updateDexDraftBar();
+		},
+		dexTierOps: function () {
+			return [].concat(this.dexSaving ? this.dexSaving.tiers : [], this.dexDraft ? this.dexDraft.tiers : []);
+		},
+		dexFormatTarget: function (formatid) {
+			var fields = null;
+			$.each([this.dexSaving, this.dexDraft], function (i, layer) {
+				if (layer && layer.formats[formatid]) fields = $.extend(fields || {}, layer.formats[formatid]);
+			});
+			return fields ? formatid + ', ' + JSON.stringify(fields) : formatid;
+		},
+		updateDexDraftBar: function () {
+			var draft = this.dexDraft;
+			var count = draft ? Object.keys(draft.pokemon).length + draft.tiers.length + Object.keys(draft.formats).length : 0;
+			this.$el.toggleClass('dexdrafting', !!(count || this.dexSaving));
+			if (!count && !this.dexSaving) return this.$('.dexdraftbar').empty();
+			var buf = this.dexSaving ? '<button class="button" disabled><i class="fa fa-refresh"></i> Saving...</button>' :
+				'<button class="button" name="saveDexDraft"><strong>Save</strong></button>';
+			if (count) {
+				buf += ' <button class="button" name="discardDexDraft">Discard</button> <small>' + count + (count === 1 ? ' unsaved change' : ' unsaved changes') + '</small>';
+			}
+			this.$('.dexdraftbar').html(buf);
+		},
+		refreshDexPage: function () {
+			if (this.dexSpecies) return this.reopenDexPokemon(this.dexSpecies.name, this.$('.dexmonpage .dexstatresults').is(':visible'));
+			if (this.dexTab === 'tiers') return this.renderDexTierPage(this.tierDetails);
+			if (this.dexTab === 'formats') return this.refreshDexFormat();
+			if (!this.dexSearch || this.dexSearchView === this.dexView) return;
+			var top = this.dexScroller().scrollTop();
+			this.setupDexSearch(this.dexView);
+			this.dexScroller().scrollTop(top);
+		},
+		discardDexDraft: function (value, button) {
+			var self = this;
+			app.addPopup(DexConfirmPopup, {
+				message: 'Discard your unsaved changes to ' + BattleLog.escapeHTML(this.curSummary.name) + '?',
+				button: "Discard",
+				sourceEl: button,
+				callback: function () {
+					self.dexDraft = null;
+					self.applyDexDraft();
+					self.refreshDexPage();
+				}
+			});
+		},
+		saveDexDraft: function () {
+			var draft = this.dexDraft;
+			if (!draft || this.dexSaving) return;
+			var room = this;
+			this.dexSaving = draft;
+			this.dexDraft = null;
+			$.each(draft.pokemon, function (id, fields) {
+				room.editDex({ pokemon: fields }, fields.name, ['pokemon', id, fields]);
+			});
+			$.each(draft.tiers, function (i, op) {
+				room.editDex({ tiers: op }, op.reset ? "Tiers" : op.species.join(', '), ['tiers', '', op]);
+			});
+			$.each(draft.formats, function (id, fields) {
+				room.editDex({ format: fields }, fields.name, ['formats', id, fields]);
+			});
+			this.updateDexDraftBar();
+		},
+		resetDexDraft: function () {
+			this.dexDraft = null;
+			this.dexSaving = null;
+			this.dexSavingDone = false;
+			this.dexBaseView = null;
+			this.updateDexDraftBar();
+		},
+		settleDexSave: function () {
+			if (!this.dexSavingDone || this.dexInFlight || this.dexLoading) return;
+			this.dexSaving = null;
+			this.dexSavingDone = false;
+			this.applyDexDraft();
+		},
+		editDex: function (edit, label, restore) {
+			this.dexEdits = this.dexEdits || [];
+			this.dexEdits.push({ dexid: this.curSummary.id, edit: edit, label: label, restore: restore });
+			if (!this.dexInFlight) this.nextDexEdit();
+		},
+		nextDexEdit: function () {
+			var next = this.dexInFlight = this.dexEdits.shift() || null;
+			if (!next) return;
 			this.setSaveState('saving');
-			app.send('/crq dexedit ' + this.curSummary.id + ', ' + JSON.stringify(edit));
+			app.send('/crq dexedit ' + next.dexid + ', ' + JSON.stringify(next.edit));
+		},
+		answerDexEdit: function (data) {
+			var sent = this.dexInFlight;
+			if (!sent) return false;
+			var answers = this.dexAnswers || (this.dexAnswers = { dexid: sent.dexid, errors: [], failed: [], saved: false });
+			if (data.error) {
+				answers.errors.push((sent.label ? sent.label + ': ' : '') + data.error);
+				if (sent.restore) answers.failed.push(sent.restore);
+			} else {
+				answers.saved = true;
+			}
+			if (data.stale) answers.stale = data.stale;
+			if (sent.edit['delete'] && !data.error) this.curFolder = '';
+			if (data.formatid) {
+				delete DexViews.formatDetails[data.formatid];
+				this.dexFormat = data.formatid;
+			}
+			this.nextDexEdit();
+			if (this.dexInFlight) return true;
+			this.dexAnswers = null;
+			this.finishDexSave(answers);
+			return true;
+		},
+		finishDexSave: function (answers) {
+			var errors = answers.errors;
+			this.setSaveState(errors.length ? 'failed' : 'saved');
+			if (errors.length) {
+				app.addPopup(Popup, {
+					message: (errors.length === 1 ? "Your change wasn't saved for the following reason:" : "Your changes weren't saved for the following reasons:") +
+						"\n\n- " + errors.join('\n- ')
+				});
+			} else if (answers.stale) {
+				app.addPopup(Popup, {
+					htmlMessage: "These don't work in the new world and are skipped until you fix them or clear the dex:<br />" +
+						answers.stale.map(function (problem) { return BattleLog.escapeHTML(problem); }).join('<br />')
+				});
+			}
+			if (answers.dexid !== this.dexid) return app.send('/crq dexes');
+			if (answers.failed.length) {
+				var later = this.dexDraft;
+				this.dexDraft = null;
+				var room = this;
+				$.each(answers.failed, function (i, restore) {
+					room.draftDex(restore[0], restore[1], restore[2]);
+				});
+				if (later) {
+					var draft = this.dexDraft;
+					draft.tiers = draft.tiers.concat(later.tiers);
+					$.each(['pokemon', 'formats'], function (i, kind) {
+						for (var key in later[kind]) mergeFields(draft[kind][key] || (draft[kind][key] = {}), later[kind][key]);
+					});
+				}
+			}
+			if (this.dexSaving && answers.saved) {
+				this.dexSavingDone = true;
+			} else {
+				this.dexSaving = null;
+			}
+			this.applyDexDraft();
+			app.send('/crq dexes');
 		}
 	});
 	_.defaults(window.DexBuilderRoom.prototype, view);

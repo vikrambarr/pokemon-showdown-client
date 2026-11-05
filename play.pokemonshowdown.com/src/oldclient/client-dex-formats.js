@@ -27,6 +27,9 @@
 	var FORMAT_GAME_TYPES = { singles: 'Singles', doubles: 'Doubles', triples: 'Triples', multi: 'Multi', freeforall: 'Free-for-all' };
 
 	_.extend(RoomsRoom.prototype, {
+		dexFormatTarget: function (formatid) {
+			return formatid;
+		},
 		selectDexFormat: function (format, button) {
 			var room = this;
 			app.addPopup(DexFormatPopup, { format: format, sourceEl: button, section: this.dexSummary.name, dexid: this.dexSummary.id, onselect: function (newFormat) {
@@ -48,7 +51,7 @@
 			this.dexFormatSearch = null;
 			this.$('.dexformatpage').html('<div class="pad"><p><em style="font-size:20pt">Loading...</em></p></div>');
 			var room = this;
-			request('dexformat', formatid).then(function (details) {
+			request('dexformat', this.dexFormatTarget(formatid)).then(function (details) {
 				room.renderDexFormat(details);
 			}, function () {
 				if (room.dexFormatId === formatid) room.renderDexFormat(null);

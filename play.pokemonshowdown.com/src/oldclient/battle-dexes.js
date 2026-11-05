@@ -80,10 +80,12 @@
 			query: null,
 			genOf: genOf,
 			load: loadDex,
+			draft: draftView,
 			tierData: tierData,
 			indexSearch: indexSearch
 		};
 		var unindexed = [];
+		var drafts = 0;
 
 		function genOf(mod) {
 			var gen = /^gen(\d)/.exec(mod);
@@ -191,6 +193,32 @@
 			inject(view);
 			DexViews.views[hash] = DexViews.views[layer.hash] = view;
 			return view;
+		}
+
+		function draftView(view, pokemon, previous) {
+			if (previous && previous.draftOf) {
+				delete Dex.moddedDexes[previous.modid];
+				delete BattleTeambuilderTable[previous.modid];
+			}
+			var draft = $.extend({}, view, {
+				draftOf: view, modid: view.modid + 'draft' + (++drafts), Pokedex: $.extend({}, view.Pokedex), Learnsets: $.extend({}, view.Learnsets)
+			});
+			for (var id in pokemon) {
+				var fields = $.extend({}, pokemon[id]);
+				var learnset = fields.learnset;
+				delete fields.learnset;
+				delete fields.name;
+				if (!$.isEmptyObject(fields)) draft.Pokedex[id] = $.extend({}, view.Pokedex[id] || view.dex.species.get(id), fields);
+				if (!learnset) continue;
+				var moves = $.extend({}, DexViews.learnsetOf(view, id));
+				for (var moveid in learnset) {
+					if (learnset[moveid]) moves[moveid] = learnset[moveid];
+					else delete moves[moveid];
+				}
+				draft.Learnsets[id] = { learnset: moves };
+			}
+			draft.dex = makeDex(draft);
+			return draft;
 		}
 
 		function tierData(view, species) {
