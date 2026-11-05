@@ -3,6 +3,7 @@
 	var request = window.DexViews.ui.request;
 	var viewSearch = window.DexViews.ui.viewSearch;
 	var dropEmptyHeaders = window.DexViews.ui.dropEmptyHeaders;
+	var setTierStyle = window.DexViews.ui.setTierStyle;
 
 	var DexFormatPopup = FormatPopup.extend({
 		initialize: function (data) {
@@ -162,8 +163,7 @@
 			};
 			viewSearch(search, view, function (typedSearch, searchType) {
 				typedSearch.dexid = room.dexid;
-				typedSearch.isNatDex = details.rules.includes('natdexmod');
-				typedSearch.isDoubles = details.gameType !== 'singles';
+				setTierStyle(typedSearch, details);
 				var getBaseResults = typedSearch.getBaseResults;
 				typedSearch.getBaseResults = function () {
 					var seen = {};

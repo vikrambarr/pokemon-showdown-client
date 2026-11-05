@@ -1,9 +1,11 @@
 (function ($) {
 
 	var TIERS = [
-		'AG', 'Uber', '(Uber)', 'OU', '(OU)', 'UUBL', 'UU', 'RUBL', 'RU', 'NUBL', 'NU', '(NU)', 'PUBL', 'PU', '(PU)', 'ZUBL', 'ZU',
-		'NFE', 'LC', 'DUber', '(DUber)', 'DOU', '(DOU)', 'DBL', 'DUU', '(DUU)', 'CAP', 'CAP NFE', 'CAP LC', 'Unreleased', 'Illegal'
+		'AG', '(AG)', 'Uber', '(Uber)', 'OU', '(OU)', 'UUBL', 'UU', 'RUBL', 'RU', 'NUBL', 'NU', '(NU)', 'PUBL', 'PU', '(PU)', 'ZUBL', 'ZU',
+		'DUber', '(DUber)', 'DOU', 'DBL', '(DOU)', 'DUU', '(DUU)', 'Mythical', 'Restricted Legendary', 'Regular', 'New', 'NFE', 'LC', 'CAP', 'CAP NFE', 'CAP LC', 'Unreleased', 'Illegal'
 	];
+	var DOUBLES_TIERS = ['DUber', '(DUber)', 'DOU', 'DBL', '(DOU)', 'DUU', '(DUU)', 'NFE', 'LC', 'Unreleased', 'Illegal'];
+	var NATDEX_MODS = ['gen9insurgence', 'gen9uranium', 'gen9infinity', 'gen9infinitefusion', 'gen9chaos', 'gen9chaosmayhem'];
 
 	var FORMAT_TIERS = ['Random Battle', 'Randbat', 'OU', 'Ubers', 'UU', 'RU', 'NU', 'PU', 'AG', 'LC', 'VGC'];
 	var FORMAT_GROUPS = [/Doubles|VGC/, /Free-for-all|FFA|Multi/i, /Draft/, /Custom Game|\bCG$/];
@@ -145,7 +147,7 @@
 		request('dexformat', formatid).then(function (details) {
 			var legal = {};
 			for (var i = 0; i < details.legal.pokemon.length; i++) legal[details.legal.pokemon[i]] = 1;
-			DexViews.formatDetails[formatid] = { rules: details.rules, gameType: details.gameType, legal: legal };
+			DexViews.formatDetails[formatid] = { rules: details.rules, gameType: details.gameType, mod: details.mod, legal: legal };
 			if (!room.curTeam || room.curTeam.format !== formatid) return;
 			room.update();
 			if (room.curSet && room.curChartType) room.updateChart(true);
@@ -337,10 +339,7 @@
 			search.dex = view.dex;
 			search.dexView = view;
 			search.formatDetails = DexViews.formatDetails[toID(format)];
-			if (search.formatDetails) {
-				search.isNatDex = search.formatDetails.rules.includes('natdexmod');
-				search.isDoubles = search.formatDetails.gameType !== 'singles';
-			}
+			if (search.formatDetails) setTierStyle(search, search.formatDetails);
 			var table = { move: 'Moves', ability: 'Abilities', item: 'Items' }[searchType];
 			if (!table) return search;
 			var getDefaultResults = search.getDefaultResults;
@@ -460,7 +459,17 @@
 		TypedSearch.prototype.getTier = function (species) {
 			if (!this.dexView) return getTier.apply(this, arguments);
 			var data = DexViews.tierData(this.dexView, species);
-			var tier = (this.isDoubles && data.doublesTier) || (this.isNatDex && data.natDexTier) || data.tier;
+			if (this.isVGC) {
+				var tags = this.dex.species.get(species.baseSpecies).tags || [];
+				if (species.isNonstandard && species.isNonstandard !== 'Unobtainable') return 'Illegal';
+				if (tags.includes('Mythical')) return 'Mythical';
+				if (tags.includes('Restricted Legendary')) return 'Restricted Legendary';
+				if (data.tier === 'NFE' || data.tier === 'LC') return data.tier;
+				return 'Regular';
+			}
+			var tier = (this.isDoubles ? data.doublesTier : this.isNatDex ? data.natDexTier : '') || data.tier ||
+				((data.doublesTier || data.natDexTier) && 'Illegal');
+			if (tier && this.isDoubles && !DOUBLES_TIERS.includes(tier)) return '(DUU)';
 			if (tier) return tier;
 			var formatType = this.formatType;
 			this.formatType = this.isDoubles ? 'doubles' : this.isNatDex ? 'natdex' : formatType;
@@ -489,7 +498,8 @@
 			});
 			var results = [];
 			for (var i = 0; i < order.length; i++) {
-				results.push(['header', order[i]]);
+				if (order[i] === 'Illegal' && this.formatDetails || this.isLC && order[i] !== 'LC') continue;
+				results.push(['header', tierHeader(order[i])]);
 				tiers[order[i]].sort(function (a, b) { return a.num - b.num || (a.name < b.name ? -1 : 1); });
 				for (var j = 0; j < tiers[order[i]].length; j++) results.push(['pokemon', tiers[order[i]][j].id]);
 			}
@@ -564,6 +574,21 @@
 			if (extend) extend(typedSearch, searchType);
 			return typedSearch;
 		};
+	}
+
+	function setTierStyle(search, details) {
+		var isChampions = details.mod.startsWith('champions');
+		search.isNatDex = details.rules.includes('natdexmod') || NATDEX_MODS.includes(details.mod);
+		search.isDoubles = details.gameType === 'doubles' && !isChampions;
+		search.isVGC = search.isDoubles && details.rules.includes('flatrules');
+		search.isLC = details.rules.includes('littlecup');
+	}
+
+	function tierHeader(tier) {
+		if (tier === '(DUU)') return "Below DUU";
+		if (tier.charAt(0) === '(') return tier.slice(1, -1) + " by technicality";
+		if (tier === 'NFE') return "NFEs not in a higher tier";
+		return tier;
 	}
 
 	function dropEmptyHeaders(rows, type) {
@@ -935,7 +960,7 @@
 	DexViews.ui = {
 		request: request, compareFormats: compareFormats, openDexPage: openDexPage, DexConfirmPopup: DexConfirmPopup,
 		HIDE_BUTTON: HIDE_BUTTON, OFFICIAL_BADGE: OFFICIAL_BADGE, canEdit: canEdit, viewSearch: viewSearch,
-		dropEmptyHeaders: dropEmptyHeaders
+		dropEmptyHeaders: dropEmptyHeaders, setTierStyle: setTierStyle
 	};
 
 })(window.jQuery);

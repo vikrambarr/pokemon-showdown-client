@@ -153,6 +153,28 @@
 			for (var id in source.sprites) view.sprites[id] = $.extend({}, view.sprites[id], source.sprites[id]);
 		}
 
+		function mergeTiers(parents) {
+			var table = window.BattleTeambuilderTable || {};
+			var original = {
+				tier: table.overrideTier || {}, natDexTier: (table.gen9natdex || {}).overrideTier || {}, doublesTier: (table.gen9doubles || {}).overrideTier || {}
+			};
+			var merged = {};
+			var taken = {};
+			for (var i = 0; i < parents.length; i++) {
+				for (var id in parents[i].FormatsData) {
+					var entry = parents[i].FormatsData[id];
+					var target = merged[id] || (merged[id] = {});
+					var done = taken[id] || (taken[id] = {});
+					for (var key in entry) {
+						if (done[key]) continue;
+						target[key] = entry[key];
+						if (!original[key] || original[key][id] !== entry[key]) done[key] = true;
+					}
+				}
+			}
+			return merged;
+		}
+
 		function register(hash, layer, parents) {
 			var gen = genOf(layer.mod);
 			var view = {
@@ -162,6 +184,7 @@
 				sprites: {}, itemSprites: {}, images: {}
 			};
 			for (var i = parents.length - 1; i >= 0; i--) merge(view, parents[i], true);
+			if (gen === 9 && parents.length > 1) view.FormatsData = mergeTiers(parents);
 			merge(view, layer, false);
 			for (var i = 0; i < layer.species.length; i++) view.species[layer.species[i]] = 1;
 			view.dex = makeDex(view);
@@ -171,7 +194,10 @@
 		}
 
 		function tierData(view, species) {
-			return view.FormatsData[species.id] || {};
+			var data = view.FormatsData[species.id];
+			if (data && (data.tier || data.doublesTier || data.natDexTier) || !DexViews.custom.Pokedex[species.id]) return data || {};
+			var base = toID(species.battleOnly || species.baseSpecies);
+			return (base !== species.id && view.FormatsData[base]) || data || {};
 		}
 
 		function makeDex(view) {
