@@ -469,19 +469,21 @@
 	overflow-x: auto;
 	overflow-y: hidden;
 	scrollbar-width: none;
+}
+.dexmonchart div.dexfield {
 	cursor: default;
 }
 .dexmonchart .dexfield::-webkit-scrollbar {
 	display: none;
 }
-.dexmonchart .dexfield,
-.dexmonchart .dexfield:hover {
+.dexmonchart div.dexfield,
+.dexmonchart div.dexfield:hover {
 	border-color: #AAAAAA;
 	box-shadow: none;
 	background: #F8FBFD;
 }
-.dark .dexmonchart .dexfield,
-.dark .dexmonchart .dexfield:hover {
+.dark .dexmonchart div.dexfield,
+.dark .dexmonchart div.dexfield:hover {
 	border-color: #6b7178;
 	box-shadow: none;
 	background: #222527;
@@ -504,7 +506,7 @@
 	min-width: 640px;
 	overflow-y: auto;
 }
-.dexstatresults .evslider {
+.dexstatresults .evslider:not([name]) {
 	pointer-events: none;
 }
 .dexstatresults .evslider::-webkit-slider-runnable-track {
@@ -642,4 +644,54 @@
 .setchart .setcell-abilities input[name=ability] {
 	margin-top: 0;
 	margin-bottom: 4px;
+}
+.dexbuildertabs {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+	gap: 6px;
+	margin: 4px 10px 10px 0;
+}
+.dexbuildertab {
+	width: 100%;
+	padding: 12px 4px;
+	text-align: center;
+	white-space: nowrap;
+}
+.dexbuildertab .fa {
+	display: block;
+	font-size: 16pt;
+	margin-bottom: 3px;
+}
+.dexmonchart button.dextypes {
+	border: 0;
+	background: none;
+	padding: 0;
+	cursor: pointer;
+}
+.dexsubpage .folderpane {
+	display: none;
+}
+.dexsubpage .teampane {
+	left: 0;
+}
+.dextierlist a.dextieroverride .numcol {
+	color: #C05000;
+	font-weight: bold;
+}
+.teambuilder-results.dextierlist {
+	position: static;
+	min-width: 0;
+	overflow: visible;
+	background: none;
+}
+.dextierlist .result a {
+	user-select: none;
+}
+.dextierbuttons {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 4px;
+}
+.dextierbuttons .button {
+	white-space: nowrap;
 }

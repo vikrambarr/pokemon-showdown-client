@@ -27,6 +27,11 @@
 		return '<div class="textbox dexfield' + (className ? ' ' + className : '') + '" title="' + value + '">' + value + '</div>';
 	}
 
+	function inputHTML(value, name, placeholder) {
+		return '<input type="text" class="textbox chartinput dexfield" name="' + name + '" value="' + BattleLog.escapeHTML(value) + '"' +
+			(placeholder ? ' placeholder="' + placeholder + '"' : '') + ' autocomplete="off" />';
+	}
+
 	function hasStandardSprites(id) {
 		return !!(window.BattlePokedex && BattlePokedex[id]) && !DexViews.custom.Pokedex[id];
 	}
@@ -62,8 +67,9 @@
 			this.$('.dexmonpage').show();
 			this.dexScroller().scrollTop(0);
 
+			var editable = this.dexEditable;
 			var buf = '<div class="pad">';
-			buf += HIDE_BUTTON + '<button name="closeDexPokemon" class="button"><i class="fa fa-chevron-left"></i> Dex</button></div>';
+			buf += (editable ? '' : HIDE_BUTTON) + '<button name="closeDexPokemon" class="button"><i class="fa fa-chevron-left"></i> ' + (editable ? 'Pok&eacute;mon' : 'Dex') + '</button></div>';
 			buf += '<div class="teambar">';
 			var prevoOf = function (child) {
 				if (child.prevo && view.species[toID(child.prevo)]) return view.dex.species.get(child.prevo);
@@ -118,8 +124,13 @@
 
 			buf += '<div class="teamchartbox individual"><ol class="teamchart"><li>';
 			buf += '<div class="setmenu">';
-			if (family.length > 1) buf += '<button name="forkLine" value="' + BattleLog.escapeHTML(species.name) + '"><i class="fa fa-code-fork"></i>Fork evo line</button> ';
-			buf += '<button name="forkSpecies" value="' + BattleLog.escapeHTML(species.name) + '"><i class="fa fa-code-fork"></i>Fork</button></div>';
+			if (editable) {
+				buf += '<button name="deleteDexPokemon" value="' + BattleLog.escapeHTML(species.name) + '"><i class="fa fa-trash"></i>' +
+					(DexViews.custom.Pokedex[species.id] ? 'Delete' : 'Undo edits') + '</button></div>';
+			} else {
+				if (family.length > 1) buf += '<button name="forkLine" value="' + BattleLog.escapeHTML(species.name) + '"><i class="fa fa-code-fork"></i>Fork evo line</button> ';
+				buf += '<button name="forkSpecies" value="' + BattleLog.escapeHTML(species.name) + '"><i class="fa fa-code-fork"></i>Fork</button></div>';
+			}
 			var sprites = view.sprites[species.id] || {};
 			var standard = hasStandardSprites(species.id);
 			buf += '<div class="setchart-nickname"><label>Sprites</label><div class="textbox spritebox">';
@@ -144,15 +155,18 @@
 			buf += '<span class="detailcell"><label>Egg</label>' + BattleLog.escapeHTML((species.eggGroups || [])[0] || '\u2014') + '</span>';
 			buf += '</button></div></div>';
 			buf += '<div class="setrow setrow-icons"><div class="setcell"><span class="itemicon"></span></div><div class="setcell setcell-typeicons">';
+			if (editable) buf += '<button class="dextypes" name="editDexTypes" title="Change types">';
 			for (var k = 0; k < species.types.length; k++) buf += Dex.getTypeIcon(species.types[k]);
+			if (editable) buf += '</button>';
 			buf += '</div></div>';
 			var abilities = species.abilities;
-			var abilityCells = [['Ability 1', abilities['0']], ['Ability 2', abilities['1']], ['Hidden', abilities['H']]];
-			if (abilities['S']) abilityCells.push(['Special', abilities['S']]);
+			var abilityCells = [['Ability 1', abilities['0'], '0'], ['Ability 2', abilities['1'], '1'], ['Hidden', abilities['H'], 'H']];
+			if (abilities['S'] || editable) abilityCells.push(['Special', abilities['S'], 'S']);
 			buf += '<div class="setrow setrow-abilities">';
 			for (var a = 0; a < abilityCells.length; a++) {
-				var ability = BattleLog.escapeHTML(abilityCells[a][1] || '');
-				buf += '<div class="setcell"><label>' + abilityCells[a][0] + '</label>' + fieldHTML(ability) + '</div>';
+				var ability = abilityCells[a][1] || '';
+				buf += '<div class="setcell"><label>' + abilityCells[a][0] + '</label>' +
+					(editable ? inputHTML(ability, 'ability' + abilityCells[a][2]) : fieldHTML(BattleLog.escapeHTML(ability))) + '</div>';
 			}
 			buf += '</div></div>';
 
@@ -160,10 +174,11 @@
 				'From: ' + (species.prevo || '\u2014'),
 				'Into: ' + ((species.evos || []).join(', ') || '\u2014')
 			];
+			if (editable) rows = [inputHTML(species.prevo || '', 'prevo', 'From'), inputHTML((species.evos || []).join(', '), 'evos', 'Into')];
 			buf += '<div class="setcol setcol-moves"><div class="setcell"><label>Evolves</label>';
 			for (var m = 0; m < rows.length; m++) {
 				if (m) buf += '<div class="setcell">';
-				buf += fieldHTML(BattleLog.escapeHTML(rows[m])) + '</div>';
+				buf += (editable ? rows[m] : fieldHTML(BattleLog.escapeHTML(rows[m]))) + '</div>';
 			}
 			buf += '<div class="setcell setcell-learnset"><label>Learnset</label><button class="textbox learnsetcount" tabindex="-1" name="showDexLearnset">&hellip;</button></div>';
 			buf += '</div>';
@@ -186,7 +201,7 @@
 			this.$('.dexmonpage').html('<div class="teamwrapper">' + buf + '</div>');
 
 			var $results = this.$('.teambuilder-results');
-			var search = new BattleSearch($results, $results);
+			var search = this.dexPokemonSearch = new BattleSearch($results, $results);
 			viewSearch(search, view);
 			$results.on('scroll', function () {
 				search.updateScroll();
@@ -241,7 +256,7 @@
 			});
 
 			var buf = '<div class="pad">';
-			buf += HIDE_BUTTON + '<button name="closeDexMove" class="button"><i class="fa fa-chevron-left"></i> ' + BattleLog.escapeHTML(from || 'Dex') + '</button></div>';
+			buf += (this.dexEditable ? '' : HIDE_BUTTON) + '<button name="closeDexMove" class="button"><i class="fa fa-chevron-left"></i> ' + BattleLog.escapeHTML(from || 'Dex') + '</button></div>';
 			buf += '<div class="teambar"><button disabled class="pokemon">' + BattleLog.escapeHTML(move.name) + '</button></div>';
 			buf += '<div class="teamchartbox individual"><ol class="teamchart"><li>';
 			buf += '<div class="setmenu"><button name="showDexMoveList" value="learn"><i class="fa fa-list"></i>Learned by</button> ' +
@@ -400,13 +415,15 @@
 				var base = species.baseStats[stat];
 				var color = Math.min(Math.floor(base * 180 / 255), 360);
 				rows.label += '<div><label>' + BattleStatNames[stat] + '</label></div>';
-				rows.base += '<div><b>' + base + '</b></div>';
-				rows.slider += '<div><input type="range" value="' + base + '" min="0" max="255" class="evslider" tabindex="-1" aria-hidden="true" style="--fill:hsl(' + color + ',85%,45%);--pct:' + (base * 100 / 255) + '%" /></div>';
-				rows.min += '<div><b>' + (stat === 'hp' ? 2 * base + 110 : Math.floor((2 * base + 5) * 0.9)) + '</b></div>';
-				rows.max += '<div><b>' + (stat === 'hp' ? 2 * base + 204 : Math.floor((2 * base + 99) * 1.1)) + '</b></div>';
+				rows.base += this.dexEditable ? '<div><input type="number" name="stat-' + stat + '" value="' + base + '" min="0" max="255" class="textbox inputform numform" /></div>' :
+					'<div><b>' + base + '</b></div>';
+				rows.slider += '<div><input type="range" value="' + base + '" min="0" max="255" class="evslider"' +
+					(this.dexEditable ? ' name="statslider-' + stat + '"' : ' tabindex="-1" aria-hidden="true"') + ' style="--fill:hsl(' + color + ',85%,45%);--pct:' + (base * 100 / 255) + '%" /></div>';
+				rows.min += '<div><b class="dexmin-' + stat + '">' + (stat === 'hp' ? 2 * base + 110 : Math.floor((2 * base + 5) * 0.9)) + '</b></div>';
+				rows.max += '<div><b class="dexmax-' + stat + '">' + (stat === 'hp' ? 2 * base + 204 : Math.floor((2 * base + 99) * 1.1)) + '</b></div>';
 			}
 			rows.label += '<div><label>Total</label></div>';
-			rows.base += '<div><b>' + bst + '</b></div>';
+			rows.base += '<div><b class="dexbst">' + bst + '</b></div>';
 			buf += '<div class="col labelcol">' + rows.label + '</div><div class="col basestatscol">' + rows.base + '</div>';
 			buf += '<div class="col evslidercol">' + rows.slider + '</div><div class="col dexrangecol">' + rows.min + '</div><div class="col dexrangecol">' + rows.max + '</div>';
 			return buf + '<div style="clear:both"></div></div>';

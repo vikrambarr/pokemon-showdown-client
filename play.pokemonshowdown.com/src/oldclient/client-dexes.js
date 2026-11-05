@@ -61,13 +61,16 @@
 				for (var j = 0; j < data[table].length; j++) ids[data[table][j]] = 1;
 			});
 			DexViews.entries[dexid] = entries;
-			var room = app.rooms.rooms;
-			if (!room || room.dexid !== dexid) return;
-			var typedSearch = room.dexSearch && room.dexSearch.engine.typedSearch;
-			if (typedSearch && typedSearch.searchType !== 'pokemon') room.dexSearch.setType(typedSearch.searchType, 'gen' + room.dexView.gen);
-			if (room.dexFormatSearch && room.dexFormatKind) room.showDexFormatList(room.dexFormatKind);
+			$.each([app.rooms.rooms, app.rooms.dexbuilder], function (j, room) {
+				if (!room || room.dexid !== dexid) return;
+				var typedSearch = room.dexSearch && room.dexSearch.engine.typedSearch;
+				if (typedSearch && typedSearch.searchType !== 'pokemon') room.dexSearch.setType(typedSearch.searchType, 'gen' + room.dexView.gen);
+				if (room.dexFormatSearch && room.dexFormatKind) room.showDexFormatList(room.dexFormatKind);
+			});
 		}, function () {});
 	}
+
+	DexViews.loadEntries = loadEntries;
 
 	DexViews.query = function (dexid) {
 		return request('dex', dexid);
@@ -119,6 +122,7 @@
 					isTeambuilderFormat: data.name.slice(-11) !== 'Custom Game', teambuilderFormat: '',
 					gen: summary.gen, mod: view ? view.modid : 'gen' + summary.gen, dexid: summary.id
 				});
+				format.id = data.id;
 				if (Dex.formats.cache[data.id]) {
 					BattleFormats[data.id] = Object.assign(Dex.formats.cache[data.id], format);
 				} else {
@@ -147,7 +151,7 @@
 		request('dexformat', formatid).then(function (details) {
 			var legal = {};
 			for (var i = 0; i < details.legal.pokemon.length; i++) legal[details.legal.pokemon[i]] = 1;
-			DexViews.formatDetails[formatid] = { rules: details.rules, gameType: details.gameType, mod: details.mod, legal: legal };
+			DexViews.formatDetails[formatid] = { rules: details.rules, gameType: details.gameType, mod: details.mod, tiers: details.tiers, legal: legal };
 			if (!room.curTeam || room.curTeam.format !== formatid) return;
 			room.update();
 			if (room.curSet && room.curChartType) room.updateChart(true);
@@ -303,6 +307,10 @@
 			}
 			if (app.rooms.dexbuilder && app.rooms.dexbuilder.saveState === 'saving') app.rooms.dexbuilder.setSaveState(data.error ? 'failed' : 'saved');
 			if (data.id !== undefined && app.rooms.dexbuilder) app.rooms.dexbuilder.curFolder = data.id || '';
+			if (data.formatid) {
+				delete DexViews.formatDetails[data.formatid];
+				if (app.rooms.dexbuilder) app.rooms.dexbuilder.dexFormat = data.formatid;
+			}
 			app.send('/crq dexes');
 		});
 		app.on('response:dexfork response:dexforkline', function (data) {
@@ -310,7 +318,7 @@
 			app.addPopup(Popup, { htmlMessage: data.error ? BattleLog.escapeHTML(data.error) : BattleLog.sanitizeHTML(data.html) });
 			app.send('/crq dexes');
 		});
-		$.each(['dex', 'dexentries', 'dexeffect', 'dexformat'], function (i, cmd) {
+		$.each(['dex', 'dexentries', 'dexeffect', 'dexformat', 'dexupload'], function (i, cmd) {
 			app.on('response:' + cmd, function (data) {
 				answer(cmd, data);
 			});
@@ -387,10 +395,13 @@
 			var changed = find.apply(this, arguments);
 			var view = this.typedSearch && this.typedSearch.dexView;
 			if (!this.results) return changed;
+			var entries = view && DexViews.entries[view.dexid];
+			if (view && !entries) loadEntries(view.dexid);
 			this.results = this.results.filter(function (row) {
 				var table = { pokemon: 'Pokedex', move: 'Moves', item: 'Items', ability: 'Abilities' }[row[0]];
-				if (!table || !DexViews.custom[table][row[1]]) return true;
-				return !!view && !!(table === 'Pokedex' ? view.species[row[1]] : view[table][row[1]]);
+				if (!table || !view) return !table || !DexViews.custom[table][row[1]];
+				if (table === 'Pokedex') return !!view.species[row[1]];
+				return entries ? !!entries[table][row[1]] : !DexViews.custom[table][row[1]] || !!view[table][row[1]];
 			}).filter(function (row, index, rows) {
 				return row[0] !== 'header' || (rows[index + 1] && rows[index + 1][0] !== 'header');
 			});
@@ -411,6 +422,8 @@
 			}
 			return moves;
 		}
+
+		DexViews.learnsetOf = learnsetOf;
 
 		function firstLearnsetid(view, search, speciesid) {
 			if (learnsetOf(view, speciesid)) return speciesid;
@@ -458,6 +471,9 @@
 		var getTier = TypedSearch.prototype.getTier;
 		TypedSearch.prototype.getTier = function (species) {
 			if (!this.dexView) return getTier.apply(this, arguments);
+			var override = !this.isVGC && this.tierOverrides && this.tierOverrides[species.id];
+			var field = this.isDoubles ? 'doublesTier' : this.isNatDex ? 'natDexTier' : 'tier';
+			if (override && override[field]) return override[field];
 			var data = DexViews.tierData(this.dexView, species);
 			if (this.isVGC) {
 				var tags = this.dex.species.get(species.baseSpecies).tags || [];
@@ -582,6 +598,7 @@
 		search.isDoubles = details.gameType === 'doubles' && !isChampions;
 		search.isVGC = search.isDoubles && details.rules.includes('flatrules');
 		search.isLC = details.rules.includes('littlecup');
+		search.tierOverrides = details.tiers || null;
 	}
 
 	function tierHeader(tier) {
@@ -772,9 +789,11 @@
 			);
 			this.dexFormatId = '';
 			this.dexFormatSearch = null;
-
+			this.setupDexSearch(view);
+		},
+		setupDexSearch: function (view) {
 			var dexid = this.dexid;
-			var search = this.dexSearch = new BattleSearch(this.$('.dexpokemon'), this.dexScroller());
+			var search = this.dexSearch = this.createDexList(this.$('.dexpokemon'), 'dexListZoom');
 			viewSearch(search, view, function (typedSearch, searchType) {
 				typedSearch.dexid = dexid;
 				if (searchType === 'pokemon') return;
@@ -794,15 +813,6 @@
 					}));
 				};
 			});
-			var room = this;
-			search.$viewport = {
-				scrollTop: function () {
-					return room.dexScroller()[0].scrollTop / room.dexListZoom;
-				},
-				height: function () {
-					return room.dexScroller()[0].clientHeight / room.dexListZoom;
-				}
-			};
 			this.scaleDexList();
 			search.setType('pokemon', 'gen' + view.gen);
 			this.showDexTab(this.dexTab);
@@ -815,7 +825,7 @@
 			var formats = tab === 'formats';
 			var buf = pokemon || formats ? '' : count.table === 'TypeChart' ? this.renderDexTypes() :
 				'<p><em>' + count.name + ' view coming soon.</em></p>';
-			this.$('.dexpage .dexformattabs button[name=showDexTab]').removeClass('cur').filter('[value="' + tab + '"]').addClass('cur');
+			this.$('.dexpage button[name=showDexTab]').removeClass('cur').filter('[value="' + tab + '"]').addClass('cur');
 			if (kind && kind !== 'pokemon') loadEntries(this.dexid);
 			if (kind && this.dexSearch.engine.typedSearch.searchType !== kind) {
 				this.$('input[name=pokemonsearch]').val('').attr('placeholder', 'Search ' + BattleLog.unescapeHTML(count.name));
@@ -851,12 +861,30 @@
 			this.dexListZoom = this.dexListZoom || 1;
 			if (!width) return;
 			this.dexListZoom = width < 640 ? width / 640 : 1;
-			this.$('.dexpokemon').css({ zoom: this.dexListZoom === 1 ? '' : this.dexListZoom, width: this.dexListZoom === 1 ? '' : '640px' });
-			if (this.dexSearch) this.dexSearch.updateScroll();
+			this.$('.dexpokemon, .dextierlist').css({ zoom: this.dexListZoom === 1 ? '' : this.dexListZoom, width: this.dexListZoom === 1 ? '' : '640px' });
+			this.updateDexScroll();
+		},
+		createDexList: function ($list, zoom) {
+			var room = this;
+			var search = new BattleSearch($list, this.dexScroller());
+			search.$viewport = {
+				scrollTop: function () {
+					return room.dexScroller()[0].scrollTop / (room[zoom] || 1);
+				},
+				height: function () {
+					return room.dexScroller()[0].clientHeight / (room[zoom] || 1);
+				}
+			};
+			this.dexLists = (this.dexLists || []).filter(function (other) {
+				return other.el !== search.el && $.contains(document.documentElement, other.el);
+			});
+			this.dexLists.push(search);
+			return search;
 		},
 		updateDexScroll: function () {
-			if (this.dexSearch) this.dexSearch.updateScroll();
-			if (this.dexFormatSearch) this.dexFormatSearch.updateScroll();
+			$.each(this.dexLists || [], function (i, search) {
+				if ($(search.el).is(':visible')) search.updateScroll();
+			});
 		},
 		searchPokemon: function (e) {
 			this.dexSearch.find(e.currentTarget.value);
@@ -960,7 +988,7 @@
 	DexViews.ui = {
 		request: request, compareFormats: compareFormats, openDexPage: openDexPage, DexConfirmPopup: DexConfirmPopup,
 		HIDE_BUTTON: HIDE_BUTTON, OFFICIAL_BADGE: OFFICIAL_BADGE, canEdit: canEdit, viewSearch: viewSearch,
-		dropEmptyHeaders: dropEmptyHeaders, setTierStyle: setTierStyle
+		dropEmptyHeaders: dropEmptyHeaders, setTierStyle: setTierStyle, tierHeader: tierHeader
 	};
 
 })(window.jQuery);

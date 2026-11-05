@@ -17,6 +17,8 @@
 		}
 	});
 
+	window.DexViews.ui.DexFormatPopup = DexFormatPopup;
+
 	var FORMAT_PICKERS = [['pokemon', 'Pok&eacute;mon', 'Pok\u00E9mon'], ['move', 'Moves', 'moves'], ['ability', 'Abilities', 'abilities'], ['item', 'Items', 'items']];
 	var FORMAT_TABS = [['rule', 'Rulesets'], ['banlist', 'Banlist']];
 	var FORMAT_BAN_TABS = [['ban', 'Tags'], ['pokemon', 'Pok&eacute;mon'], ['item', 'Items'], ['move', 'Moves'], ['ability', 'Abilities']];
@@ -38,7 +40,7 @@
 			if (!width) return;
 			this.dexFormatZoom = width < 670 ? width / 670 : 1;
 			this.$('.dexformatwrapper').css({ zoom: this.dexFormatZoom === 1 ? '' : this.dexFormatZoom, width: this.dexFormatZoom === 1 ? '' : '670px' });
-			if (this.dexFormatSearch) this.dexFormatSearch.updateScroll();
+			this.updateDexScroll();
 		},
 		openDexFormat: function (formatid) {
 			this.dexFormat = formatid;
@@ -71,6 +73,11 @@
 			buf += '<label class="label">Dex: <strong>' + BattleLog.escapeHTML(details.dex) + '</strong></label> ';
 			buf += '<label class="label">Mod: <strong>' + BattleLog.escapeHTML(details.mod) + '</strong></label> ';
 			buf += '<label class="label">Game type: <strong>' + BattleLog.escapeHTML(FORMAT_GAME_TYPES[details.gameType] || details.gameType) + '</strong></label></p>';
+			if (this.dexEditable) {
+				buf += '<p><label class="label">Name: <input type="text" class="textbox" name="formatname" value="' + BattleLog.escapeHTML(details.name) + '" size="20" maxlength="40" /></label> ' +
+					'<button class="button" name="newDexFormat"><i class="fa fa-plus"></i> New format</button> ' +
+					'<button class="button" name="deleteDexFormat"><i class="fa fa-trash"></i> Delete format</button></p>';
+			}
 			buf += '</div><ul class="dexformattabs">';
 			for (var j = 0; j < FORMAT_TABS.length; j++) {
 				buf += '<li><button class="button" name="showDexFormatList" value="' + FORMAT_TABS[j][0] + '">' + FORMAT_TABS[j][1] + '</button></li>';
@@ -147,20 +154,12 @@
 			for (var n = 0; n < details.outright.length; n++) outright[details.outright[n]] = 1;
 			var onTop = kind === 'pokemon' ? outright : banned;
 			var $list = $page.find('.dexformatlist');
-			var search = this.dexFormatSearch = new BattleSearch($list, this.dexScroller());
+			var search = this.dexFormatSearch = this.createDexList($list, 'dexFormatZoom');
 			search.renderRow = function (id, type, matchStart, matchLength, errorMessage, attrs) {
 				if (type === kind && banned[id]) attrs = attrs ? attrs.replace('class="', 'class="banned ') : ' class="banned"';
 				return BattleSearch.prototype.renderRow.call(this, id, type, matchStart, matchLength, errorMessage, attrs);
 			};
 			var room = this;
-			search.$viewport = {
-				scrollTop: function () {
-					return room.dexScroller()[0].scrollTop / room.dexFormatZoom;
-				},
-				height: function () {
-					return room.dexScroller()[0].clientHeight / room.dexFormatZoom;
-				}
-			};
 			viewSearch(search, view, function (typedSearch, searchType) {
 				typedSearch.dexid = room.dexid;
 				setTierStyle(typedSearch, details);
@@ -195,6 +194,7 @@
 			query = query.toLowerCase();
 			var details = this.dexFormatDetails;
 			var tree = this.dexFormatTree;
+			var editable = this.dexEditable;
 			var renderNode = function (ruleid, ancestors, parentActive) {
 				var rule = tree.byId[ruleid];
 				var on = details.rules.includes(ruleid);
@@ -213,7 +213,8 @@
 				if (query && !childBuf && !(rule.name + ' ' + (rule.desc || '')).toLowerCase().includes(query)) return '';
 				var title = on ? (source ? "Required by " + source + (elsewhere ? ", highlighted there" : "") : elsewhere ? "On, highlighted at the top" : "On") :
 					off ? "Off, switched off by this format" : "Off";
-				return '<li><button type="button" class="button' + (on ? (elsewhere ? ' ruleelsewhere' : ' ruleon') : '') + '" title="' + BattleLog.escapeHTML(title) + '">' +
+				return '<li><button type="button" class="button' + (on ? (elsewhere ? ' ruleelsewhere' : ' ruleon') : '') + '" title="' + BattleLog.escapeHTML(title) + '"' +
+					(editable ? ' name="toggleDexRule" value="' + ruleid + '"' : '') + '>' +
 					BattleLog.escapeHTML(rule.name) + '</button>' +
 					(rule.desc ? ' <small class="ruletreedesc">' + BattleLog.sanitizeHTML(rule.desc) + '</small>' : '') +
 					(childBuf ? '<ul>' + childBuf + '</ul>' : '') + '</li>';
@@ -235,7 +236,8 @@
 					var ban = group.bans[i];
 					if (query && !(ban.name + ' ' + (ban.desc || '')).toLowerCase().includes(query)) continue;
 					var title = FORMAT_BAN_STATES[ban.state] + (ban.source ? " by " + ban.source : "");
-					groupBuf += '<li><button type="button" class="button' + (ban.state && ban.state !== 'unbanned' ? ' ruleoff' : '') + '" title="' + BattleLog.escapeHTML(title) + '">' +
+					groupBuf += '<li><button type="button" class="button' + (ban.state && ban.state !== 'unbanned' ? ' ruleoff' : '') + '" title="' + BattleLog.escapeHTML(title) + '"' +
+						(this.dexEditable ? ' name="toggleDexBan" value="' + BattleLog.escapeHTML(ban.name) + '"' : '') + '>' +
 						BattleLog.escapeHTML(ban.name) + '</button>' +
 						(ban.desc ? ' <small class="ruletreedesc">' + BattleLog.sanitizeHTML(ban.desc) + '</small>' : '') + '</li>';
 				}
