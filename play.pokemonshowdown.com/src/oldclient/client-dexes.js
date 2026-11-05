@@ -498,7 +498,7 @@
 			this.forkTarget = '';
 			this.$el.append(
 				'<div data-workspace="create"><div class="pad dexsearchpage">' + HIDE_BUTTON +
-				'<h2>Search dexes</h2><form class="dexsearch"><p><label>Dex or username:<br />' +
+				'<h2>Search dexes</h2><form class="dexsearch"><p><label>Dex or creator:<br />' +
 				'<input type="search" class="textbox" name="dexsearch" placeholder="(blank = all dexes)" size="30" autocomplete="off" /></label></p>' +
 				'<p><button type="submit" class="button"><i class="fa fa-search"></i> <strong>Search</strong></button></p></form>' +
 				'<div class="dexresults" style="max-width:480px"><p><em style="font-size:20pt">Loading...</em></p></div></div>' +

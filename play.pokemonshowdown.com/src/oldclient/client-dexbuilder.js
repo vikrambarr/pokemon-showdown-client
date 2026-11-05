@@ -60,6 +60,7 @@
 		title: 'Dexbuilder',
 		events: {
 			'click .selectFolder': 'selectFolder',
+			'change select[name=dexpicker]': 'selectFolder',
 			'click .team': 'clickDexTeam',
 			'submit form.dexsettings': 'submitDexSettings',
 			'change form.dexsettings input[name=name]': 'saveDexName',
@@ -91,9 +92,14 @@
 			this.updateFolderList(slots, shared, official);
 			var summary = all[folders.indexOf(this.curFolder)];
 			var key = JSON.stringify([userid, summary, this.free]);
+			this.dexOptions = this.dexOptionsHTML(slots, shared, official);
+			this.$('select[name=dexpicker]').html(this.dexOptions);
 			if (key === this.teamListKey) return;
 			this.teamListKey = key;
 			this.updateTeamList(summary);
+		},
+		dexPickerHTML: function () {
+			return '<p class="dexpicker"><select name="dexpicker" class="button">' + this.dexOptions + '</select></p>';
 		},
 		updateFolderList: function (slots, shared, official) {
 			var buf = '<div class="folderlist"><div class="folderlistbefore"></div>';
@@ -107,6 +113,16 @@
 			buf += '<div class="folderlistafter"></div></div>';
 			this.$('.folderpane').html(buf);
 		},
+		dexOptionsHTML: function (slots, shared, official) {
+			var self = this;
+			var options = function (label, list, extra) {
+				if (!list.length && !extra) return '';
+				return '<optgroup label="' + label + '">' + list.map(function (summary) {
+					return '<option value="' + BattleLog.escapeHTML(summary.id) + '"' + (self.curFolder === summary.id ? ' selected' : '') + '>' + BattleLog.escapeHTML(summary.name) + '</option>';
+				}).join('') + (extra || '') + '</optgroup>';
+			};
+			return (this.curFolder ? '' : '<option value="" selected disabled>(choose a dex)</option>') + options("Dexes", slots, '<option value="+">(new dex)</option>') + options("Shared with you", shared) + options("Official", official);
+		},
 		folderHTML: function (summary) {
 			var cur = this.curFolder === summary.id;
 			return '<div class="folder' + (cur ? ' cur"><div class="folderhack3"><div class="folderhack1"></div><div class="folderhack2"></div>' : '">') +
@@ -117,7 +133,7 @@
 			var sameDex = summary && this.curSummary && this.curSummary.id === summary.id && this.$('form.dexsettings').length;
 			this.curSummary = summary;
 			if (!summary) {
-				var buf = '<h2><i class="fa fa-folder-open-o"></i> Dexes</h2>';
+				var buf = this.dexPickerHTML() + '<h2><i class="fa fa-folder-open-o"></i> Dexes</h2>';
 				buf += '<ul class="teamlist"><li><p><em>' + (app.user.get('named') ? 'you don\'t have any dexes lol' : 'log in to make dexes') + '</em></p></li></ul>';
 				this.$('.teampane').html(buf);
 				return;
@@ -132,7 +148,7 @@
 			}
 			this.saveState = '';
 			var locked = isOwner ? '' : ' disabled';
-			var buf = '<h2 class="dexheading">' + this.dexHeadingHTML() + '</h2>';
+			var buf = this.dexPickerHTML() + '<h2 class="dexheading">' + this.dexHeadingHTML() + '</h2>';
 			buf += '<form class="dexsettings"><div class="dexsettingsrow">';
 			buf += '<p><label class="label">Name:</label><input type="text" class="textbox" name="name" value="' + BattleLog.escapeHTML(summary.name) + '" size="24" maxlength="40"' + locked + ' /></p>';
 			buf += '<p><label class="label">World:</label><select name="base" class="button"' + locked + '>' + baseOptions(summary) + '</select></p>';
@@ -194,9 +210,10 @@
 			if (this.curSummary) this.$('.dexheading').html(this.dexHeadingHTML());
 		},
 		selectFolder: function (e) {
-			var value = e.currentTarget.dataset.value;
+			var value = e.currentTarget.dataset.value || e.currentTarget.value;
 			if (value === '+') {
 				this.newDex(e.currentTarget);
+				this.$('select[name=dexpicker]').val(this.curFolder);
 				return;
 			}
 			this.curFolder = value;
