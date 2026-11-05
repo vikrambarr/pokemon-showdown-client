@@ -589,3 +589,57 @@
 	transform: scale(2);
 	transform-origin: 0 0;
 }
+
+.setcell-fusion {
+	position: absolute;
+	left: 172px;
+	top: 5px;
+	border: 1px solid #999999;
+	background: #CBD6E1;
+	border-radius: 5px;
+	padding: 1px 0 0 0;
+	width: 110px;
+	box-shadow: inset 1px 1px 0 rgba(255,255,255,.6);
+}
+.setcell-fusion label {
+	display: block;
+	font-size: 7pt;
+	font-weight: bold;
+	color: #555555;
+	padding-left: 2px;
+	margin-bottom: -1px;
+}
+.setcell-fusion input {
+	display: block;
+	padding: 1px;
+	margin: 2px 3px 1px 1px;
+	width: 104px;
+	height: 20px;
+}
+.setcell-fusion .closebutton {
+	position: absolute;
+	top: -1px;
+	right: 1px;
+}
+.setchart .setcell-typeicons-da {
+	float: left;
+	margin-right: 0;
+	margin-left: 4px;
+}
+.setchart .setcell-abilities {
+	margin-top: -2px;
+}
+.dark .setcell-fusion {
+	background-color: #5A6570;
+	box-shadow: none;
+}
+.dark .setcell-fusion label {
+	color: #BBB;
+}
+.setmenu button {
+	padding: 2px 2px;
+}
+.setchart .setcell-abilities input[name=ability] {
+	margin-top: 0;
+	margin-bottom: 4px;
+}

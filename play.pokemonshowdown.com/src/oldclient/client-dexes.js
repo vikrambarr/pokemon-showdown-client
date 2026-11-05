@@ -14,6 +14,7 @@
 	DexViews.list = [];
 	DexViews.formats = {};
 	DexViews.entries = {};
+	DexViews.formatDetails = {};
 
 	function request(cmd, target) {
 		var key = cmd + ' ' + target;
@@ -139,10 +140,35 @@
 		return view.dex;
 	}
 
+	function loadFormatDetails(room, formatid) {
+		if (DexViews.formatDetails[formatid]) return;
+		request('dexformat', formatid).then(function (details) {
+			var legal = {};
+			for (var i = 0; i < details.legal.pokemon.length; i++) legal[details.legal.pokemon[i]] = 1;
+			DexViews.formatDetails[formatid] = { rules: details.rules, gameType: details.gameType, legal: legal };
+			if (!room.curTeam || room.curTeam.format !== formatid) return;
+			room.update();
+			if (room.curSet && room.curChartType) room.updateChart(true);
+		}, function () {});
+	}
+
+	function fixTeamFormats() {
+		var fixed = false;
+		$.each(Storage.teams || [], function (i, team) {
+			var summary = team.format.startsWith('gen6') && DexViews.formats[team.format.slice(4)];
+			if (!summary) return;
+			team.format = team.format.slice(4);
+			team.gen = summary.gen;
+			fixed = true;
+		});
+		return fixed;
+	}
+
 	function useTeamDex(room) {
 		var team = room.curTeam;
 		var summary = team && formatDex(team.format);
 		if (!summary) return;
+		loadFormatDetails(room, team.format);
 		var dex = loadedDex(summary);
 		if (dex) {
 			team.dex = dex;
@@ -160,6 +186,7 @@
 	var focus = TeambuilderRoom.prototype.focus;
 	var changeFormat = TeambuilderRoom.prototype.changeFormat;
 	var update = TeambuilderRoom.prototype.update;
+	var updateFolderList = TeambuilderRoom.prototype.updateFolderList;
 	_.extend(TeambuilderRoom.prototype, {
 		getGen: function (format) {
 			var summary = formatDex(format);
@@ -167,6 +194,7 @@
 		},
 		edit: function (i) {
 			if (i && i.currentTarget) i = $(i.currentTarget).data('value');
+			fixTeamFormats();
 			var team = Storage.teams[+i];
 			var summary = team && formatDex(team.format);
 			if (summary && !loadedDex(summary) && !DexViews.failed[summary.hash]) {
@@ -187,7 +215,45 @@
 			changeFormat.apply(this, arguments);
 			useTeamDex(this);
 		},
+		updateFolderList: function () {
+			var curFolder = this.curFolder;
+			var curFolderKeep = this.curFolderKeep;
+			if (formatDex(curFolder)) this.curFolder = 'genX' + curFolder;
+			if (formatDex(curFolderKeep)) this.curFolderKeep = 'genX' + curFolderKeep;
+			try {
+				updateFolderList.apply(this, arguments);
+			} finally {
+				this.curFolder = curFolder;
+				this.curFolderKeep = curFolderKeep;
+			}
+			var $header = this.$('.folderpane h3').filter(function () { return $(this).text() === '???'; }).closest('.folder');
+			var folders = $header.nextUntil('.foldersep').filter(function () {
+				if (!$(this).find('.selectFolder').attr('data-value').startsWith('genXgenX')) return true;
+				$(this).remove();
+				return false;
+			}).get().map(function (el) {
+				var $select = $(el).find('.selectFolder');
+				var format = $select.attr('data-value').slice(4);
+				var summary = formatDex(format);
+				$select.attr('data-value', format);
+				if (summary) $select.contents().last().replaceWith(BattleLog.escapeHTML(format.slice(summary.id.length)));
+				return { el: el, dex: summary ? summary.name : '???', format: format };
+			}).sort(function (a, b) {
+				return (a.dex === '???') - (b.dex === '???') || a.dex.localeCompare(b.dex) || a.format.localeCompare(b.format);
+			});
+			var $last = $header;
+			var dex = null;
+			for (var i = 0; i < folders.length; i++) {
+				if (folders[i].dex !== dex) {
+					dex = folders[i].dex;
+					$last = $('<div class="folder"><h3></h3></div>').find('h3').text(dex).end().insertAfter($last);
+				}
+				$last = $(folders[i].el).insertAfter($last);
+			}
+			$header.remove();
+		},
 		update: function () {
+			fixTeamFormats();
 			update.apply(this, arguments);
 			if (this.curTeam || !Storage.teams) return;
 			var self = this;
@@ -210,6 +276,13 @@
 			if (!list) return;
 			DexViews.list = list;
 			addFormats();
+			var teambuilder = app.rooms.teambuilder;
+			if (fixTeamFormats() && teambuilder && teambuilder.curTeam) {
+				useTeamDex(teambuilder);
+				teambuilder.update();
+			} else if (teambuilder) {
+				teambuilder.updateFolderList();
+			}
 			if (app.rooms.rooms) {
 				app.rooms.rooms.updateDexSearch();
 				app.rooms.rooms.updateDexPage();
@@ -263,8 +336,49 @@
 			if (!search) return search;
 			search.dex = view.dex;
 			search.dexView = view;
-			search.dexid = summary.id;
+			search.formatDetails = DexViews.formatDetails[toID(format)];
+			if (search.formatDetails) {
+				search.isNatDex = search.formatDetails.rules.includes('natdexmod');
+				search.isDoubles = search.formatDetails.gameType !== 'singles';
+			}
+			var table = { move: 'Moves', ability: 'Abilities', item: 'Items' }[searchType];
+			if (!table) return search;
+			var getDefaultResults = search.getDefaultResults;
+			search.getDefaultResults = function () {
+				var results = getDefaultResults.apply(this, arguments).slice();
+				var start = results.findIndex(function (row) { return row[0] === 'header' && row[1] === table; }) + 1;
+				var listed = {};
+				for (var i = 0; i < results.length; i++) listed[results[i][1]] = 1;
+				Object.keys(view[table]).sort().forEach(function (id) {
+					if (!DexViews.custom[table][id] || listed[id] || view[table][id].isPokeball) return;
+					var end = start;
+					while (end < results.length && results[end][0] !== 'header' && results[end][1] < id) end++;
+					results.splice(end, 0, [searchType, id]);
+				});
+				return results;
+			};
 			return search;
+		};
+
+		var inFormatDex = function (formatid, callback) {
+			var summary = formatid && formatDex(formatid);
+			var view = summary && DexViews.views[summary.hash];
+			if (!view) return callback(formatid);
+			var mod = Dex.mod;
+			Dex.mod = function () { return view.dex; };
+			try {
+				return callback('gen' + view.gen + formatid.slice(summary.id.length));
+			} finally {
+				Dex.mod = mod;
+			}
+		};
+		var StatGuesser = window.BattleStatGuesser;
+		var StatOptimizer = window.BattleStatOptimizer;
+		window.BattleStatGuesser = function (formatid) {
+			return inFormatDex(formatid, function (id) { return new StatGuesser(id); });
+		};
+		window.BattleStatOptimizer = function (set, formatid) {
+			return inFormatDex(formatid, function (id) { return StatOptimizer(set, id); });
 		};
 
 		var TypedSearch = window.BattleTypedSearch;
@@ -379,9 +493,10 @@
 				tiers[order[i]].sort(function (a, b) { return a.num - b.num || (a.name < b.name ? -1 : 1); });
 				for (var j = 0; j < tiers[order[i]].length; j++) results.push(['pokemon', tiers[order[i]][j].id]);
 			}
-			return results.filter(function (row) {
-				return row[0] !== 'pokemon' || !self.dex.species.get(row[1]).isCosmeticForme;
-			});
+			var legal = this.formatDetails && this.formatDetails.legal;
+			return dropEmptyHeaders(results.filter(function (row) {
+				return row[0] !== 'pokemon' || !self.dex.species.get(row[1]).isCosmeticForme && (!legal || legal[row[1]]);
+			}));
 		};
 
 		var getMoveResults = MoveSearch.getBaseResults;
@@ -416,7 +531,7 @@
 			var getDefaultResults = info[0].getDefaultResults;
 			info[0].getDefaultResults = function () {
 				var results = getDefaultResults.apply(this, arguments);
-				var view = this.dexView;
+				var view = this.dexid && this.dexView;
 				var entries = view && DexViews.entries[this.dexid];
 				if (view && !entries) loadEntries(this.dexid);
 				if (!entries) return results;

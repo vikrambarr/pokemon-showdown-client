@@ -149,50 +149,111 @@
 		return abilityData;
 	};
 
-	function fusionCell(set) {
-		if (!set.fusion) return '';
-		return '<span class="detailcell"><label>Fusion</label>' + BattleLog.escapeHTML(set.fusion) + '</span>';
+	function formatRules(format) {
+		var details = window.DexViews && window.DexViews.formatDetails[format];
+		return details ? details.rules : [];
 	}
 
 	var renderSet = TeambuilderRoom.prototype.renderSet;
-	var updateDetailsForm = TeambuilderRoom.prototype.updateDetailsForm;
-	var detailsChange = TeambuilderRoom.prototype.detailsChange;
+	var updateChart = TeambuilderRoom.prototype.updateChart;
+	var chartChange = TeambuilderRoom.prototype.chartChange;
+	var chartSet = TeambuilderRoom.prototype.chartSet;
 	var updatePokemonSprite = TeambuilderRoom.prototype.updatePokemonSprite;
 	_.extend(TeambuilderRoom.prototype, {
 		renderSet: function (set, i) {
 			var buf = renderSet.call(this, set, i);
-			if (!set || !set.fusion) return buf;
-			return buf.replace(/(name="details">[\s\S]*?)(<\/button>)/, '$1' + fusionCell(set) + '$2');
+			var rules = formatRules(this.curTeam.format);
+			var isFusion = !!set.fusion || rules.includes('infinitefusionmod');
+			var isDA = !!set.ability2 || rules.includes('doubleabilitymod');
+			if (isFusion) buf = buf.replace('<label>Pok&eacute;mon</label>', '<label>Pok&eacute;mon/Head</label>');
+			if (!set.species) return buf;
+			if (isFusion) {
+				var fusionCell = '<div class="setcell-fusion"><label>Fusion/Body</label>' +
+					'<input type="text" name="fusion" class="textbox chartinput" value="' + BattleLog.escapeHTML(set.fusion || '') + '" autocomplete="off" />' +
+					'<button class="closebutton" name="deleteFusion" aria-label="Delete"><i class="fa fa-times-circle"></i></button></div>';
+				buf = buf.replace('<div class="setmenu">', '$&<button name="swapFusion"><i class="fa fa-random"></i>Swap</button> ');
+				buf = buf.replace('<div class="setchart', fusionCell + '$&');
+				var types = fuse(this.curTeam.dex, this.curTeam.dex.species.get(set.species), set.fusion || '').types;
+				buf = buf.replace(/(<div class="setcell setcell-typeicons">)[\s\S]*?(<\/div>)/, '$1' + types.map(function (type) { return Dex.getTypeIcon(type); }).join('') + '$2');
+			}
+			if (isDA) {
+				var abilityCell = /<div class="setcell setcell-ability">[\s\S]*?<\/div>/.exec(buf);
+				if (!abilityCell) return buf;
+				var ability2 = '<input type="text" name="ability2" class="textbox chartinput" value="' + BattleLog.escapeHTML(set.ability2 || '') + '" autocomplete="off" />';
+				var abilitiesCell = abilityCell[0].replace('<label>Ability</label>', '<label>Abilities</label>')
+					.replace('setcell-ability"', 'setcell-ability setcell-abilities"').replace('</div>', ability2 + '</div>');
+				buf = buf.replace(abilityCell[0], '').replace('<div class="setcell setcell-typeicons">', '<div class="setcell setcell-typeicons setcell-typeicons-da">');
+				buf = buf.replace(/(<div class="setrow setrow-icons">[\s\S]*?)(<\/div><div class="setrow">)/, '$1' + abilitiesCell + '$2');
+			}
+			return buf;
 		},
-		updateDetailsForm: function () {
-			updateDetailsForm.call(this);
-			var set = this.curSet;
-			if (!set) return;
-			var buf = '<div class="formrow"><label class="formlabel">Fusion:</label><div>' +
-				'<input type="text" name="fusion" class="textbox" value="' + BattleLog.escapeHTML(set.fusion || '') + '" /></div></div>';
-			buf += '<div class="formrow"><label class="formlabel">Ability 2:</label><div>' +
-				'<input type="text" name="ability2" class="textbox" value="' + BattleLog.escapeHTML(set.ability2 || '') + '" /></div></div>';
-			this.$chart.find('form.detailsform').append(buf);
+		swapFusion: function (i, button) {
+			var set = this.curSetList[+$(button).closest('li').attr('value')];
+			if (!set.fusion) return;
+			var fusion = set.fusion;
+			set.fusion = set.species;
+			set.species = fusion;
+			delete set.altsprite;
+			this.save();
+			this.update();
+			if (this.curSet) this.updateChart();
 		},
-		detailsChange: function (e) {
+		deleteFusion: function (i, button) {
+			var set = this.curSetList[+$(button).closest('li').attr('value')];
+			delete set.fusion;
+			delete set.altsprite;
+			this.save();
+			this.update();
+			if (this.curSet) this.updateChart();
+		},
+		updateChart: function () {
 			var set = this.curSet;
-			if (set) {
-				var fusion = this.curTeam.dex.species.get(this.$chart.find('input[name=fusion]').val());
-				if (fusion.exists) {
-					set.fusion = fusion.name;
+			if (!set || this.curChartName !== 'ability2' || !set.fusion) return updateChart.apply(this, arguments);
+			this.curSet = _.extend({}, set, { species: set.fusion });
+			try {
+				return updateChart.apply(this, arguments);
+			} finally {
+				this.curSet = set;
+			}
+		},
+		chartChange: function (e, selectNext) {
+			var name = e.currentTarget.name;
+			if (name !== 'fusion' && name !== 'ability2') return chartChange.apply(this, arguments);
+			if (this.curChartName !== name) return;
+			var value = e.currentTarget.value;
+			var entry = name === 'fusion' ? this.curTeam.dex.species.get(value) : this.curTeam.dex.abilities.get(value);
+			if (toID(value) && !entry.exists) {
+				$(e.currentTarget).addClass('incomplete');
+				return;
+			}
+			this.chartSet(entry.exists ? entry.name : '', selectNext);
+		},
+		chartSet: function (val, selectNext) {
+			var name = this.curChartName;
+			if (name !== 'fusion' && name !== 'ability2') return chartSet.apply(this, arguments);
+			var set = this.curSet;
+			this.$('input[name=' + name + ']').val(val).removeClass('incomplete');
+			if (name === 'fusion') {
+				var changed = (set.fusion || '') !== val;
+				if (val) {
+					set.fusion = val;
 				} else {
 					delete set.fusion;
-					delete set.altsprite;
 				}
-				var ability2 = this.curTeam.dex.abilities.get(this.$chart.find('input[name=ability2]').val());
-				if (ability2.exists) {
-					set.ability2 = ability2.name;
+				if (changed) {
+					delete set.altsprite;
+					this.updateSetTop();
+				}
+				if (selectNext) this.$(this.$('input[name=item]').length ? 'input[name=item]' : 'input[name=ability]').select();
+			} else {
+				if (val) {
+					set.ability2 = val;
 				} else {
 					delete set.ability2;
 				}
+				if (selectNext) this.$('input[name=move1]').select();
 			}
-			detailsChange.call(this, e);
-			if (set) this.$('button[name=details]').append(fusionCell(set));
+			this.save();
 		},
 		updatePokemonSprite: function () {
 			updatePokemonSprite.call(this);
@@ -200,6 +261,7 @@
 			if (set && set.fusion) this.$('.pokemonicon-' + this.curSetLoc).attr('style', Dex.getPokemonIcon(set));
 		}
 	});
+	TeambuilderRoom.prototype.chartTypes = _.extend({}, TeambuilderRoom.prototype.chartTypes, { fusion: 'pokemon', ability2: 'ability' });
 
 	var EXTRAS = ['fusion', 'altsprite', 'ability2'];
 	var importing = null;
