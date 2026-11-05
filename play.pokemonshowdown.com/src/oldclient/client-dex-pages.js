@@ -18,7 +18,14 @@
 		allySide: "Ally side", foeSide: "Foe side", all: "Field", randomNormal: "Random foe", scripted: "Scripted"
 	};
 
-	var SPRITE_CELLS = [['front', 'F'], ['back', 'B'], ['front-shiny', 'F*'], ['back-shiny', 'B*'], ['icon', 'I']];
+	var SHINY_STAR = '<span class="shinystar"><i class="fa fa-star"></i><span>';
+	var SPRITE_CELLS = [
+		['front', 'F'], ['back', 'B'], ['front-shiny', SHINY_STAR + 'F</span></span>'], ['back-shiny', SHINY_STAR + 'B</span></span>'], ['icon', 'I']
+	];
+
+	function fieldHTML(value, className) {
+		return '<div class="textbox dexfield' + (className ? ' ' + className : '') + '" title="' + value + '">' + value + '</div>';
+	}
 
 	function hasStandardSprites(id) {
 		return !!(window.BattlePokedex && BattlePokedex[id]) && !DexViews.custom.Pokedex[id];
@@ -125,7 +132,7 @@
 			buf += '<div class="setchart dexmonchart' + (spriteData.pixelated ? ' pixelated' : '') + '" style="' + Dex.getTeambuilderSprite({ species: species.name }, view.dex) + ';">';
 
 			buf += '<div class="setcol setcol-icon"><div class="setcell-sprite"></div>';
-			buf += '<div class="setcell setcell-pokemon"><label>Pok&eacute;mon</label><input type="text" class="textbox" readonly value="' + BattleLog.escapeHTML(species.name) + '" /></div></div>';
+			buf += '<div class="setcell setcell-pokemon"><label>Pok&eacute;mon</label>' + fieldHTML(BattleLog.escapeHTML(species.name)) + '</div></div>';
 
 			var ratio = species.genderRatio;
 			buf += '<div class="setcol setcol-details"><div class="setrow">';
@@ -140,11 +147,12 @@
 			for (var k = 0; k < species.types.length; k++) buf += Dex.getTypeIcon(species.types[k]);
 			buf += '</div></div>';
 			var abilities = species.abilities;
-			var abilityCells = [['Ability 1', abilities['0']], ['Ability 2', abilities['1'] || abilities['S']], ['Hidden', abilities['H']]];
+			var abilityCells = [['Ability 1', abilities['0']], ['Ability 2', abilities['1']], ['Hidden', abilities['H']]];
+			if (abilities['S']) abilityCells.push(['Special', abilities['S']]);
 			buf += '<div class="setrow setrow-abilities">';
 			for (var a = 0; a < abilityCells.length; a++) {
 				var ability = BattleLog.escapeHTML(abilityCells[a][1] || '');
-				buf += '<div class="setcell"><label>' + abilityCells[a][0] + '</label><input type="text" class="textbox" readonly value="' + ability + '" title="' + ability + '" /></div>';
+				buf += '<div class="setcell"><label>' + abilityCells[a][0] + '</label>' + fieldHTML(ability) + '</div>';
 			}
 			buf += '</div></div>';
 
@@ -155,12 +163,12 @@
 			buf += '<div class="setcol setcol-moves"><div class="setcell"><label>Evolves</label>';
 			for (var m = 0; m < rows.length; m++) {
 				if (m) buf += '<div class="setcell">';
-				buf += '<input type="text" class="textbox" readonly value="' + BattleLog.escapeHTML(rows[m]) + '" title="' + BattleLog.escapeHTML(rows[m]) + '" /></div>';
+				buf += fieldHTML(BattleLog.escapeHTML(rows[m])) + '</div>';
 			}
-			buf += '<div class="setcell setcell-learnset"><input type="text" class="textbox learnsetcount" readonly value="Learnset:" /></div>';
+			buf += '<div class="setcell setcell-learnset"><label>Learnset</label><button class="textbox learnsetcount" tabindex="-1" name="showDexLearnset">&hellip;</button></div>';
 			buf += '</div>';
 
-			buf += '<div class="setcol setcol-stats"><div class="setrow"><label>Stats</label><button class="textbox setstats" >';
+			buf += '<div class="setcol setcol-stats"><div class="setrow"><label>Stats</label><button class="textbox setstats" tabindex="-1" name="showDexStats">';
 			buf += '<span class="statrow statrow-head"><label></label> <span class="statgraph"></span> <em>Base</em></span>';
 			var bst = 0;
 			for (var stat in BattleStatNames) {
@@ -173,6 +181,7 @@
 			buf += '</button></div></div>';
 			buf += '</div></li></ol></div>';
 			buf += '<div class="teambuilder-results"></div>';
+			buf += '<div class="dexstatresults" style="display:none">' + this.dexStatsHTML(species, bst) + '</div>';
 			this.dexSpeciesBST = bst;
 			this.$('.dexmonpage').html('<div class="teamwrapper">' + buf + '</div>');
 
@@ -184,7 +193,7 @@
 			});
 			search.setType('move', 'gen' + view.gen + 'ag', { species: species.name, moves: [] });
 			var count = search.resultSet.filter(function (row) { return row[0] === 'move'; }).length;
-			this.$('.learnsetcount').val('Learnset: ' + count + (count === 1 ? ' move' : ' moves'));
+			this.$('.learnsetcount').text(count + (count === 1 ? ' move' : ' moves'));
 			this.scaleDexPokemon();
 		},
 		scaleDexPokemon: function () {
@@ -228,7 +237,7 @@
 			request('dexeffect', this.dexid + ', move, ' + move.id).then(function (data) {
 				room.renderDexMove(data);
 			}, function () {
-				if (room.dexMove === move) room.$('.dexmovebase').val('\u2014');
+				if (room.dexMove === move) room.$('.dexmovebase').text('\u2014');
 			});
 
 			var buf = '<div class="pad">';
@@ -240,10 +249,10 @@
 			buf += '<div class="setchart dexmonchart">';
 
 			buf += '<div class="setcol setcol-icon"><div class="setcell-sprite dexmoveicons">' + Dex.getTypeIcon(move.type) + Dex.getCategoryIcon(move.category) + '</div>';
-			buf += '<div class="setcell setcell-pokemon"><label>Name</label><input type="text" class="textbox" readonly value="' + BattleLog.escapeHTML(move.name) + '" /></div></div>';
+			buf += '<div class="setcell setcell-pokemon"><label>Name</label>' + fieldHTML(BattleLog.escapeHTML(move.name)) + '</div></div>';
 
 			buf += '<div class="setcol setcol-details"><div class="setrow">';
-			buf += '<div class="setcell setcell-details"><label>Base move</label><input type="text" class="textbox dexmovebase" readonly value="Loading..." /></div></div>';
+			buf += '<div class="setcell setcell-details"><label>Base move</label>' + fieldHTML('Loading...', 'dexmovebase') + '</div></div>';
 			var cells = [
 				['Type', move.type], ['Category', move.category], ['Power', move.basePower || '\u2014'],
 				['Accuracy', move.accuracy && move.accuracy !== true ? move.accuracy + '%' : '\u2014']
@@ -251,7 +260,7 @@
 			buf += '<div class="setrow setrow-abilities">';
 			for (var c = 0; c < cells.length; c++) {
 				var value = BattleLog.escapeHTML(String(cells[c][1]));
-				buf += '<div class="setcell"><label>' + cells[c][0] + '</label><input type="text" class="textbox" readonly value="' + value + '" title="' + value + '" /></div>';
+				buf += '<div class="setcell"><label>' + cells[c][0] + '</label>' + fieldHTML(value) + '</div>';
 			}
 			buf += '</div></div>';
 
@@ -260,7 +269,7 @@
 			buf += '<div class="setcol setcol-moves">';
 			for (var d = 0; d < descs.length; d++) {
 				var desc = BattleLog.escapeHTML(descs[d][1]);
-				buf += '<div class="setcell"><label>' + descs[d][0] + '</label><input type="text" class="textbox" readonly value="' + desc + '" title="' + desc + '" /></div>';
+				buf += '<div class="setcell"><label>' + descs[d][0] + '</label>' + fieldHTML(desc) + '</div>';
 			}
 			buf += '<div class="setcell setcell-learnset"><button class="textbox learnsetcount" name="showDexMoveList" value="learn">Learned by:</button></div>';
 			buf += '</div>';
@@ -302,7 +311,7 @@
 			if (!this.dexMove || data.id !== this.dexMove.id || data.dexid !== this.dexid) return;
 			this.dexMoveData = data;
 			var base = data.base ? this.dexView.dex.moves.get(data.base).name : '\u2014';
-			this.$('.dexmovebase').val(base).attr('title', base);
+			this.$('.dexmovebase').text(base).attr('title', base);
 			if (this.dexMoveList === 'code') this.showDexMoveList('code');
 		},
 		showDexMoveList: function (list) {
@@ -384,18 +393,45 @@
 			buf += '</table>';
 			app.addPopup(Popup, { htmlMessage: buf, sourceEl: app.dispatchingButton, maxWidth: 400 });
 		},
+		dexStatsHTML: function (species, bst) {
+			var buf = '<div class="resultheader"><h3>Stats</h3></div><div class="statform">';
+			var rows = { label: '<div></div>', base: '<div><em>Base</em></div>', slider: '<div></div>', min: '<div><em>Min</em></div>', max: '<div><em>Max</em></div>' };
+			for (var stat in BattleStatNames) {
+				var base = species.baseStats[stat];
+				var color = Math.min(Math.floor(base * 180 / 255), 360);
+				rows.label += '<div><label>' + BattleStatNames[stat] + '</label></div>';
+				rows.base += '<div><b>' + base + '</b></div>';
+				rows.slider += '<div><input type="range" value="' + base + '" min="0" max="255" class="evslider" tabindex="-1" aria-hidden="true" style="--fill:hsl(' + color + ',85%,45%);--pct:' + (base * 100 / 255) + '%" /></div>';
+				rows.min += '<div><b>' + (stat === 'hp' ? 2 * base + 110 : Math.floor((2 * base + 5) * 0.9)) + '</b></div>';
+				rows.max += '<div><b>' + (stat === 'hp' ? 2 * base + 204 : Math.floor((2 * base + 99) * 1.1)) + '</b></div>';
+			}
+			rows.label += '<div><label>Total</label></div>';
+			rows.base += '<div><b>' + bst + '</b></div>';
+			buf += '<div class="col labelcol">' + rows.label + '</div><div class="col basestatscol">' + rows.base + '</div>';
+			buf += '<div class="col evslidercol">' + rows.slider + '</div><div class="col dexrangecol">' + rows.min + '</div><div class="col dexrangecol">' + rows.max + '</div>';
+			return buf + '<div style="clear:both"></div></div>';
+		},
+		showDexStats: function () {
+			this.showDexLearnset(!this.$('.dexmonpage .dexstatresults').is(':visible'));
+		},
+		showDexLearnset: function (stats) {
+			stats = stats === true;
+			this.$('.dexmonpage .dexstatresults').toggle(stats);
+			this.$('.dexmonpage .teambuilder-results').toggle(!stats);
+			this.$('.dexmonpage .setstats').toggleClass('cur', stats);
+		},
 		showDexSprite: function (kind) {
 			var uploadid = (this.dexView.sprites[this.dexSpecies.id] || {})[kind];
 			var image = uploadid && this.dexView.images[uploadid];
 			if (!image && hasStandardSprites(this.dexSpecies.id)) {
 				var dex = Object.getPrototypeOf(Dex);
-				var sprite = '<span class="picon" style="' + dex.getPokemonIcon.call(Dex, this.dexSpecies.name) + '"></span>';
+				var sprite = '<span class="dexiconpreview"><span class="picon" style="' + dex.getPokemonIcon.call(Dex, this.dexSpecies.name) + '"></span></span>';
 				var size = '40&times;30';
 				if (kind !== 'icon') {
 					var data = dex.getSpriteData.call(Dex, this.dexSpecies.name, kind.slice(0, 5) === 'front', {
 						gen: this.dexView.dex.gen, shiny: kind.indexOf('shiny') >= 0, noScale: true
 					});
-					sprite = '<img src="' + data.url + '" width="' + data.w + '" height="' + data.h + '" alt="' + kind + '"' + (data.pixelated ? ' class="pixelated"' : '') + ' />';
+					sprite = '<img src="' + data.url + '" width="' + data.w * 2 + '" height="' + data.h * 2 + '" alt="' + kind + '"' + (data.pixelated ? ' class="pixelated"' : '') + ' />';
 					size = data.w + '&times;' + data.h;
 				}
 				app.addPopup(Popup, {
@@ -410,7 +446,7 @@
 			}
 			app.addPopup(Popup, {
 				htmlMessage: '<strong>' + kind + '</strong> <small>(' + image.width + '&times;' + image.height + ')</small>\n' +
-					'<img src="' + Dex.resourcePrefix + 'sprites/custom/' + BattleLog.escapeHTML(image.file) + '" width="' + image.width + '" height="' + image.height + '" alt="' + kind + '"' +
+					'<img src="' + Dex.resourcePrefix + 'sprites/custom/' + BattleLog.escapeHTML(image.file) + '" width="' + image.width * 2 + '" height="' + image.height * 2 + '" alt="' + kind + '"' +
 					(image.pixelated ? ' class="pixelated"' : '') + ' />' +
 					(image.artist ? '\n<small>by ' + BattleLog.escapeHTML(image.artist) + '</small>' : ''),
 				sourceEl: app.dispatchingButton

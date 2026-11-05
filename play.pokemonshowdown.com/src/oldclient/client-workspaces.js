@@ -180,6 +180,8 @@
 			buf += '<p><label class="label">Team:</label>' + this.renderTeams() + '</p>';
 			buf += '<p style="margin-top:94px"><button class="button mainmenu1 big" name="openDexBuilder"><strong>Create!</strong><br /><small>Make and edit your dexes</small></button></p></form></div>';
 			this.$('.mainmenu').attr('data-workspace', 'battle').after('<div class="createmenu" data-workspace="create" style="padding-bottom:51px">' + buf + '</div>');
+			var $join = this.$('.rightmenu .menugroup').attr('data-workspace', 'battle');
+			$join.clone().attr('data-workspace', 'create').insertAfter($join).find('button').text("Dex search").val('rooms');
 			this.$('[data-workspace]').hide().filter('[data-workspace="' + app.workspace + '"]').show();
 		},
 		openDexBuilder: function () {

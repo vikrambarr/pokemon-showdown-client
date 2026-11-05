@@ -31,7 +31,8 @@
 	border-radius: 0;
 	background: none;
 	font: inherit;
-	font-size: 8pt;
+	font-size: 7pt;
+	font-weight: bold;
 	line-height: 18px;
 	text-align: center;
 	cursor: pointer;
@@ -41,11 +42,11 @@
 }
 .spritebox .spritecell.has {
 	background: #d9f2d9;
-	color: #206020;
+	color: #000000;
 }
 .spritebox .spritecell.missing {
 	background: #f7dcdc;
-	color: #903030;
+	color: #000000;
 }
 .dark .spritebox .spritecell + .spritecell {
 	border-left-color: #555555;
@@ -100,8 +101,8 @@
 	flex: 1 1 0;
 	min-width: 0;
 }
-.dexmonchart .setrow-abilities input {
-	width: calc(100% - 8px);
+.dexmonchart .setrow-abilities .dexfield {
+	width: calc(100% - 4px);
 }
 .dexmonpage .teambuilder-results {
 	bottom: 0;
@@ -307,20 +308,11 @@
 	background: #2c4a2c;
 	color: #b8e6b8;
 }
-.dexsettingsrow {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: flex-end;
-	gap: 0 16px;
-}
-.dexsettingsrow p {
-	margin: 0 0 8px 0;
-}
 .dexsettings textarea {
-	width: 520px;
-	max-width: 100%;
+	width: 100%;
+	box-sizing: border-box;
 	min-height: 4em;
-	resize: both;
+	resize: vertical;
 	field-sizing: fixed;
 }
 .dexsavestate {
@@ -431,10 +423,169 @@
 	margin-left: auto;
 }
 .dexpicker {
+	position: relative;
+}
+.dexpicker select,
+.dexpicker .dexpickercaret {
 	display: none;
 }
 @media (max-width:649px) {
-	.dexpicker {
+	.dexpicker select {
 		display: block;
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		opacity: 0;
+		cursor: pointer;
 	}
+	.dexpicker .dexpickercaret {
+		display: inline-block;
+	}
+}
+.dexmenu {
+	float: right;
+	position: relative;
+	z-index: 1;
+	margin: 2px 8px 0 4px;
+}
+.ps-popup .dexsettings .label {
+	width: auto;
+}
+.ps-popup .dexsettings .textbox {
+	width: 100%;
+	box-sizing: border-box;
+}
+.dexmonchart .dexfield {
+	display: block;
+	box-sizing: border-box;
+	width: 108px;
+	height: 24px;
+	margin: 2px 3px 1px 1px;
+	padding: 1px 3px;
+	line-height: 20px;
+	white-space: nowrap;
+	overflow-x: auto;
+	overflow-y: hidden;
+	scrollbar-width: none;
+	cursor: default;
+}
+.dexmonchart .dexfield::-webkit-scrollbar {
+	display: none;
+}
+.dexmonchart .dexfield,
+.dexmonchart .dexfield:hover {
+	border-color: #AAAAAA;
+	box-shadow: none;
+	background: #F8FBFD;
+}
+.dark .dexmonchart .dexfield,
+.dark .dexmonchart .dexfield:hover {
+	border-color: #6b7178;
+	box-shadow: none;
+	background: #222527;
+}
+.dexmonchart .setcell-details .dexfield {
+	width: 220px;
+}
+.dexmonchart .setcol-moves .dexfield {
+	width: 133px;
+}
+.dexdetails td + td {
+	padding-left: 10px;
+}
+.dexstatresults {
+	position: absolute;
+	top: 200px;
+	left: 0;
+	bottom: 0;
+	right: 0;
+	min-width: 640px;
+	overflow-y: auto;
+}
+.dexstatresults .evslider {
+	pointer-events: none;
+}
+.dexstatresults .evslider::-webkit-slider-runnable-track {
+	background: linear-gradient(to right, var(--fill) var(--pct), #F8FBFD var(--pct));
+}
+.dexstatresults .evslider::-moz-range-progress {
+	background: var(--fill);
+}
+.dark .dexstatresults .evslider::-webkit-slider-runnable-track {
+	background: linear-gradient(to right, var(--fill) var(--pct), #222527 var(--pct));
+}
+.dexstatresults .dexrangecol {
+	width: 52px;
+}
+.dexeditorlist {
+	list-style-type: none;
+	margin: 0 0 6px 0;
+	padding: 0;
+}
+.dexeditorlist li {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	min-height: 22px;
+}
+.dexeditorlist small {
+	color: #888888;
+}
+.dexeditorlist button.username {
+	background: transparent;
+	border: 0;
+	border-radius: 3px;
+	padding: 1px 4px;
+	font: bold 9pt Verdana, sans-serif;
+	cursor: pointer;
+}
+.dexeditorlist button.username:hover {
+	background: #dce4ec;
+}
+.dark .dexeditorlist button.username:hover {
+	background: #444444;
+}
+.dexmonchart .setcell-learnset label + button.learnsetcount {
+	display: block;
+	box-sizing: border-box;
+	width: 133px;
+	height: 24px;
+	margin: 2px 3px 1px 1px;
+	padding: 1px 3px;
+}
+.spritecell .shinystar {
+	position: relative;
+	display: inline-block;
+	width: 18px;
+	height: 18px;
+	vertical-align: top;
+}
+.spritecell .shinystar i {
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 18px;
+	font-size: 17px;
+	line-height: 18px;
+	color: #F2C200;
+	text-shadow: 0 0 1px #9A7A00;
+}
+.spritecell .shinystar span {
+	position: relative;
+	font-size: 7pt;
+	font-weight: bold;
+	line-height: 19px;
+	color: #000000;
+}
+.dexiconpreview {
+	display: block;
+	width: 80px;
+	height: 60px;
+	margin: 0 auto;
+}
+.dexiconpreview .picon {
+	transform: scale(2);
+	transform-origin: 0 0;
 }
