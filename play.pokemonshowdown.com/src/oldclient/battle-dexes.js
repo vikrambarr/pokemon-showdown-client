@@ -76,6 +76,8 @@
 			sprites: {},
 			itemSprites: {},
 			types: {},
+			current: null,
+			within: within,
 			query: null,
 			genOf: genOf,
 			load: loadDex,
@@ -119,6 +121,16 @@
 				});
 			}
 			return DexViews.loading[hash];
+		}
+
+		function within(view, fn, self, args) {
+			var previous = DexViews.current;
+			DexViews.current = view;
+			try {
+				return fn.apply(self, args);
+			} finally {
+				DexViews.current = previous;
+			}
 		}
 
 		function loadDex(summary) {
@@ -261,15 +273,19 @@
 			for (var id in view.TypeChart) {
 				if (TYPES.indexOf(id) >= 0) continue;
 				if (!DexViews.types[id]) added.push([id, 'type']);
-				var name = id.charAt(0).toUpperCase() + id.slice(1);
-				DexViews.types[id] = {
-					name: name,
-					label: view.TypeChart[id].label || name.toUpperCase().replace(/[^A-Z0-9?-]/g, '').slice(0, 6),
-					color: view.TypeChart[id].color || '#9a9aa8'
-				};
+				DexViews.types[id] = typeStyle(id, view.TypeChart[id]);
 			}
 			unindexed = unindexed.concat(added);
 			indexSearch();
+		}
+
+		function typeStyle(id, entry) {
+			var name = id.charAt(0).toUpperCase() + id.slice(1);
+			return {
+				name: name,
+				label: entry.label || name.toUpperCase().replace(/[^A-Z0-9?-]/g, '').slice(0, 6),
+				color: entry.color || '#9a9aa8'
+			};
 		}
 
 		function indexSearch() {
@@ -379,7 +395,7 @@
 					id = toID(pokemon.volatiles.formechange[1]);
 				}
 			}
-			var view = pokemon instanceof Pokemon ? viewOf(pokemon.side.battle.dex) : null;
+			var view = pokemon instanceof Pokemon ? viewOf(pokemon.side.battle.dex) : DexViews.current;
 			var sprites = spritesOf(view, id) || spritesOf(null, id);
 			var image = sprites && (pokemon.gender === 'F' && sprites['icon-f'] || sprites.icon);
 			if (!image) return icon;
@@ -413,7 +429,9 @@
 
 		var getItemIcon = Dex.getItemIcon;
 		Dex.getItemIcon = function (item) {
-			var image = item && DexViews.itemSprites[toID(typeof item === 'string' ? item : item.id || item.name)];
+			var id = item && toID(typeof item === 'string' ? item : item.id || item.name);
+			var view = DexViews.current;
+			var image = id && (view && view.images[view.itemSprites[id]] || DexViews.itemSprites[id]);
 			if (!image) return getItemIcon.apply(this, arguments);
 			var size = fit(image, 24, 24);
 			return 'background:transparent url(' + imageURL(image) + ') no-repeat center / ' + size[0] + 'px ' + size[1] + 'px' +
@@ -458,7 +476,9 @@
 
 		var getTypeIcon = Dex.getTypeIcon;
 		Dex.getTypeIcon = function (type, b) {
-			var custom = DexViews.types[toID(type)];
+			var id = toID(type);
+			var view = DexViews.current;
+			var custom = TYPES.indexOf(id) < 0 && (view && view.TypeChart[id] ? typeStyle(id, view.TypeChart[id]) : DexViews.types[id]);
 			if (!custom) return getTypeIcon.apply(this, arguments);
 			return '<img src="' + typeIconURL(custom) + '" alt="' + BattleLog.escapeHTML(custom.name) + '" height="14" width="32" class="pixelated' + (b ? ' b' : '') + '" />';
 		};
@@ -493,6 +513,20 @@
 				if (poke) this.scene.resultAnim(poke, 'Frostbitten', 'frb');
 			}
 		};
+
+		whenLoaded(['BattleSearch'], function () {
+			var renderRow = window.BattleSearch.prototype.renderRow;
+			window.BattleSearch.prototype.renderRow = function () {
+				return within(viewOf(this.engine && this.engine.dex), renderRow, this, arguments);
+			};
+		});
+
+		whenLoaded(['BattleTooltips'], function () {
+			var showTooltip = window.BattleTooltips.prototype.showTooltip;
+			window.BattleTooltips.prototype.showTooltip = function () {
+				return within(viewOf(this.battle && this.battle.dex), showTooltip, this, arguments);
+			};
+		});
 
 		whenLoaded(['PokemonSprite'], function () {
 			var updateStatbar = window.PokemonSprite.prototype.updateStatbar;
