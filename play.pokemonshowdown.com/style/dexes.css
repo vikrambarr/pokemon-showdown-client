@@ -437,15 +437,17 @@
 	border-radius: 3px;
 	font-size: 8pt;
 	line-height: 21px;
-	color: #000000;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
+.dexmovegrid .dexgridwide {
+	grid-column: span 2;
+}
 .dark .dexmovegrid span {
 	border-color: #555555;
 }
-.dark .dexmovegrid span[style] {
+.dexmovegrid span[style] {
 	color: #000000;
 }
 .dexmoveattributes .statrow {
@@ -542,9 +544,6 @@
 .dexmonchart .dexmovenumbers .setcell:first-child .dexfield {
 	padding-right: 17px;
 }
-.dexmonchart .dexmovenumbers .dexunit {
-	right: 4px;
-}
 .dexmonchart .dexmovenumbers .setcell:nth-child(2) .dexfield {
 	padding-right: 14px;
 }
@@ -566,15 +565,9 @@
 .dexmovechart .setcol-moves .setcell:first-child {
 	margin-top: 42px;
 }
-.dexmonchart .dexunitcell {
-	position: relative;
-}
-.dexmonchart .dexunitcell .dexfield {
-	padding-right: 20px;
-}
 .dexmonchart .dexunit {
 	position: absolute;
-	right: 7px;
+	right: 4px;
 	bottom: 6px;
 	font-size: 8pt;
 	color: #888888;

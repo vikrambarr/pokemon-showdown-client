@@ -234,7 +234,6 @@
 		var power = data.ohko ? ["OHKO", 1] : data.damage ? [(data.damage === 'level' ? "Lv" : data.damage) + " dmg", null] :
 			data.basePower ? [data.basePower + " BP", clamp((data.basePower - 20) / 130)] : ["&mdash; BP", null];
 		var priority = data.priority || 0;
-		var crit = data.critRatio || 1;
 		var hits = Array.isArray(data.multihit) ? data.multihit : data.multihit ? [data.multihit, data.multihit] : [1, 1];
 		var average = hits[0] === 2 && hits[1] === 5 ? 3.1 : (hits[0] + hits[1]) / 2;
 		var secondaries = data.secondaries || (data.secondary ? [data.secondary] : []);
@@ -247,10 +246,9 @@
 			["Accuracy", data.accuracy === true ? "Sure hit" : data.accuracy + "%", data.accuracy === true ? 1 : clamp((data.accuracy - 50) / 50)],
 			["PP", data.pp + " PP", clamp((data.pp - 5) / 35)],
 			["Priority", (priority > 0 ? "+" : "") + priority + " priority", priority ? clamp(0.5 + priority / 8) : null],
-			["Crit ratio", data.willCrit ? "Sure crit" : "+" + (crit - 1) + " crit", data.willCrit ? 1 : crit > 1 ? clamp(0.5 + (crit - 1) / 4) : null],
+			["Drain, recoil or heal", drain[0], drain[1]],
 			["Hits", hits[0] === hits[1] ? hits[0] + (hits[0] === 1 ? " hit" : " hits") : hits[0] + "&ndash;" + hits[1] + " hits", average > 1 ? clamp(0.5 + (average - 1) / 8) : null],
-			[secondaries.length ? "Secondary effect" : "No secondary effect", effect[0], effect[1]],
-			[data.drain ? "Drain" : data.recoil ? "Recoil" : data.heal ? "Heal" : "No drain, recoil or heal", drain[0], drain[1]]
+			["Secondary effect", effect[0], effect[1], true]
 		];
 	}
 
@@ -545,7 +543,7 @@
 			var effect = this.dexEffect;
 			var info = this.dexEffectData;
 			var table = effect.table;
-			var view = DexViews.current = this.dexView;
+			DexViews.current = this.dexView;
 			var data = this.dexEffectValues();
 			var editable = !!this.dexEditable;
 			entries = DexViews.entries[this.dexid] || null;
@@ -729,7 +727,7 @@
 				buf += '<span class="dexmovegrid">';
 				$.each(moveGridCells(data), function (i, cell) {
 					var hue = Math.round(cell[2] * 120);
-					buf += '<span title="' + cell[0] + '"' + (cell[2] === null ? '' : ' style="background:hsl(' + hue + ',40%,75%);border-color:hsl(' + hue + ',40%,45%)"') + '>' + cell[1] + '</span>';
+					buf += '<span title="' + cell[0] + '"' + (cell[3] ? ' class="dexgridwide"' : '') + (cell[2] === null ? '' : ' style="background:hsl(' + hue + ',40%,75%);border-color:hsl(' + hue + ',40%,45%)"') + '>' + cell[1] + '</span>';
 				});
 				return buf + '</span></button></div>';
 			}
