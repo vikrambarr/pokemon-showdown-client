@@ -212,6 +212,10 @@
 		if (control === 'select' && typeof options === 'string' && options.slice(0, 10) === 'condition:' && entries && entries.choices) {
 			return escape(entries.choices.names[toID(value)] || String(value));
 		}
+		if (control === 'select' && typeof options === 'string' && options.slice(0, 4) === 'ref:') {
+			var ref = (refOptions(options.slice(4).split(','), 'id', DexViews.current) || []).filter(function (entry) { return entry[0] === toID(value); })[0];
+			if (ref) return ref[1];
+		}
 		if (control === 'select' && Array.isArray(options)) {
 			var option = options.filter(function (entry) { return Array.isArray(entry) && String(entry[0]) === String(value); })[0];
 			if (option) return option[1];
@@ -401,6 +405,7 @@
 				'<input type="text" class="textbox" name="from" />';
 			this.$el.html('<form><p><label class="label">Name:<br /><input type="text" class="textbox autofocus" name="name" maxlength="40" /></label></p>' +
 				'<p><label class="label">Copy from (optional):<br />' + fromHTML + '</label></p>' +
+				'<p><label class="checkbox"><input type="checkbox" name="counts" checked /> The copy counts as the original</label></p>' +
 				'<p class="buttonbar"><button type="submit" class="button"><strong>Create</strong></button> <button type="button" name="close" class="button">Cancel</button></p></form>');
 		},
 		submit: function (data) {
@@ -414,6 +419,7 @@
 			var edit = {};
 			edit[KINDS[this.table]] = { name: name };
 			if ($.trim(data.from)) edit[KINDS[this.table]].inheritsFrom = $.trim(data.from);
+			if ($.trim(data.from) && data.counts) edit[KINDS[this.table]].countsAs = $.trim(data.from);
 			room.editDex(edit);
 		}
 	});
@@ -526,6 +532,7 @@
 			buf += '<span class="detailcell detailcell-first"><label>Source</label>' + source + '</span>';
 			buf += '<span class="detailcell"><label>Legality</label>' + escape(data.isNonstandard || 'Standard') + '</span>';
 			buf += '<span class="detailcell"><label>Based on</label>' + escape(base) + '</span>';
+			buf += '<span class="detailcell"><label>Counts as</label>' + (data.countsAs ? valueText('select', data.countsAs, 'ref:' + table) : '&mdash;') + '</span>';
 			buf += '</button></div></div>';
 			buf += '<div class="setrow setrow-icons"><div class="setcell"><span class="itemicon"></span></div><div class="setcell setcell-typeicons dextypeselects">';
 			if (table === 'Moves') buf += this.dexEffectIconSelectHTML('type', data.type) + this.dexEffectIconSelectHTML('category', data.category);
@@ -654,7 +661,13 @@
 				collect(data.condition, 'condition.');
 				if (leaves.length) sections.push(["Its condition", leaves]);
 			}
-			sections.unshift(["Description", [['shortDesc', "Short", 'text'], ['desc', "Full", 'textarea']]]);
+			var counts = "Wherever the battle engine or another effect checks for that " + KINDS[this.dexEffect.table] + ", this one counts too. Both can be active at once.";
+			var lost = this.dexEffectData.lost;
+			if (!data.countsAs && lost && (lost.engine.length || lost.references.length)) {
+				counts += " Without it, this copy misses how the engine treats " + valueText('select', this.dexEffectData.base, 'ref:' + this.dexEffect.table) + " and " + lost.references.length + " effects that check for it by name.";
+			}
+			sections.unshift(["Description", [['shortDesc', "Short", 'text'], ['desc', "Full", 'textarea']]],
+				["Counts as", [['countsAs', "Effect", 'select', 'ref:' + this.dexEffect.table]], counts]);
 			var buf = '<div class="pad">';
 			if (this.dexEditable && this.dexEffectData.editable) {
 				buf += '<p><small>Legality, forme and engine fields can only be changed in official dexes, so they aren\'t listed here.</small></p>';
@@ -666,6 +679,7 @@
 					rows += '<tr><th>' + field[1] + '</th><td>' + self.dexEffectFieldHTML(field[0], field[2], field[3], data) + '</td></tr>';
 				});
 				if (rows) buf += '<div class="resultheader"><h3>' + section[0] + '</h3></div><table class="dexdetails dexeffectfields">' + rows + '</table>';
+				if (rows && section[2]) buf += '<p><small>' + section[2] + '</small></p>';
 			});
 			return buf + '</div>';
 		},
