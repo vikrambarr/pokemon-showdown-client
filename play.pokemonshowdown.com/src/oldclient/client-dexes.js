@@ -855,10 +855,10 @@
 			var names = dex.types.names().filter(function (name) { return dex.types.get(name).exists !== false; });
 			var buf = '<p><small>Rows are the attacking type, columns are the defending type.</small></p>';
 			buf += '<div class="ladder dextypechart"><table><tr><th></th>';
-			for (var i = 0; i < names.length; i++) buf += '<th>' + Dex.getTypeIcon(names[i]) + '</th>';
+			for (var i = 0; i < names.length; i++) buf += '<th title="' + BattleLog.escapeHTML(names[i]) + '">' + Dex.getTypeIcon(names[i]) + '</th>';
 			buf += '</tr>';
 			for (var i = 0; i < names.length; i++) {
-				buf += '<tr><th>' + Dex.getTypeIcon(names[i]) + '</th>';
+				buf += '<tr><th title="' + BattleLog.escapeHTML(names[i]) + '">' + Dex.getTypeIcon(names[i]) + '</th>';
 				for (var j = 0; j < names.length; j++) {
 					var taken = (dex.types.get(names[j]).damageTaken || {})[names[i]] || 0;
 					buf += '<td class="' + ['', 'super', 'resist', 'immune'][taken] + '">' + ['', '2', '&frac12;', '0'][taken] + '</td>';

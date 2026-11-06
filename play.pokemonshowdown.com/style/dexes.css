@@ -423,6 +423,31 @@
 	width: 132px;
 	text-align: left;
 }
+.dexmovegrid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	grid-auto-rows: 1fr;
+	gap: 2px;
+	height: 100%;
+	box-sizing: border-box;
+	padding: 2px;
+}
+.dexmovegrid span {
+	border: 1px solid #CCCCCC;
+	border-radius: 3px;
+	font-size: 8pt;
+	line-height: 21px;
+	color: #000000;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.dark .dexmovegrid span {
+	border-color: #555555;
+}
+.dark .dexmovegrid span[style] {
+	color: #000000;
+}
 .dexmoveattributes .statrow {
 	display: flex;
 	padding: 0 4px;
@@ -506,6 +531,54 @@
 }
 .dexmonchart .setcol-moves .dexfield {
 	width: 133px;
+}
+.dexmonchart .dexmovenumbers .dexfield {
+	width: 45px;
+	margin-right: 1px;
+}
+.dexmonchart .dexmovenumbers .dexunitcell .dexfield {
+	width: 66px;
+}
+.dexmonchart .dexmovenumbers .setcell:first-child .dexfield {
+	padding-right: 17px;
+}
+.dexmonchart .dexmovenumbers .dexunit {
+	right: 4px;
+}
+.dexmonchart .dexmovenumbers .setcell:nth-child(2) .dexfield {
+	padding-right: 14px;
+}
+.dexmonchart .dexmovenumbers select.dexfield {
+	padding-left: 1px;
+	padding-right: 1px;
+}
+.dexmonchart .dexshortdesc .dexfield {
+	width: 367px;
+}
+.dexmonchart .dexmovenumbers .setcell {
+	position: relative;
+	top: 2px;
+}
+.dexmonchart .dexshortdesc {
+	position: relative;
+	z-index: 1;
+}
+.dexmovechart .setcol-moves .setcell:first-child {
+	margin-top: 42px;
+}
+.dexmonchart .dexunitcell {
+	position: relative;
+}
+.dexmonchart .dexunitcell .dexfield {
+	padding-right: 20px;
+}
+.dexmonchart .dexunit {
+	position: absolute;
+	right: 7px;
+	bottom: 6px;
+	font-size: 8pt;
+	color: #888888;
+	pointer-events: none;
 }
 .dexstatresults {
 	position: absolute;
@@ -922,12 +995,18 @@
 }
 .dexshowedits .dexedited:not(.dexmark),
 .dexshowedits .dexmonchart .dexedited,
-.dexshowedits .utilichart .result a.dexedited {
+.dexshowedits .utilichart .result a.dexedited,
+.dexshowedits .dexeffectfield.dexedited > input:not([type=checkbox]),
+.dexshowedits .dexeffectfield.dexedited > select,
+.dexshowedits .dexeffectfield.dexedited > textarea {
 	background: #FBE7A1;
 }
 .dark .dexshowedits .dexedited:not(.dexmark),
 .dark .dexshowedits .dexmonchart .dexedited,
-.dark .dexshowedits .utilichart .result a.dexedited {
+.dark .dexshowedits .utilichart .result a.dexedited,
+.dark .dexshowedits .dexeffectfield.dexedited > input:not([type=checkbox]),
+.dark .dexshowedits .dexeffectfield.dexedited > select,
+.dark .dexshowedits .dexeffectfield.dexedited > textarea {
 	background: #5A4A16;
 }
 .dexshowedits .dexmonchart .setcell-typeicons .dexedited,

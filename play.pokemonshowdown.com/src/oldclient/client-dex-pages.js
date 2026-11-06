@@ -13,7 +13,7 @@
 
 	var SHINY_STAR = '<span class="shinystar"><i class="fa fa-star"></i><span>';
 	var SPRITE_CELLS = [
-		['front', 'F'], ['back', 'B'], ['front-shiny', SHINY_STAR + 'F</span></span>'], ['back-shiny', SHINY_STAR + 'B</span></span>'], ['icon', 'I']
+		['front', 'F', 'Front'], ['back', 'B', 'Back'], ['front-shiny', SHINY_STAR + 'F</span></span>', 'Shiny front'], ['back-shiny', SHINY_STAR + 'B</span></span>', 'Shiny back'], ['icon', 'I', 'Icon']
 	];
 
 	function fieldHTML(value, className) {
@@ -138,7 +138,7 @@
 			buf += '<div class="setchart-nickname"><label>Sprites</label><div class="textbox spritebox">';
 			for (var j = 0; j < SPRITE_CELLS.length; j++) {
 				var kind = SPRITE_CELLS[j][0];
-				buf += '<button class="spritecell ' + (standard || sprites[kind] && view.images[sprites[kind]] ? 'has' : 'missing') + '" name="showDexSprite" value="' + kind + '">' + SPRITE_CELLS[j][1] + '</button>';
+				buf += '<button class="spritecell ' + (standard || sprites[kind] && view.images[sprites[kind]] ? 'has' : 'missing') + '" name="showDexSprite" value="' + kind + '" title="' + SPRITE_CELLS[j][2] + '">' + SPRITE_CELLS[j][1] + '</button>';
 			}
 			buf += '</div></div>';
 			var spriteData = Dex.getTeambuilderSpriteData({ species: species.name }, view.dex);
@@ -163,7 +163,7 @@
 				for (var t = 0; t < 2; t++) {
 					var current = species.types[t] || '';
 					var other = species.types[1 - t];
-					buf += '<span class="dextypeslot" title="Change ' + (t ? 'secondary' : 'primary') + ' type">' +
+					buf += '<span class="dextypeslot" title="' + BattleLog.escapeHTML(current || 'None') + '">' +
 						(current ? Dex.getTypeIcon(current) : '<span class="dextypeblank"></span>');
 					buf += '<select name="dextype" class="dextypearrow base-select" data-index="' + t + '"><button></button>';
 					if (t) buf += '<option value=""' + (current ? '' : ' selected') + '>&mdash;</option>';
@@ -174,7 +174,7 @@
 					buf += '</select><svg class="dextypecaret" width="10" height="7" viewBox="0 0 14 9"><path d="M1 1H13L7 8Z" fill="#fff" stroke="#000" stroke-width="1.5" stroke-linejoin="round" /></svg></span>';
 				}
 			} else {
-				for (var k = 0; k < species.types.length; k++) buf += Dex.getTypeIcon(species.types[k]);
+				for (var k = 0; k < species.types.length; k++) buf += '<span title="' + BattleLog.escapeHTML(species.types[k]) + '">' + Dex.getTypeIcon(species.types[k]) + '</span>';
 			}
 			buf += '</div></div>';
 			var abilities = species.abilities;
