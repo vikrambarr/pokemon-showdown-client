@@ -905,13 +905,6 @@
 .dark .dexsecondary {
 	border-color: #555555;
 }
-.dexcodeslots th {
-	text-align: left;
-}
-.dexcodeslots code {
-	font-size: 8pt;
-	white-space: pre;
-}
 .dexmark {
 	background: hsl(var(--hue), 90%, 72%);
 	color: inherit;
@@ -920,8 +913,26 @@
 	background: hsl(var(--hue), 65%, 38%);
 	color: #FFFFFF;
 }
-.dexcodeslots input[type=number] {
-	width: 70px;
+.dexcode pre .dexinline {
+	font: inherit;
+	color: inherit;
+	margin: 0;
+	padding: 0 1px;
+	border: 0;
+	border-radius: 2px;
+	height: auto;
+	line-height: inherit;
+	vertical-align: baseline;
+	box-shadow: none;
+}
+.dexcode pre .dexevent {
+	background: #DDDDDD;
+}
+.dark .dexcode pre .dexevent {
+	background: #444444;
+}
+.dexcode pre .dexinline:focus {
+	outline: 1px solid #6688AA;
 }
 .dexcode pre {
 	margin-bottom: 6px;
