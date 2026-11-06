@@ -419,7 +419,7 @@
 			var edit = {};
 			edit[KINDS[this.table]] = { name: name };
 			if ($.trim(data.from)) edit[KINDS[this.table]].inheritsFrom = $.trim(data.from);
-			if ($.trim(data.from) && data.counts) edit[KINDS[this.table]].countsAs = $.trim(data.from);
+			if ($.trim(data.from) && data.counts) edit[KINDS[this.table]].countsAs = true;
 			room.editDex(edit);
 		}
 	});
@@ -450,6 +450,11 @@
 			var room = this;
 			request('dexeffect', this.dexid + ', ' + KINDS[table] + ', ' + id).then(function (data) {
 				if (room.dexEffect !== effect) return;
+				$.each(data.handlers, function (i, handler) {
+					$.each(handler.slots, function (j, slot) {
+						slot.fixed = slot.kind === 'ref' && [data.id, data.base].indexOf(toID(slot.value)) >= 0;
+					});
+				});
 				room.dexEffectData = data;
 				effect.name = data.name;
 				room.renderDexEffect();
@@ -532,7 +537,7 @@
 			buf += '<span class="detailcell detailcell-first"><label>Source</label>' + source + '</span>';
 			buf += '<span class="detailcell"><label>Legality</label>' + escape(data.isNonstandard || 'Standard') + '</span>';
 			buf += '<span class="detailcell"><label>Based on</label>' + escape(base) + '</span>';
-			buf += '<span class="detailcell"><label>Counts as</label>' + (data.countsAs ? valueText('select', data.countsAs, 'ref:' + table) : '&mdash;') + '</span>';
+			buf += '<span class="detailcell"><label>Counts as</label>' + (data.countsAs && base !== '—' ? escape(base) : '&mdash;') + '</span>';
 			buf += '</button></div></div>';
 			buf += '<div class="setrow setrow-icons"><div class="setcell"><span class="itemicon"></span></div><div class="setcell setcell-typeicons dextypeselects">';
 			if (table === 'Moves') buf += this.dexEffectIconSelectHTML('type', data.type) + this.dexEffectIconSelectHTML('category', data.category);
@@ -661,13 +666,16 @@
 				collect(data.condition, 'condition.');
 				if (leaves.length) sections.push(["Its condition", leaves]);
 			}
-			var counts = "Wherever the battle engine or another effect checks for that " + KINDS[this.dexEffect.table] + ", this one counts too. Both can be active at once.";
-			var lost = this.dexEffectData.lost;
-			if (!data.countsAs && lost && (lost.engine.length || lost.references.length)) {
-				counts += " Without it, this copy misses how the engine treats " + valueText('select', this.dexEffectData.base, 'ref:' + this.dexEffect.table) + " and " + lost.references.length + " effects that check for it by name.";
+			sections.unshift(["Description", [['shortDesc', "Short", 'text'], ['desc', "Full", 'textarea']]]);
+			var info = this.dexEffectData;
+			if (info.base && info.base !== info.id) {
+				var original = valueText('select', info.base, 'ref:' + this.dexEffect.table);
+				var counts = "Wherever the battle engine or another effect checks for " + original + ", this copy counts too. Both can be active at once.";
+				if (!data.countsAs && info.lost && (info.lost.engine.length || info.lost.references.length)) {
+					counts += " Without it, this copy misses how the engine treats " + original + " and " + info.lost.references.length + " effects that check for it by name.";
+				}
+				sections.splice(1, 0, ["Counts as", [['countsAs', "Counts as " + original, 'bool']], counts]);
 			}
-			sections.unshift(["Description", [['shortDesc', "Short", 'text'], ['desc', "Full", 'textarea']]],
-				["Counts as", [['countsAs', "Effect", 'select', 'ref:' + this.dexEffect.table]], counts]);
 			var buf = '<div class="pad">';
 			if (this.dexEditable && this.dexEffectData.editable) {
 				buf += '<p><small>Legality, forme and engine fields can only be changed in official dexes, so they aren\'t listed here.</small></p>';
@@ -695,7 +703,7 @@
 				if (!handler.editable) return;
 				var pairs = numberPairs(handler);
 				$.each(handler.slots, function (j, slot) {
-					if (pairs[slot.index] === null) return;
+					if (pairs[slot.index] === null || slot.fixed) return;
 					var member = { key: handler.path + ':' + slot.index, slot: slot, path: handler.path };
 					var pair = pairs[slot.index];
 					if (pair) member.pair = { key: handler.path + ':' + pair.slot.index, slot: pair.slot, kind: pair.kind };
@@ -752,7 +760,7 @@
 				text(slot.start);
 				var shown = shownOf(slot);
 				if (pair) shown += src.slice(slot.start + slot.length, pair.start) + shownOf(pair);
-				buf += '<mark class="dexmark" style="--hue: ' + colors[key] + '">' + escape(shown) + '</mark>';
+				buf += slot.fixed ? escape(shown) : '<mark class="dexmark" style="--hue: ' + colors[key] + '">' + escape(shown) + '</mark>';
 				at = pair ? pair.start + pair.length : slot.start + slot.length;
 			});
 			text(src.length);
@@ -768,7 +776,7 @@
 			var lines = !!this.dexCodeLines;
 			var buf = '<div class="pad">';
 			if (!info.handlers.length) return buf + '<p><em>No code: everything this ' + KINDS[this.dexEffect.table] + ' does comes from its fields.</em></p></div>';
-			var editables = info.handlers.filter(function (handler) { return handler.editable && handler.slots.length; });
+			var editables = info.handlers.filter(function (handler) { return handler.editable && handler.slots.some(function (slot) { return !slot.fixed; }); });
 			if (editables.length && editable) buf += '<p><small>Change the highlighted numbers and names to change what the code does.</small></p>';
 			var grouping = this.dexEffectSlotGroups();
 			var colors = grouping.colors;
@@ -840,11 +848,11 @@
 				}
 				if (!handler.editable) {
 					buf += '<p><small>This code can\'t be changed here.</small></p>';
-				} else if (lines && handler.slots.length) {
+				} else if (lines && editables.indexOf(handler) >= 0) {
 					buf += '<table class="dexdetails dexcodeslots">';
 					var pairs = numberPairs(handler);
 					$.each(handler.slots, function (j, slot) {
-						if (pairs[slot.index] === null) return;
+						if (pairs[slot.index] === null || slot.fixed) return;
 						var key = handler.path + ':' + slot.index;
 						var found = pairs[slot.index];
 						var pair = found && { key: handler.path + ':' + found.slot.index, slot: found.slot, kind: found.kind };
