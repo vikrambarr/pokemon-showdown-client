@@ -808,8 +808,6 @@
 			var editable = !!this.dexEditable;
 			var buf = '<div class="pad">';
 			if (!info.handlers.length) return buf + '<p><em>No code: everything this ' + KINDS[this.dexEffect.table] + ' does comes from its fields.</em></p></div>';
-			var editables = info.handlers.filter(function (handler) { return handler.editable && handler.slots.some(function (slot) { return !slot.fixed; }); });
-			if (editables.length && editable) buf += '<p><small>Change the highlighted numbers and names to change what the code does.</small></p>';
 			var grouping = this.dexEffectSlotGroups();
 			$.each(info.handlers, function (i, handler) {
 				buf += '<h3>' + escape(handler.path) + '</h3>';
