@@ -79,7 +79,7 @@
 			if (this.dexEditable) {
 				buf += '<p><label class="label">Name: <input type="text" class="textbox" name="formatname" value="' + BattleLog.escapeHTML(details.name) + '" size="20" maxlength="40" /></label> ' +
 					'<button class="button" name="newDexFormat"><i class="fa fa-plus"></i> New format</button> ' +
-					'<button class="button" name="deleteDexFormat"><i class="fa fa-trash"></i> Delete format</button></p>';
+					'<button class="button" name="deleteDexFormat"><i class="fa fa-trash"></i> Delete format</button>' + this.dexSaveHTML('button dexsave') + '</p>';
 			}
 			buf += '</div><ul class="dexformattabs">';
 			for (var j = 0; j < FORMAT_TABS.length; j++) {

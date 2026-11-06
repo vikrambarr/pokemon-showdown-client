@@ -1,14 +1,20 @@
 .dexpokemon .result a,
+.dextabempty .result a,
+.dexeffectpanel .result a,
 .dexformatlist .result a {
 	border-radius: 4px;
 	cursor: pointer;
 }
 .dexpokemon .result a:hover,
+.dextabempty .result a:hover,
+.dexeffectpanel .result a:hover,
 .dexformatlist .result a:hover {
 	border-color: #D8D8D8;
 	background: #F8F8F8;
 }
 .dark .dexpokemon .result a:hover,
+.dark .dextabempty .result a:hover,
+.dark .dexeffectpanel .result a:hover,
 .dark .dexformatlist .result a:hover {
 	border-color: #777777;
 	background: rgba(100, 100, 100, 0.5);
@@ -330,9 +336,6 @@
 	overflow-x: auto;
 	margin-bottom: 8px;
 }
-.dextypechart table {
-	margin: 0;
-}
 .dextypechart td {
 	padding: 3px 0;
 	width: 24px;
@@ -381,16 +384,26 @@
 	justify-content: center;
 	gap: 6px;
 }
-.dexmoveicons img {
+.dexmoveicons > img,
+.dexmoveicons > span > img,
+.dexmoveicons .dextypeslot > img {
 	zoom: 2;
 	image-rendering: pixelated;
+}
+.dexmoveicons > img[src*="/categories/"],
+.dexmoveicons > span > img[src*="/categories/"],
+.dexmoveicons .dextypeslot > img[src*="/categories/"] {
+	zoom: 1;
+	width: 64px;
+	height: 32px;
+	object-fit: cover;
 }
 .dexcode h3 {
 	margin: 12px 0 4px 0;
 	font-size: 10pt;
 }
 .dexcode pre {
-	margin: 0;
+	margin: 0 0 6px 0;
 	padding: 6px 8px;
 	font-size: 8pt;
 	tab-size: 4;
@@ -475,14 +488,12 @@
 	overflow-y: hidden;
 	scrollbar-width: none;
 }
-.dexmonchart div.dexfield {
-	cursor: default;
-}
 .dexmonchart .dexfield::-webkit-scrollbar {
 	display: none;
 }
 .dexmonchart div.dexfield,
 .dexmonchart div.dexfield:hover {
+	cursor: default;
 	border-color: #AAAAAA;
 	box-shadow: none;
 	background: #F8FBFD;
@@ -493,14 +504,8 @@
 	box-shadow: none;
 	background: #222527;
 }
-.dexmonchart .setcell-details .dexfield {
-	width: 220px;
-}
 .dexmonchart .setcol-moves .dexfield {
 	width: 133px;
-}
-.dexdetails td + td {
-	padding-left: 10px;
 }
 .dexstatresults {
 	position: absolute;
@@ -522,9 +527,6 @@
 }
 .dark .dexstatresults .evslider::-webkit-slider-runnable-track {
 	background: linear-gradient(to right, var(--fill) var(--pct), #222527 var(--pct));
-}
-.dexstatresults .dexrangecol {
-	width: 52px;
 }
 .dexstatresults .evcol {
 	margin-left: 8px;
@@ -690,6 +692,11 @@
 	margin-left: 1px;
 	cursor: pointer;
 }
+.dexmoveicons .dextypecaret {
+	width: 14px;
+	height: 9px;
+	margin-left: 2px;
+}
 .dexmonchart select.dextypearrow {
 	position: absolute;
 	left: 0;
@@ -740,31 +747,11 @@
 .dexsubpage .teampane {
 	left: 0;
 }
-.dexdraftbar {
-	position: absolute;
-	left: 159px;
-	right: 0;
-	top: 0;
+.dexsave {
 	display: none;
-	padding: 5px 8px;
-	border-bottom: 1px solid #AAAAAA;
 }
-.dexdrafting .dexdraftbar {
-	display: block;
-}
-.dexdrafting .teampane {
-	top: 36px;
-}
-.dexsubpage .dexdraftbar {
-	left: 0;
-}
-.dark .dexdraftbar {
-	border-bottom-color: #555555;
-}
-@media (max-width:649px) {
-	.dexdraftbar {
-		left: 0;
-	}
+.dexdrafting .dexsave {
+	display: inline-block;
 }
 .dexsubpage .teampane > .dexmenu,
 .dexsubpage .teampane > .dexpicker {
@@ -872,13 +859,6 @@
 	font-size: 36px;
 	color: #888888;
 }
-.dexmonchart .setcol-moves select.dexfield {
-	display: block;
-	box-sizing: border-box;
-	width: 133px;
-	height: 24px;
-	margin: 2px 3px 1px 1px;
-}
 .dexeffectfields input[type=number] {
 	width: 60px;
 }
@@ -940,6 +920,25 @@
 .dexcode pre .dexinline:focus {
 	outline: 1px solid #6688AA;
 }
-.dexcode pre {
-	margin-bottom: 6px;
+.dexshowedits .dexedited:not(.dexmark),
+.dexshowedits .dexmonchart .dexedited,
+.dexshowedits .utilichart .result a.dexedited {
+	background: #FBE7A1;
+}
+.dark .dexshowedits .dexedited:not(.dexmark),
+.dark .dexshowedits .dexmonchart .dexedited,
+.dark .dexshowedits .utilichart .result a.dexedited {
+	background: #5A4A16;
+}
+.dexshowedits .dexmonchart .setcell-typeicons .dexedited,
+.dexshowedits .dexmoveicons .dexedited {
+	border-radius: 3px;
+	box-shadow: 0 0 0 4px #FBE7A1;
+}
+.dark .dexshowedits .dexmonchart .setcell-typeicons .dexedited,
+.dark .dexshowedits .dexmoveicons .dexedited {
+	box-shadow: 0 0 0 4px #5A4A16;
+}
+.dexshowedits .dexcode pre .dexedited {
+	box-shadow: 0 0 0 2px #E2B53A;
 }

@@ -4,7 +4,7 @@
 
 	var baseApp = _.pick(this.App.prototype, ['initialize', '_addRoom', 'focusRoom', 'removeRoom', 'updateSideRoom', 'updateAutojoin']);
 	var baseTopbar = _.pick(Topbar.prototype, ['renderRoomTab', 'updateTabbarMini', 'click']);
-	var baseMainMenuRoom = _.pick(MainMenuRoom.prototype, ['initialize']);
+	var baseMainMenuRoom = _.pick(MainMenuRoom.prototype, ['initialize', 'updateFormats']);
 	var baseTabListPopup = _.pick(TabListPopup.prototype, ['click']);
 
 	var WORKSPACE_TABS = [['battle', 'gamepad', "Play"], ['create', 'wrench', "Create"]];
@@ -184,8 +184,17 @@
 			$join.clone().attr('data-workspace', 'create').insertAfter($join).find('button').text("Dex search").val('rooms');
 			this.$('[data-workspace]').hide().filter('[data-workspace="' + app.workspace + '"]').show();
 		},
+		updateFormats: function () {
+			baseMainMenuRoom.updateFormats.apply(this, arguments);
+			if (!window.BattleFormats || !app.isDisconnected) return;
+			var $form = this.$('.createmenu form');
+			$form.find('button.big').html('<em>Disconnected</em>').addClass('disabled');
+			$form.find('p.cancel').remove();
+			$form.append('<p class="cancel buttonbar"><button name="reconnect" class="button">Reconnect</button></p>');
+		},
 		openDexBuilder: function () {
-			app.joinRoom('dexbuilder', DexBuilderRoom);
+			if (app.isDisconnected) return;
+			app.joinRoom('dexbuilder', window.DexBuilderRoom);
 		}
 	});
 

@@ -57,7 +57,7 @@
 	function loadEntries(dexid) {
 		if (DexViews.entries[dexid] || !dexid || missingEntries[dexid]) return;
 		request('dexentries', dexid).then(function (data) {
-			var entries = { custom: data.custom, modified: data.modified, names: data.names, choices: data.choices, species: data.Pokedex };
+			var entries = { custom: data.custom, modified: data.modified, names: data.names, choices: data.choices, species: data.Pokedex, originals: data.originals || {}, conditions: data.conditions || {} };
 			$.each(['Moves', 'Abilities', 'Items', 'Conditions'], function (i, table) {
 				var ids = entries[table] = {};
 				for (var j = 0; j < data[table].length; j++) ids[data[table][j]] = 1;
@@ -997,10 +997,22 @@
 		}
 	});
 
+	function canonical(value) {
+		if (value === undefined || value === null || value === '' || value === false) return '';
+		if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
+		if (typeof value !== 'object') return String(value);
+		var keys = Object.keys(value).sort().filter(function (key) { return canonical(value[key]); });
+		return keys.length ? '{' + keys.map(function (key) { return key + ':' + canonical(value[key]); }).join(',') + '}' : '';
+	}
+
+	function changedValue(value, original) {
+		return canonical(value) !== canonical(original);
+	}
+
 	DexViews.ui = {
 		request: request, compareFormats: compareFormats, openDexPage: openDexPage, DexConfirmPopup: DexConfirmPopup,
 		HIDE_BUTTON: HIDE_BUTTON, OFFICIAL_BADGE: OFFICIAL_BADGE, canEdit: canEdit, viewSearch: viewSearch,
-		dropEmptyHeaders: dropEmptyHeaders, setTierStyle: setTierStyle, tierHeader: tierHeader
+		dropEmptyHeaders: dropEmptyHeaders, setTierStyle: setTierStyle, tierHeader: tierHeader, changedValue: changedValue
 	};
 
 })(window.jQuery);

@@ -16,6 +16,9 @@
 	var STATS = ['hp', 'atk', 'def', 'spa', 'spd', 'spe', 'accuracy', 'evasion'];
 	var STATUSES = [['brn', "Burn"], ['par', "Paralysis"], ['slp', "Sleep"], ['frz', "Freeze"], ['psn', "Poison"], ['tox', "Toxic"]];
 	var CATEGORIES = ['Physical', 'Special', 'Status'];
+	var CONDITION_KINDS = {
+		status: "Status", volatileStatus: "Volatile", sideCondition: "Side", slotCondition: "Slot", pseudoWeather: "Field", weather: "Weather", terrain: "Terrain"
+	};
 	var YES = [['true', "Yes"]];
 	var MOVE_TARGETS = [
 		['normal', "Adjacent"], ['any', "Any"], ['self', "Self"], ['adjacentAlly', "Adjacent ally"], ['adjacentAllyOrSelf', "Ally or self"],
@@ -23,13 +26,56 @@
 		['allySide', "Ally side"], ['foeSide', "Foe side"], ['all', "Field"], ['randomNormal', "Random foe"], ['scripted', "Scripted"]
 	];
 	var FLAGS = {
-		Moves: [
-			'allyanim', 'bite', 'bullet', 'bypasssub', 'cantusetwice', 'charge', 'contact', 'dance', 'defrost', 'distance', 'failcopycat',
-			'failencore', 'failinstruct', 'failmefirst', 'failmimic', 'futuremove', 'gravity', 'heal', 'metronome', 'minimize', 'mirror',
-			'mustpressure', 'noassist', 'nonsky', 'noparentalbond', 'nosketch', 'nosleeptalk', 'pledgecombo', 'powder', 'protect', 'pulse',
-			'punch', 'recharge', 'reflectable', 'slicing', 'snatch', 'sound', 'wind'
-		],
-		Abilities: ['breakable', 'cantsuppress', 'failroleplay', 'failskillswap', 'noentrain', 'noreceiver', 'notrace', 'notransform']
+		Moves: {
+			allyanim: "The move plays its animation when used on an ally.",
+			bite: "Power is multiplied by 1.5 when used by a Pokemon with the Ability Strong Jaw.",
+			bullet: "Has no effect on Pokemon with the Ability Bulletproof.",
+			bypasssub: "Ignores a target's substitute.",
+			cantusetwice: "The user cannot select this move after a previous successful use.",
+			charge: "The user is unable to make a move between turns.",
+			contact: "Makes contact.",
+			dance: "When used by a Pokemon, other Pokemon with the Ability Dancer can attempt to execute the same move.",
+			defrost: "Thaws the user if executed successfully while the user is frozen.",
+			distance: "Can target a Pokemon positioned anywhere in a Triple Battle.",
+			failcopycat: "Cannot be selected by Copycat.",
+			failencore: "Encore fails if target used this move.",
+			failinstruct: "Cannot be repeated by Instruct.",
+			failmefirst: "Cannot be selected by Me First.",
+			failmimic: "Cannot be copied by Mimic.",
+			futuremove: "Targets a slot, and in 2 turns damages that slot.",
+			gravity: "Prevented from being executed or selected during Gravity's effect.",
+			heal: "Prevented from being executed or selected during Heal Block's effect.",
+			metronome: "Can be selected by Metronome.",
+			minimize: "Deals double damage if the user is minimized.",
+			mirror: "Can be copied by Mirror Move.",
+			mustpressure: "Additional PP is deducted due to Pressure when it ordinarily would not.",
+			noassist: "Cannot be selected by Assist.",
+			nonsky: "Prevented from being executed or selected in a Sky Battle.",
+			noparentalbond: "Cannot be made to hit twice via Parental Bond.",
+			nosketch: "Cannot be copied by Sketch.",
+			nosleeptalk: "Cannot be selected by Sleep Talk.",
+			pledgecombo: "Gems will not activate. Cannot be redirected by Storm Drain / Lightning Rod.",
+			powder: "Has no effect on Pokemon which are Grass-type, have the Ability Overcoat, or hold Safety Goggles.",
+			protect: "Blocked by Detect, Protect, Spiky Shield, and if not a Status move, King's Shield.",
+			pulse: "Power is multiplied by 1.5 when used by a Pokemon with the Ability Mega Launcher.",
+			punch: "Power is multiplied by 1.2 when used by a Pokemon with the Ability Iron Fist.",
+			recharge: "If this move is successful, the user must recharge on the following turn and cannot make a move.",
+			reflectable: "Bounced back to the original user by Magic Coat or the Ability Magic Bounce.",
+			slicing: "Power is multiplied by 1.5 when used by a Pokemon with the Ability Sharpness.",
+			snatch: "Can be stolen from the original user and instead used by another Pokemon using Snatch.",
+			sound: "Has no effect on Pokemon with the Ability Soundproof.",
+			wind: "Activates the Wind Power and Wind Rider Abilities."
+		},
+		Abilities: {
+			breakable: "Can be suppressed by Mold Breaker and related effects.",
+			cantsuppress: "Ability can't be suppressed by e.g. Gastro Acid or Neutralizing Gas.",
+			failroleplay: "Role Play fails if target has this Ability.",
+			failskillswap: "Skill Swap fails if either the user or target has this Ability.",
+			noentrain: "Entrainment fails if user has this Ability.",
+			noreceiver: "Receiver and Power of Alchemy will not activate if an ally faints with this Ability.",
+			notrace: "Trace cannot copy this Ability.",
+			notransform: "Disables the Ability if the user is Transformed."
+		}
 	};
 	var SECTIONS = {
 		Moves: [
@@ -122,7 +168,7 @@
 	function selectOptions(options, view) {
 		if (options === 'status') return STATUSES;
 		if (options === 'stat') return STATS;
-		if (options === 'flag') return FLAGS.Moves.concat(FLAGS.Abilities).sort();
+		if (options === 'flag') return Object.keys(FLAGS.Moves).concat(Object.keys(FLAGS.Abilities)).sort();
 		if (options.slice(0, 4) === 'ref:') return refOptions(options.slice(4).split(','), 'id', view);
 		if (options.slice(0, 5) === 'name:') return refOptions(options.slice(5).split(','), 'name', view);
 		if (options.slice(0, 10) === 'condition:') {
@@ -377,13 +423,8 @@
 		initialize: function (data) {
 			this.room = data.room;
 			this.table = data.table;
-			entries = DexViews.entries[this.room.dexid] || null;
-			var from = refOptions([this.table], 'id', this.room.dexView);
-			var fromHTML = from ? '<select class="button" name="from">' + optionsHTML(from, '', "(nothing)") + '</select>' :
-				'<input type="text" class="textbox" name="from" />';
+			this.from = data.from;
 			this.$el.html('<form><p><label class="label">Name:<br /><input type="text" class="textbox autofocus" name="name" maxlength="40" /></label></p>' +
-				'<p><label class="label">Copy from (optional):<br />' + fromHTML + '</label></p>' +
-				'<p><label class="checkbox"><input type="checkbox" name="counts" checked /> The copy counts as the original</label></p>' +
 				'<p class="buttonbar"><button type="submit" class="button"><strong>Create</strong></button> <button type="button" name="close" class="button">Cancel</button></p></form>');
 		},
 		submit: function (data) {
@@ -396,8 +437,8 @@
 			room.pendingEffect = [this.table, toID(name)];
 			var edit = {};
 			edit[KINDS[this.table]] = { name: name };
-			if ($.trim(data.from)) edit[KINDS[this.table]].inheritsFrom = $.trim(data.from);
-			if ($.trim(data.from) && data.counts) edit[KINDS[this.table]].countsAs = true;
+			if (this.from) edit[KINDS[this.table]].inheritsFrom = this.from;
+			if (this.from) edit[KINDS[this.table]].countsAs = true;
 			room.editDex(edit);
 		}
 	});
@@ -467,7 +508,7 @@
 		dexEffectFieldHTML: function (path, control, options, data, className) {
 			var value = control === 'secondaries' ? data.secondaries || (data.secondary ? [data.secondary] : []) : getPath(data, path);
 			if (!this.dexEffectCanEdit(path)) {
-				return '<div class="textbox dexfield' + (className ? ' ' + className : '') + '">' + valueText(control, value, options) + '</div>';
+				return '<div class="textbox dexfield' + (className ? ' ' + className : '') + '" data-edit="' + escape(path) + '">' + valueText(control, value, options) + '</div>';
 			}
 			if (control === 'secondaries') {
 				var view = this.dexView;
@@ -496,7 +537,8 @@
 			var buf = '<div class="pad">' + this.dexEffectBackHTML() + '</div>';
 			buf += '<div class="teambar"><button disabled class="pokemon">' + escape(info.name) + '</button></div>';
 			buf += '<div class="teamchartbox individual"><ol class="teamchart"><li>';
-			buf += '<div class="setmenu"><button name="showDexEffectPanel" value="code"><i class="fa fa-code"></i>Code</button>';
+			buf += '<div class="setmenu">' + (info.handlers.length ? '<button name="showDexEffectPanel" value="code"><i class="fa fa-code"></i>Code</button>' : '') + this.dexEditsHTML();
+			if (editable) buf += this.dexSaveHTML('dexsave') + ' <button name="copyDexEffect"><i class="fa fa-clone"></i>Copy</button>';
 			if (editable && info.edited) {
 				buf += ' <button name="deleteDexEffect"><i class="fa fa-trash"></i>' + (info.official ? 'Reset to base' : 'Delete') + '</button>';
 			} else if (!editable) {
@@ -506,26 +548,14 @@
 			buf += '<div class="setchart dexmonchart dexeffectchart">';
 
 			buf += '<div class="setcol setcol-icon"><div class="setcell-sprite dexmoveicons">' + this.dexEffectIconHTML(data) + '</div>';
-			buf += '<div class="setcell setcell-pokemon"><label>' + NAMES[table] + '</label><div class="textbox dexfield" title="' + escape(info.name) + '">' + escape(info.name) + '</div></div></div>';
+			buf += '<div class="setcell setcell-pokemon"><label>' + NAMES[table] + '</label><input type="text" class="textbox dexfield" name="effectsearch" value="' + escape(info.name) + '" autocomplete="off" /></div></div>';
 
-			var source = !info.official ? 'Custom' : info.edited ? 'Edited' : 'Unedited';
-			var base = info.base && info.base !== info.id ? (view.dex[{ Moves: 'moves', Abilities: 'abilities', Items: 'items' }[table] || 'moves'].get(info.base).name || info.base) : '—';
-			buf += '<div class="setcol setcol-details"><div class="setrow">';
-			buf += '<div class="setcell setcell-details"><label>Details</label><button class="textbox setdetails" tabindex="-1" name="showDexEffectDetails">';
-			buf += '<span class="detailcell detailcell-first"><label>Source</label>' + source + '</span>';
-			buf += '<span class="detailcell"><label>Legality</label>' + escape(data.isNonstandard || 'Standard') + '</span>';
-			buf += '<span class="detailcell"><label>Based on</label>' + escape(base) + '</span>';
-			if (base !== '—') buf += '<span class="detailcell"><label>Counts as</label>' + (data.countsAs ? escape(base) : 'No') + '</span>';
-			buf += '</button></div></div>';
-			buf += '<div class="setrow setrow-icons"><div class="setcell"><span class="itemicon"></span></div><div class="setcell setcell-typeicons dextypeselects">';
-			if (table === 'Moves') buf += this.dexEffectIconSelectHTML('type', data.type) + this.dexEffectIconSelectHTML('category', data.category);
-			buf += '</div></div>';
+			buf += '<div class="setcol setcol-details">';
 			buf += '<div class="setrow setrow-abilities">';
-			if (FLAGS[table]) buf += '<div class="setcell"><label>Flags</label><div class="textbox dexchipbox dexflagbox">' + this.dexFlagChipsHTML(data) + '</div></div>';
+			if (FLAGS[table]) buf += '<div class="setcell"><label class="dexflaglabel">Flags (' + Object.keys(data.flags || {}).filter(function (flag) { return data.flags[flag]; }).length + ')</label><div class="textbox dexchipbox dexflagbox">' + this.dexFlagChipsHTML(data) + '</div></div>';
 			buf += '</div></div>';
 
 			buf += '<div class="setcol setcol-moves">';
-			buf += '<div class="setcell"><label>Description</label>' + this.dexEffectFieldHTML('shortDesc', 'text', null, data, 'dexfield') + '</div>';
 			var cells = {
 				Moves: [['Target', 'target', 'select', MOVE_TARGETS], ['Learned by']],
 				Abilities: [['Weather', 'suppressWeather', 'select', [['true', "Suppresses"], ['false', "Doesn't suppress"]]], ['Pokémon']],
@@ -533,9 +563,9 @@
 				Conditions: [['Duration', 'duration', 'int', [1, 100]], ['Counter max', 'counterMax', 'int', [1, 10000]]]
 			}[table];
 			for (var c = 0; c < cells.length; c++) {
-				buf += '<div class="setcell' + (cells[c][1] ? '' : ' setcell-learnset') + '"><label>' + cells[c][0] + '</label>';
+				buf += '<div class="setcell' + (cells[c][1] ? '' : ' setcell-learnset') + '"><label' + (cells[c][1] ? '' : ' class="dexlearnsetlabel" data-name="' + cells[c][0] + '"') + '>' + cells[c][0] + '</label>';
 				buf += cells[c][1] ? this.dexEffectFieldHTML(cells[c][1], cells[c][2], cells[c][3], data, 'dexfield') :
-					'<button class="textbox learnsetcount" tabindex="-1" name="showDexEffectPanel" value="list">&hellip;</button>';
+					'<input type="text" class="textbox dexfield learnsetcount" name="learnersearch" placeholder="Pok&eacute;mon" autocomplete="off" />';
 				buf += '</div>';
 			}
 			buf += '</div>';
@@ -543,10 +573,12 @@
 			buf += '<div class="setcol setcol-stats">' + this.dexEffectStatsHTML(data) + '</div>';
 			buf += '</div></li></ol></div>';
 			if (table === 'Moves' || table === 'Abilities') buf += '<div class="teambuilder-results" data-panel="list"></div>';
+			buf += '<div class="teambuilder-results" data-panel="effects"></div>';
 			if (FLAGS[table]) buf += '<div class="dexstatresults dexeffectpanel" data-panel="flags"></div>';
 			buf += '<div class="dexstatresults dexeffectpanel" data-panel="fields">' + this.dexEffectFieldsHTML(data) + '</div>';
 			buf += '<div class="dexstatresults dexeffectpanel dexcode" data-panel="code">' + this.dexEffectCodeHTML() + '</div>';
 			this.$('.dexmonpage').html('<div class="teamwrapper">' + buf + '</div>');
+			this.dexEffectPicker = null;
 			this.$('.dexmonpage pre select.dexinline').each(function () { fitInline(this); });
 
 			if (table === 'Moves' || table === 'Abilities') this.setupDexEffectList();
@@ -560,17 +592,52 @@
 				$focus.focus();
 			}
 			this.scaleDexPokemon();
+			this.markDexEdits();
+		},
+		markDexEffectEdits: function () {
+			var info = this.dexEffectData;
+			var original = info && info.original;
+			var $page = this.$('.dexmonpage');
+			$page.find('button[name=toggleDexEdits]').toggle(!!original);
+			if (!original) return;
+			var self = this;
+			var data = this.dexEffectValues();
+			var valueOf = function (object, path) {
+				if (path === 'secondaries') return object.secondaries || (object.secondary ? [object.secondary] : []);
+				if (path === 'countsAs') return !!object.countsAs;
+				return getPath(object, path);
+			};
+			$page.find('[data-path], [data-edit]').each(function () {
+				var path = this.getAttribute('data-path') || this.getAttribute('data-edit');
+				if (DexViews.ui.changedValue(valueOf(data, path), valueOf(original, path))) $(this).addClass('dexedited');
+			});
+			var flags = data.flags || {};
+			if (Object.keys(original.flags || {}).some(function (flag) { return original.flags[flag] && !flags[flag]; })) $page.find('.dexflagbox').addClass('dexedited');
+			var slots = {};
+			$.each(info.handlers, function (i, handler) {
+				$.each(handler.slots, function (j, slot) { slots[handler.path + ':' + slot.index] = slot; });
+			});
+			if ($page.find('[data-panel=fields] .dexedited').not('[data-path=shortDesc], [data-path=desc], [data-path=countsAs], [data-edit=shortDesc], [data-edit=desc], [data-edit=countsAs]').length) $page.find('.setstats').addClass('dexedited');
+			$page.find('[data-slotkeys]').each(function () {
+				if (this.getAttribute('data-slotkeys').split(' ').some(function (key) {
+					return slots[key] && String(self.dexEffectSlotValue(key, slots[key])) !== String(slots[key].original);
+				})) $(this).addClass('dexedited');
+			});
+			$page.find('[data-event]').each(function () {
+				var path = this.getAttribute('data-event');
+				if ($(this).find('select').val() !== path.slice(path.lastIndexOf('.') + 1)) $(this).addClass('dexedited');
+			});
 		},
 		dexEffectIconHTML: function (data) {
 			var table = this.dexEffect.table;
-			if (table === 'Moves') return Dex.getTypeIcon(data.type) + Dex.getCategoryIcon(data.category);
+			if (table === 'Moves') return this.dexEffectIconSelectHTML('type', data.type) + this.dexEffectIconSelectHTML('category', data.category);
 			if (table === 'Items') return '<span class="itemicon dexitemicon" style="' + Dex.getItemIcon($.extend({}, data, { id: this.dexEffect.id })) + '"></span>';
 			return '<i class="fa fa-' + ICONS[table] + ' dexeffecticon"></i>';
 		},
 		dexEffectIconSelectHTML: function (path, value) {
 			var view = this.dexView;
 			var icon = function (name) { return path === 'type' ? Dex.getTypeIcon(name) : Dex.getCategoryIcon(name); };
-			if (!this.dexEffectCanEdit(path)) return icon(value);
+			if (!this.dexEffectCanEdit(path)) return '<span data-edit="' + path + '">' + icon(value) + '</span>';
 			var names = path === 'type' ? selectOptions('type', view) : CATEGORIES;
 			var options = names.map(function (name) {
 				return '<option value="' + escape(name) + '"' + (name === value ? ' selected' : '') + '>' + icon(name) + '</option>';
@@ -582,18 +649,28 @@
 			var flags = Object.keys(data.flags || {}).filter(function (flag) { return data.flags[flag]; });
 			var editable = this.dexEffectCanEdit('flags');
 			return flags.map(function (flag) {
-				return '<span class="dexchip">' + escape(flag) + (editable ? ' <button class="dexchipx" name="toggleDexEffectFlag" value="' + escape(flag) + '" tabindex="-1">&times;</button>' : '') + '</span>';
+				return '<span class="dexchip" data-edit="flags.' + escape(flag) + '">' + escape(flag) + (editable ? ' <button class="dexchipx" name="toggleDexEffectFlag" value="' + escape(flag) + '" tabindex="-1">&times;</button>' : '') + '</span>';
 			}).join('') + (editable ? '<input type="text" class="dexchipinput" name="effectflags"' + (flags.length ? '' : ' placeholder="Flags"') + ' autocomplete="off" />' : '');
 		},
 		dexFlagListHTML: function (query) {
 			var data = this.dexEffectValues();
 			var flags = data.flags || {};
+			var editable = this.dexEffectCanEdit('flags');
+			var descs = FLAGS[this.dexEffect.table];
 			query = toID(query);
+			var ids = Object.keys($.extend({}, descs, flags)).filter(function (flag) {
+				return !query || flag.indexOf(query) >= 0 || toID(descs[flag] || '').indexOf(query) >= 0;
+			}).sort();
+			var set = ids.filter(function (flag) { return flags[flag]; });
+			var groups = [["Flags (" + set.length + ")", set]];
+			if (editable) groups.push(["Other flags", ids.filter(function (flag) { return !flags[flag]; })]);
 			var buf = '<ul class="utilichart">';
-			$.each(FLAGS[this.dexEffect.table], function (i, flag) {
-				if (query && flag.indexOf(query) < 0) return;
-				buf += '<li class="result"><a data-entry="flag|' + flag + '"' + (flags[flag] ? ' class="cur"' : '') + '><span class="col movenamecol">' +
-					(flags[flag] ? '<i class="fa fa-check"></i> ' : '') + flag + '</span></a></li>';
+			$.each(groups, function (i, group) {
+				buf += '<li class="result"><h3>' + group[0] + '</h3></li>';
+				$.each(group[1], function (j, flag) {
+					buf += '<li class="result"><a data-entry="flag|' + flag + '" data-edit="flags.' + flag + '"' + (editable && flags[flag] ? ' class="cur"' : '') + '>' +
+						'<span class="col movenamecol">' + flag + '</span> <span class="col movedesccol">' + escape(descs[flag] || '') + '</span></a></li>';
+				});
 			});
 			return buf + '</ul>';
 		},
@@ -755,8 +832,8 @@
 				if (typeof value === 'number') return value < 0 || Object.is(value, -0) ? '(' + value + ')' : String(value);
 				return JSON.stringify(value);
 			};
-			var style = function (key, width) {
-				return ' style="--hue: ' + colors[key] + (width ? '; width: ' + width + 'ch' : '') + '"';
+			var style = function (key, width, keys) {
+				return ' data-slotkeys="' + escape(keys || key) + '" style="--hue: ' + colors[key] + (width ? '; width: ' + width + 'ch' : '') + '"';
 			};
 			var controlOf = function (slot) {
 				var key = handler.path + ':' + slot.index;
@@ -797,7 +874,7 @@
 				var meaning = pairMeaning(pair.kind, self.dexEffectSlotValue(key, slot), self.dexEffectSlotValue(handler.path + ':' + pair.slot.index, pair.slot));
 				var between = text(slot.start + slot.length, pair.slot.start);
 				buf += editable ? '<span class="dexpair" data-kind="' + pair.kind + '" title="' + escape(meaning) + '">' + controlOf(slot) + between + controlOf(pair.slot) + '</span>' :
-					'<mark class="dexmark"' + style(key) + ' title="' + escape(meaning) + '">' + escape(shownOf(slot)) + between + escape(shownOf(pair.slot)) + '</mark>';
+					'<mark class="dexmark"' + style(key, 0, key + ' ' + handler.path + ':' + pair.slot.index) + ' title="' + escape(meaning) + '">' + escape(shownOf(slot)) + between + escape(shownOf(pair.slot)) + '</mark>';
 			});
 			buf += text(at, src.length);
 			return buf;
@@ -807,7 +884,6 @@
 			var info = this.dexEffectData;
 			var editable = !!this.dexEditable;
 			var buf = '<div class="pad">';
-			if (!info.handlers.length) return buf + '<p><em>No code: everything this ' + KINDS[this.dexEffect.table] + ' does comes from its fields.</em></p></div>';
 			var grouping = this.dexEffectSlotGroups();
 			$.each(info.handlers, function (i, handler) {
 				buf += '<h3>' + escape(handler.path) + '</h3>';
@@ -816,10 +892,62 @@
 			});
 			return buf + '</div>';
 		},
+		setupDexMoveLearners: function () {
+			var effect = this.dexEffect;
+			var editable = this.dexEditable;
+			var view = this.dexView;
+			var saved = this.dexBaseView || view;
+			var entries = DexViews.entries[this.dexid];
+			var $results = this.$('.dexmonpage [data-panel=list]');
+			var search = this.dexEffectSearch = new BattleSearch($results, $results);
+			var learners = {};
+			var count = 0;
+			var learnedBefore = function (id) {
+				var original = entries && entries.originals[id];
+				if (original === null) return learners[id];
+				if (original) return original.learnset.indexOf(effect.id) >= 0;
+				var learnset = DexViews.learnsetOf(saved, id);
+				return !!(learnset && learnset[effect.id]);
+			};
+			search.renderRow = function (id, type, matchStart, matchLength, errorMessage, attrs) {
+				var classes = type !== 'pokemon' ? '' : (editable && learners[id] ? ' cur' : '') + (learners[id] !== learnedBefore(id) ? ' dexedited' : '');
+				if (classes) attrs = attrs ? attrs.replace('class="', 'class="' + classes.slice(1) + ' ') : ' class="' + classes.slice(1) + '"';
+				return BattleSearch.prototype.renderRow.call(this, id, type, matchStart, matchLength, errorMessage, attrs);
+			};
+			viewSearch(search, view, function (typedSearch) {
+				var getBaseResults = typedSearch.getBaseResults;
+				typedSearch.getBaseResults = function () {
+					var learned = [];
+					var inherited = [];
+					var others = [];
+					var seen = {};
+					$.each(getBaseResults.call(this), function (i, row) {
+						if (row[0] !== 'pokemon' || seen[row[1]]) return;
+						seen[row[1]] = 1;
+						var learnset = DexViews.learnsetOf(view, row[1]);
+						learners[row[1]] = !!(learnset && learnset[effect.id]);
+						(learners[row[1]] ? learned : this.canLearn(row[1], effect.id) ? inherited : others).push(row);
+					}.bind(this));
+					$.each([learned, inherited, others], function (i, list) {
+						list.sort(function (a, b) { return a[1] < b[1] ? -1 : 1; });
+					});
+					count = learned.length + inherited.length;
+					var results = [['header', "Learned by (" + learned.length + ")"]].concat(learned);
+					if (inherited.length) results = results.concat([['header', "From pre-evolutions (" + inherited.length + ")"]], inherited);
+					return editable ? results.concat([['header', "Other Pokémon"]], others) : results;
+				};
+			});
+			$results.off('scroll').on('scroll', function () {
+				search.updateScroll();
+			});
+			search.setType('pokemon', 'gen' + view.gen);
+			this.dexEffectListCount(count);
+		},
 		setupDexEffectList: function () {
 			var effect = this.dexEffect;
+			if (effect.table === 'Moves') return this.setupDexMoveLearners();
 			var view = this.dexView;
-			var $results = this.$('.dexmonpage .teambuilder-results');
+			var $results = this.$('.dexmonpage [data-panel=list]');
 			var search = this.dexEffectSearch = new BattleSearch($results, $results);
 			viewSearch(search, view, function (typedSearch) {
 				var getBaseResults = typedSearch.getBaseResults;
@@ -836,40 +964,97 @@
 				search.updateScroll();
 			});
 			search.setType('pokemon', 'gen' + view.gen);
-			var count = search.resultSet.filter(function (row) { return row[0] === 'pokemon'; }).length;
-			this.$('.dexmonpage .learnsetcount').text(count + ' Pokémon');
+			this.dexEffectListCount(search.resultSet.filter(function (row) { return row[0] === 'pokemon'; }).length);
+		},
+		dexEffectListCount: function (count) {
+			var $label = this.$('.dexmonpage .dexlearnsetlabel');
+			$label.text($label.attr('data-name') + ' (' + count + ')');
+			var query = $.trim(this.$('.dexmonpage input[name=learnersearch]').val() || '');
+			if (query) this.dexEffectSearch.find(query);
+		},
+		focusDexLearnerSearch: function () {
+			if (this.dexEffectPanel !== 'list') this.showDexEffectPanel('list', true);
+		},
+		searchDexLearners: function (e) {
+			if (this.dexEffectPanel !== 'list') this.showDexEffectPanel('list', true);
+			this.dexEffectSearch.find($.trim(e.currentTarget.value));
 		},
 		showDexEffectPanel: function (panel, keep) {
 			if (!this.dexEffectData) return;
 			var table = this.dexEffect.table;
 			var start = table === 'Moves' || table === 'Abilities' ? 'list' : 'fields';
 			if (!keep && panel === this.dexEffectPanel && panel !== start && panel !== 'flags') panel = start;
+			if (panel === 'code' && !this.dexEffectData.handlers.length) panel = start;
 			this.dexEffectPanel = panel;
-			if (panel === 'flags') this.$('.dexmonpage [data-panel=flags]').html(this.dexFlagListHTML(this.$('.dexmonpage input[name=effectflags]').val()));
+			if (panel === 'flags') {
+				this.$('.dexmonpage [data-panel=flags]').html(this.dexFlagListHTML(this.$('.dexmonpage input[name=effectflags]').val()));
+				if (!keep) this.markDexEdits();
+			}
 			this.$('.dexmonpage [data-panel]').each(function () {
 				$(this).toggle(this.dataset.panel === panel);
 			});
 			this.$('.dexmonpage .setstats').toggleClass('cur', panel === 'fields' && start !== 'fields');
 			this.$('.dexmonpage .setmenu button[value=code]').toggleClass('cur', panel === 'code');
 			if (panel === 'list' && this.dexEffectSearch) this.dexEffectSearch.updateScroll();
+			if (panel === 'effects' && !this.dexEffectPicker) this.setupDexEffectPicker();
 		},
-		showDexEffectDetails: function (value, button) {
-			var data = this.dexEffectValues();
-			var buf = '<table class="dexdetails">';
-			var add = function (entry, path) {
-				if (entry && typeof entry === 'object' && !Array.isArray(entry) && path !== 'flags' && Object.keys(entry).length) {
-					for (var key in entry) add(entry[key], path ? path + '.' + key : key);
-					return;
-				}
-				var text = path === 'flags' ? Object.keys(entry).join(', ') : typeof entry === 'string' ? entry : JSON.stringify(entry);
-				buf += '<tr><th>' + escape(path) + '</th><td>' + escape(text || '') + '</td></tr>';
-			};
-			add(data, '');
-			buf += '</table>';
-			app.addPopup(Popup, { htmlMessage: buf, sourceEl: button, maxWidth: 480 });
+		setupDexEffectPicker: function () {
+			var table = this.dexEffect.table;
+			var $results = this.$('.dexmonpage [data-panel=effects]');
+			if (table === 'Conditions') {
+				this.dexEffectPicker = true;
+				$results.html(this.dexConditionsHTML().replace(/^<p>.*?<\/p>/, ''));
+				return;
+			}
+			var kind = { Moves: 'move', Abilities: 'ability', Items: 'item' }[table];
+			var dexid = this.dexid;
+			var search = this.dexEffectPicker = new BattleSearch($results, $results);
+			viewSearch(search, this.dexView, function (typedSearch) {
+				typedSearch.dexid = dexid;
+				typedSearch.getBaseResults = function () {
+					var shown = DexViews.entries[dexid];
+					var seen = {};
+					var results = DexViews.ui.dropEmptyHeaders(this.getDefaultResults().filter(function (row) {
+						if (row[0] !== kind) return true;
+						seen[row[1]] = 1;
+						return !!shown && !!shown[table][row[1]];
+					}));
+					var others = Object.keys(shown ? shown[table] : {}).filter(function (id) { return !seen[id]; }).sort();
+					if (!others.length) return results;
+					return results.concat([['header', "Other " + table.toLowerCase()]], others.map(function (id) {
+						return [kind, id];
+					}));
+				};
+			});
+			$results.off('scroll').on('scroll', function () {
+				search.updateScroll();
+			});
+			search.setType(kind, 'gen' + this.dexView.gen);
+		},
+		focusDexEffectSearch: function (e) {
+			e.currentTarget.select();
+			this.showDexEffectPanel('effects', true);
+		},
+		searchDexEffects: function (e) {
+			var query = e.currentTarget.value;
+			if (this.dexEffectPanel !== 'effects') this.showDexEffectPanel('effects', true);
+			if (this.dexEffectPicker !== true) return this.dexEffectPicker.find(query);
+			query = toID(query);
+			this.$('.dexmonpage [data-panel=effects] .result').each(function () {
+				var $a = $(this).children('a');
+				$(this).toggle(!$a.length || !query || toID($a.children('.movenamecol').text()).indexOf(query) >= 0);
+			});
+		},
+		blurDexEffectSearch: function (e) {
+			if (this.dexEffectData) e.currentTarget.value = this.dexEffectData.name;
 		},
 		clickDexEffectEntry: function (e) {
 			var entry = e.currentTarget.dataset.entry.split('|');
+			var table = { move: 'Moves', ability: 'Abilities', item: 'Items', condition: 'Conditions' }[entry[0]];
+			if (table && $(e.currentTarget).closest('[data-panel=effects]').length) {
+				this.openDexEffect(table, entry[1], this.dexEffect.from);
+				return;
+			}
 			if (entry[0] === 'flag') {
 				if (this.dexEditable) this.toggleDexEffectFlag(entry[1]);
 				return;
@@ -897,21 +1082,55 @@
 			var names = entries.names || {};
 			var custom = entries.custom.Conditions || [];
 			var modified = entries.modified.Conditions || [];
+			var statuses = {};
+			$.each(STATUSES, function (i, status) { statuses[status[0]] = status[1]; });
+			var nameOf = function (id) {
+				return statuses[id] && (names[id] || id) === id ? statuses[id] : names[id] || id;
+			};
+			var kinds = Object.keys(CONDITION_KINDS);
+			var rank = function (id) {
+				var kind = kinds.indexOf((entries.conditions[id] || [''])[0]);
+				return kind < 0 ? kinds.length : kind;
+			};
 			var ids = Object.keys(entries.Conditions).sort(function (a, b) {
-				return (names[a] || a).localeCompare(names[b] || b);
+				return rank(a) - rank(b) || nameOf(a).localeCompare(nameOf(b));
 			});
+			var groups = [
+				[this.dexView.name + " custom conditions", ids.filter(function (id) { return custom.indexOf(id) >= 0; })],
+				[this.dexView.name + " modified conditions", ids.filter(function (id) { return modified.indexOf(id) >= 0; })],
+				["Conditions", ids.filter(function (id) { return custom.indexOf(id) < 0 && modified.indexOf(id) < 0; })]
+			];
 			var buf = this.dexEditable ? '<p><button class="button" name="newDexEffect"><i class="fa fa-plus"></i> New condition</button></p>' : '';
 			buf += '<ul class="utilichart">';
-			for (var i = 0; i < ids.length; i++) {
-				var tag = custom.indexOf(ids[i]) >= 0 ? 'Custom' : modified.indexOf(ids[i]) >= 0 ? 'Edited' : '';
-				buf += '<li class="result"><a data-entry="condition|' + ids[i] + '"><span class="col movenamecol">' + escape(names[ids[i]] || ids[i]) + '</span>' +
-					(tag ? ' <span class="col movedesccol">' + tag + '</span>' : '') + '</a></li>';
-			}
+			$.each(groups, function (i, group) {
+				if (!group[1].length) return;
+				buf += '<li class="result"><h3>' + escape(group[0]) + '</h3></li>';
+				$.each(group[1], function (j, id) {
+					var info = entries.conditions[id] || ['', ''];
+					buf += '<li class="result"><a data-entry="condition|' + id + '"><span class="col movenamecol">' + escape(nameOf(id)) + '</span> ' +
+						'<span class="col widelabelcol"><em>Kind</em><br />' + (CONDITION_KINDS[info[0]] || '&mdash;') + '</span> ' +
+						'<span class="col movedesccol">' + escape(info[1]) + '</span></a></li>';
+				});
+			});
 			return buf + '</ul>';
 		}
 	};
 
 	var builderMethods = {
+		closeDexEffect: function (value, button) {
+			if (button) return this.leaveDex(button, function () { this.closeDexEffect(); });
+			viewMethods.closeDexEffect.call(this);
+		},
+		clickDexEffectEntry: function (e) {
+			var entry = e.currentTarget.dataset.entry.split('|');
+			if (entry[0] !== 'pokemon' || this.dexEffect.table !== 'Moves' || !this.dexEditable) return viewMethods.clickDexEffectEntry.call(this, e);
+			var $results = this.$('.dexmonpage [data-panel=list]');
+			var top = $results.scrollTop();
+			this.toggleDexMove(toID(entry[1]), this.dexEffect.id);
+			this.setupDexEffectList();
+			$results.scrollTop(top);
+			this.dexEffectSearch.updateScroll();
+		},
 		dexEffectDraft: function () {
 			var effect = this.dexEffect;
 			var key = effect.table + ':' + effect.id;
@@ -965,6 +1184,7 @@
 			this.$('.dexmonpage .dexmoveicons').html(this.dexEffectIconHTML(data));
 			this.$('.dexmonpage .setcol-stats').html(this.dexEffectStatsHTML(data));
 			this.$('.dexmonpage .setstats').toggleClass('cur', this.dexEffectPanel === 'fields' && !!this.$('.dexmonpage [data-panel=list]').length);
+			this.markDexEdits();
 		},
 		resizeDexInline: function (e) {
 			fitInline(e.currentTarget);
@@ -985,6 +1205,7 @@
 		},
 		searchDexEffectFlags: function (e) {
 			this.$('.dexmonpage [data-panel=flags]').html(this.dexFlagListHTML(e.currentTarget.value));
+			this.markDexEdits();
 		},
 		toggleDexEffectFlag: function (flag) {
 			var flags = this.dexEffectValues().flags || {};
@@ -996,9 +1217,11 @@
 			var query = $input.val();
 			var focused = $input.is(':focus') || this.dexEffectPanel === 'flags';
 			this.$('.dexmonpage .dexflagbox').html(this.dexFlagChipsHTML(data));
+			this.$('.dexmonpage .dexflaglabel').text('Flags (' + Object.keys(data.flags || {}).filter(function (key) { return data.flags[key]; }).length + ')');
 			this.$('.dexmonpage .setcol-stats').html(this.dexEffectStatsHTML(data));
 			this.$('.dexmonpage [data-panel=flags]').html(this.dexFlagListHTML(query));
 			if (focused) this.$('.dexmonpage input[name=effectflags]').val(query).focus();
+			this.markDexEdits();
 		},
 		deleteDexEffect: function (value, button) {
 			var self = this;
@@ -1023,10 +1246,28 @@
 		newDexEffect: function (value, button) {
 			var count = this.dexSummary.counts[this.dexTab];
 			if (count && KINDS[count.table]) app.addPopup(DexNewEffectPopup, { room: this, table: count.table, sourceEl: button });
+		},
+		copyDexEffect: function (value, button) {
+			var effect = this.dexEffect;
+			app.addPopup(DexNewEffectPopup, { room: this, table: effect.table, from: effect.id, sourceEl: button });
 		}
 	};
 
 	_.extend(RoomsRoom.prototype, viewMethods);
+	_.each([RoomsRoom, window.DexBuilderRoom], function (Room) {
+		_.extend(Room.prototype.events, {
+			'focus .dexmonpage input[name=effectsearch]': 'focusDexEffectSearch',
+			'input .dexmonpage input[name=effectsearch]': 'searchDexEffects',
+			'blur .dexmonpage input[name=effectsearch]': 'blurDexEffectSearch',
+			'focus .dexmonpage input[name=monsearch]': 'focusDexMonSearch',
+			'input .dexmonpage input[name=monsearch]': 'searchDexMonSearch',
+			'blur .dexmonpage input[name=monsearch]': 'blurDexMonSearch',
+			'focus .dexmonpage input[name=movesearch]': 'focusDexMoveSearch',
+			'input .dexmonpage input[name=movesearch]': 'searchDexMoveSearch',
+			'focus .dexmonpage input[name=learnersearch]': 'focusDexLearnerSearch',
+			'input .dexmonpage input[name=learnersearch]': 'searchDexLearners'
+		});
+	});
 	_.extend(window.DexBuilderRoom.prototype, builderMethods);
 	_.defaults(window.DexBuilderRoom.prototype, viewMethods);
 	_.extend(window.DexBuilderRoom.prototype.events, {
