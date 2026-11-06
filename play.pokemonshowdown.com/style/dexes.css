@@ -912,11 +912,12 @@
 	font-size: 8pt;
 	white-space: pre;
 }
-.dexcodeslots mark {
-	background: #FFE8A0;
+.dexmark {
+	background: hsl(var(--hue), 90%, 72%);
+	color: inherit;
 }
-.dark .dexcodeslots mark {
-	background: #6A5A20;
+.dark .dexmark {
+	background: hsl(var(--hue), 65%, 38%);
 	color: #FFFFFF;
 }
 .dexcodeslots input[type=number] {

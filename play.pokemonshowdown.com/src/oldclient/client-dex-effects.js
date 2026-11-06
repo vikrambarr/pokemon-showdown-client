@@ -39,17 +39,19 @@
 				['damage', "Fixed damage", 'damage'], ['ohko', "One-hit KO", 'select', 'ohko']
 			]],
 			["Effects", [
-				['status', "Status", 'select', 'status'], ['volatileStatus', "Volatile status", 'text'], ['boosts', "Stat changes", 'boosts'],
+				['status', "Status", 'select', 'status'], ['volatileStatus', "Volatile status", 'select', 'condition:volatileStatus'], ['boosts', "Stat changes", 'boosts'],
 				['selfBoost.boosts', "User's stat changes after hitting", 'boosts'], ['drain', "Drain", 'fraction'], ['recoil', "Recoil", 'fraction'],
 				['heal', "Heal", 'fraction'], ['selfSwitch', "User switches out", 'select', YES.concat(['copyvolatile', 'shedtail'])],
 				['selfdestruct', "User faints", 'select', [['always', "Always"], ['ifHit', "If it hits"]]]
 			]],
 			["Field", [
-				['weather', "Weather", 'text'], ['terrain', "Terrain", 'text'], ['pseudoWeather', "Field condition", 'text'],
-				['sideCondition', "Side condition", 'text'], ['slotCondition', "Slot condition", 'text']
+				['weather', "Weather", 'select', 'condition:weather'], ['terrain', "Terrain", 'select', 'condition:terrain'],
+				['pseudoWeather', "Field condition", 'select', 'condition:pseudoWeather'],
+				['sideCondition', "Side condition", 'select', 'condition:sideCondition'],
+				['slotCondition', "Slot condition", 'select', 'condition:slotCondition']
 			]],
 			["Secondary effects", [['secondaries', "", 'secondaries']]],
-			["After use", [['self.boosts', "User's stats", 'boosts'], ['self.volatileStatus', "User's volatile status", 'text']]],
+			["After use", [['self.boosts', "User's stats", 'boosts'], ['self.volatileStatus', "User's volatile status", 'select', 'condition:volatileStatus']]],
 			["Damage calculation", [
 				['overrideOffensiveStat', "Attacks with", 'select', 'stat'], ['overrideDefensiveStat', "Hits against", 'select', 'stat'],
 				['overrideOffensivePokemon', "Attacking stat from", 'select', [['target', "Target"], ['source', "User"]]],
@@ -68,10 +70,10 @@
 		],
 		Abilities: [["Attributes", [['suppressWeather', "Suppresses weather", 'bool']]]],
 		Items: [
-			["Fling", [['fling.basePower', "Power", 'int', [0, 250]], ['fling.status', "Status", 'select', 'status'], ['fling.volatileStatus', "Volatile status", 'text']]],
+			["Fling", [['fling.basePower', "Power", 'int', [0, 250]], ['fling.status', "Status", 'select', 'status'], ['fling.volatileStatus', "Volatile status", 'select', 'condition:volatileStatus']]],
 			["Natural Gift", [['naturalGift.basePower', "Power", 'int', [0, 250]], ['naturalGift.type', "Type", 'select', 'type']]],
 			["Effects", [['boosts', "Stat changes", 'boosts'], ['ignoreKlutz', "Works with Klutz", 'bool']]],
-			["Icon", [['spriteFrom', "Use the icon of", 'text'], ['spritenum', "Sprite number", 'int', [0, 761]]]]
+			["Icon", [['spriteFrom', "Use the icon of", 'select', 'ref:Items'], ['spritenum', "Sprite number", 'int', [0, 761]]]]
 		],
 		Conditions: [["Attributes", [
 			['duration', "Duration", 'int', [1, 100]], ['counterMax', "Counter max", 'int', [1, 10000]],
@@ -79,9 +81,10 @@
 		]]]
 	};
 	var SECONDARY = [
-		['chance', "Chance (%)", 'int', [1, 100]], ['status', "Status", 'select', 'status'], ['volatileStatus', "Volatile status", 'text'],
+		['chance', "Chance (%)", 'int', [1, 100]], ['status', "Status", 'select', 'status'], ['volatileStatus', "Volatile status", 'select', 'condition:volatileStatus'],
 		['boosts', "Target's stats", 'boosts'], ['self.boosts', "User's stats", 'boosts']
 	];
+	var GETTERS = { Moves: 'moves', Abilities: 'abilities', Items: 'items', Pokedex: 'species' };
 	var CARET = '<svg class="dextypecaret" width="10" height="7" viewBox="0 0 14 9"><path d="M1 1H13L7 8Z" fill="#fff" stroke="#000" stroke-width="1.5" stroke-linejoin="round" /></svg>';
 
 	function getPath(object, path) {
@@ -101,9 +104,35 @@
 		return value === undefined || value === null || value === '';
 	}
 
+	var entries = null;
+
+	function refOptions(tables, form, view) {
+		if (!entries) return null;
+		var options = [];
+		$.each(tables, function (i, table) {
+			var ids = table === 'Pokedex' ? entries.species : Object.keys(entries[table] || {});
+			$.each(ids || [], function (j, id) {
+				var name = GETTERS[table] ? view.dex[GETTERS[table]].get(id).name : entries.names[id];
+				options.push([form === 'name' ? name || id : id, escape(name || id)]);
+			});
+		});
+		return options.sort(function (a, b) { return a[1].localeCompare(b[1]); });
+	}
+
 	function selectOptions(options, view) {
 		if (options === 'status') return STATUSES;
 		if (options === 'stat') return STATS;
+		if (options === 'flag') return FLAGS.Moves.concat(FLAGS.Abilities).sort();
+		if (options.slice(0, 4) === 'ref:') return refOptions(options.slice(4).split(','), 'id', view);
+		if (options.slice(0, 5) === 'name:') return refOptions(options.slice(5).split(','), 'name', view);
+		if (options.slice(0, 10) === 'condition:') {
+			var choices = entries && entries.choices;
+			if (!choices) return null;
+			var used = choices[options.slice(10)] || [];
+			var label = function (id) { return [id, escape(choices.names[id] || id)]; };
+			var rest = choices.all.filter(function (id) { return used.indexOf(id) < 0; });
+			return used.map(label).concat(used.length && rest.length ? [{ group: "Other" }] : [], rest.map(label));
+		}
 		var types = view.dex.types.names().filter(function (name) { return view.dex.types.get(name).exists !== false; });
 		if (options === 'type') return types;
 		if (options === 'ohko') return YES.concat(types);
@@ -113,12 +142,20 @@
 	function optionsHTML(options, value, blankLabel) {
 		var buf = blankLabel !== undefined ? '<option value=""' + (blank(value) ? ' selected' : '') + '>' + blankLabel + '</option>' : '';
 		var found = blank(value);
+		var exact = options.some(function (option) { return String(value) === String(Array.isArray(option) ? option[0] : option); });
+		var grouped = false;
 		for (var i = 0; i < options.length; i++) {
+			if (options[i].group) {
+				buf += (grouped ? '</optgroup>' : '') + '<optgroup label="' + escape(options[i].group) + '">';
+				grouped = true;
+				continue;
+			}
 			var option = Array.isArray(options[i]) ? options[i] : [options[i], escape(options[i])];
-			var selected = !found && String(value) === String(option[0]);
+			var selected = !found && (exact ? String(value) === String(option[0]) : toID(value) === toID(option[0]));
 			if (selected) found = true;
 			buf += '<option value="' + escape(option[0]) + '"' + (selected ? ' selected' : '') + '>' + option[1] + '</option>';
 		}
+		if (grouped) buf += '</optgroup>';
 		if (!found && typeof value !== 'object') buf += '<option value="' + escape(String(value)) + '" selected>' + escape(String(value)) + '</option>';
 		return buf;
 	}
@@ -172,6 +209,9 @@
 		if (control === 'range' && Array.isArray(value)) return value.join('&ndash;');
 		if (typeof value === 'boolean') return value ? "Yes" : "No";
 		if (typeof value === 'object') return escape(JSON.stringify(value));
+		if (control === 'select' && typeof options === 'string' && options.slice(0, 10) === 'condition:' && entries && entries.choices) {
+			return escape(entries.choices.names[toID(value)] || String(value));
+		}
 		if (control === 'select' && Array.isArray(options)) {
 			var option = options.filter(function (entry) { return Array.isArray(entry) && String(entry[0]) === String(value); })[0];
 			if (option) return option[1];
@@ -190,6 +230,13 @@
 			return number(value, options);
 		case 'num':
 			return number(value);
+		case 'code':
+		case 'codepair':
+			var step = function (current) {
+				return '<input type="number" class="textbox" step="' + options.step + '" value="' + (typeof current === 'number' ? current : '') + '" />';
+			};
+			if (control === 'code') return step(value) + (options.suffix || '');
+			return step(value[0]) + ' ' + options.sep + ' ' + step(value[1]);
 		case 'accuracy':
 			return number(value === true ? '' : value, [0, 100], value === true ? ' disabled' : '') +
 				' <label class="checkbox"><input type="checkbox"' + (value === true ? ' checked' : '') + ' /> Never misses</label>';
@@ -203,12 +250,17 @@
 			return Object.keys(BOOSTS).map(function (stat) {
 				return '<label class="dexboost">' + BOOSTS[stat] + ' ' + number(value && value[stat], [-6, 6], ' data-stat="' + stat + '"') + '</label>';
 			}).join(' ');
+		case 'damage':
+			return number(value === 'level' ? '' : value, [1, 1000], value === 'level' ? ' disabled' : '') +
+				' <label class="checkbox"><input type="checkbox"' + (value === 'level' ? ' checked' : '') + ' /> Equal to the user\'s level</label>';
 		case 'bool':
 			return '<input type="checkbox"' + (value ? ' checked' : '') + ' />';
 		case 'textarea':
 			return '<textarea class="textbox" rows="3">' + escape(blank(value) ? '' : String(value)) + '</textarea>';
 		case 'select':
-			return '<select class="button' + cls + '">' + optionsHTML(selectOptions(options, view), value === true ? 'true' : value === false ? 'false' : value, '&mdash;') + '</select>';
+			var choices = selectOptions(options, view);
+			if (!choices) return controlHTML('text', value, null, view, className);
+			return '<select class="button' + cls + '">' + optionsHTML(choices, value === true ? 'true' : value === false ? 'false' : value, '&mdash;') + '</select>';
 		default:
 			return '<input type="text" class="textbox' + cls + '" value="' + escape(blank(value) ? '' : String(value)) + '" autocomplete="off" />';
 		}
@@ -228,6 +280,61 @@
 		return { secondary: secondary, secondaries: null };
 	}
 
+	function pairKind(src, first, second) {
+		if (first.kind !== 'number' || second.kind !== 'number') return null;
+		var before = src.slice(Math.max(0, first.start - 20), first.start);
+		var between = src.slice(first.start + first.length, second.start);
+		var after = src.charAt(second.start + second.length);
+		if (/^, ?$/.test(between)) {
+			if (/\[$/.test(before) && after === ']') return second.original === 4096 ? 'ratio' : 'fraction';
+			if (/\.randomChance\($/.test(before) && after === ')') return 'chance';
+			if (/\.random\($/.test(before) && after === ')') return 'range';
+		}
+		if (/\* ?$/.test(before) && /^ ?\/ ?$/.test(between)) return 'percent';
+		return null;
+	}
+
+	function numberPairs(handler) {
+		var src = handler.code || '';
+		var pairs = {};
+		var slots = handler.slots.slice().sort(function (a, b) { return a.start - b.start; });
+		for (var i = 0; i + 1 < slots.length; i++) {
+			var kind = pairKind(src, slots[i], slots[i + 1]);
+			if (!kind) continue;
+			pairs[slots[i].index] = { slot: slots[i + 1], kind: kind };
+			pairs[slots[i + 1].index] = null;
+			i++;
+		}
+		return pairs;
+	}
+
+	function round(value) {
+		return Number(value.toFixed(4));
+	}
+
+	function pairValue(kind, top, bottom) {
+		if (kind === 'ratio') return round(top / bottom);
+		if (kind === 'chance' || kind === 'percent') return round(top / bottom * 100);
+		if (kind === 'range') return [top, bottom - 1];
+		return [top, bottom];
+	}
+
+	function pairSlots(kind, value, bottom) {
+		if (kind === 'fraction') return value;
+		if (kind === 'range') return [value[0], value[1] + 1];
+		if (kind === 'ratio') return [Math.round(value * bottom), bottom];
+		var top = value * bottom / 100;
+		if (kind === 'percent') return [Number(top.toFixed(6)), bottom];
+		if (Math.abs(top - Math.round(top)) < 1e-9) return [Math.round(top), bottom];
+		return value % 1 ? [Math.round(value * 10), 1000] : [value, 100];
+	}
+
+	function pairText(kind, value) {
+		if (kind === 'range') return value.join('&ndash;');
+		if (kind === 'fraction') return value.join('/');
+		return value + (kind === 'ratio' ? '' : '%');
+	}
+
 	function readNumber(input) {
 		var value = $.trim($(input).val());
 		return value === '' || isNaN(Number(value)) ? null : Number(value);
@@ -239,7 +346,11 @@
 		switch (control) {
 		case 'int':
 		case 'num':
+		case 'code':
 			return readNumber(inputs[0]);
+		case 'codepair':
+			var pair = [readNumber(inputs[0]), readNumber(inputs[1])];
+			return pair[0] === null || pair[1] === null ? null : pair;
 		case 'accuracy':
 			$(inputs[0]).prop('disabled', inputs[1].checked);
 			return inputs[1].checked ? true : readNumber(inputs[0]);
@@ -262,8 +373,8 @@
 		case 'bool':
 			return inputs[0].checked;
 		case 'damage':
-			var damage = $.trim(inputs.val());
-			return damage === '' ? null : isNaN(Number(damage)) ? damage : Number(damage);
+			$(inputs[0]).prop('disabled', inputs[1].checked);
+			return inputs[1].checked ? 'level' : readNumber(inputs[0]);
 		case 'secondaries':
 			return $wrap.find('.dexsecondary').map(function () {
 				var secondary = {};
@@ -284,8 +395,12 @@
 		initialize: function (data) {
 			this.room = data.room;
 			this.table = data.table;
+			entries = DexViews.entries[this.room.dexid] || null;
+			var from = refOptions([this.table], 'id', this.room.dexView);
+			var fromHTML = from ? '<select class="button" name="from">' + optionsHTML(from, '', "(nothing)") + '</select>' :
+				'<input type="text" class="textbox" name="from" />';
 			this.$el.html('<form><p><label class="label">Name:<br /><input type="text" class="textbox autofocus" name="name" maxlength="40" /></label></p>' +
-				'<p><label class="label">Copy from (optional):<br /><input type="text" class="textbox" name="from" /></label></p>' +
+				'<p><label class="label">Copy from (optional):<br />' + fromHTML + '</label></p>' +
 				'<p class="buttonbar"><button type="submit" class="button"><strong>Create</strong></button> <button type="button" name="close" class="button">Cancel</button></p></form>');
 		},
 		submit: function (data) {
@@ -309,6 +424,7 @@
 			id = toID(id);
 			var getter = { Moves: 'moves', Abilities: 'abilities', Items: 'items' }[table];
 			var entries = DexViews.entries[this.dexid];
+			if (!entries) DexViews.loadEntries(this.dexid);
 			var name = getter ? view.dex[getter].get(id).name : entries && entries.names && entries.names[id];
 			if (this.$('.dexpage').is(':visible')) this.dexScrollTop = this.dexScroller().scrollTop();
 			keep = keep && this.dexEffect && this.dexEffect.table === table && this.dexEffect.id === id;
@@ -382,6 +498,7 @@
 			var view = DexViews.current = this.dexView;
 			var data = this.dexEffectValues();
 			var editable = !!this.dexEditable;
+			entries = DexViews.entries[this.dexid] || null;
 			var scrolls = {};
 			this.$('.dexmonpage [data-panel]').each(function () { scrolls[this.dataset.panel] = this.scrollTop; });
 			var focused = this.$('.dexmonpage input:focus');
@@ -552,46 +669,185 @@
 			});
 			return buf + '</div>';
 		},
+		dexEffectSlotValue: function (key, slot) {
+			var slots = (this.dexEffectDraft() || {}).slots || {};
+			return Object.prototype.hasOwnProperty.call(slots, key) ? slots[key] === null ? slot.original : slots[key] : slot.value;
+		},
+		dexEffectSlotGroups: function () {
+			var groups = [];
+			var byValue = {};
+			var colors = {};
+			$.each(this.dexEffectData.handlers, function (i, handler) {
+				if (!handler.editable) return;
+				var pairs = numberPairs(handler);
+				$.each(handler.slots, function (j, slot) {
+					if (pairs[slot.index] === null) return;
+					var member = { key: handler.path + ':' + slot.index, slot: slot, path: handler.path };
+					var pair = pairs[slot.index];
+					if (pair) member.pair = { key: handler.path + ':' + pair.slot.index, slot: pair.slot, kind: pair.kind };
+					var id = slot.kind === 'number' ? null : slot.kind + '|' + toID(slot.original);
+					if (id && byValue[id]) {
+						byValue[id].push(member);
+					} else {
+						var group = [member];
+						if (id) byValue[id] = group;
+						groups.push(group);
+					}
+					colors[member.key] = groups.indexOf(byValue[id] || groups[groups.length - 1]);
+					if (member.pair) colors[member.pair.key] = colors[member.key];
+				});
+			});
+			$.each(colors, function (key, index) {
+				colors[key] = Math.round(index * 360 / groups.length);
+			});
+			return { groups: groups, colors: colors };
+		},
+		dexEffectCodeBlockHTML: function (handler, colors) {
+			var self = this;
+			var src = handler.code || '';
+			if (!handler.editable || !handler.slots.length) {
+				var source = (this.dexEffectData.source || []).filter(function (entry) { return entry[0] === handler.path; })[0];
+				return escape(source ? source[1] : src);
+			}
+			var rows = src.split('\n');
+			var indent = Math.min.apply(null, rows.slice(1).filter(function (row) { return $.trim(row); }).map(function (row) {
+				return row.length - row.replace(/^\s+/, '').length;
+			}));
+			if (!isFinite(indent)) indent = 0;
+			var buf = '';
+			var at = 0;
+			var slots = handler.slots.slice().sort(function (a, b) { return a.start - b.start; });
+			var pairs = numberPairs(handler);
+			var text = function (until) {
+				var chunk = src.slice(at, until);
+				buf += escape(indent ? chunk.replace(new RegExp('\n[ \t]{0,' + indent + '}', 'g'), '\n') : chunk);
+				at = until;
+			};
+			var shownOf = function (slot) {
+				var value = self.dexEffectSlotValue(handler.path + ':' + slot.index, slot);
+				var shown = src.slice(slot.start, slot.start + slot.length);
+				if (String(value) === String(slot.original)) return shown;
+				if (slot.kind === 'stat' && /^[a-z]+$/.test(shown)) return String(value);
+				if (typeof value === 'number') return value < 0 || Object.is(value, -0) ? '(' + value + ')' : String(value);
+				return JSON.stringify(value);
+			};
+			$.each(slots, function (i, slot) {
+				if (pairs[slot.index] === null) return;
+				var key = handler.path + ':' + slot.index;
+				var pair = pairs[slot.index] && pairs[slot.index].slot;
+				text(slot.start);
+				var shown = shownOf(slot);
+				if (pair) shown += src.slice(slot.start + slot.length, pair.start) + shownOf(pair);
+				buf += '<mark class="dexmark" style="--hue: ' + colors[key] + '">' + escape(shown) + '</mark>';
+				at = pair ? pair.start + pair.length : slot.start + slot.length;
+			});
+			text(src.length);
+			return buf;
+		},
 		dexEffectCodeHTML: function () {
+			var self = this;
 			var info = this.dexEffectData;
 			var draft = this.dexEffectDraft() || {};
-			var slots = draft.slots || {};
 			var events = draft.events || {};
 			var view = this.dexView;
 			var editable = !!this.dexEditable;
+			var lines = !!this.dexCodeLines;
 			var buf = '<div class="pad">';
 			if (!info.handlers.length) return buf + '<p><em>No code: everything this ' + KINDS[this.dexEffect.table] + ' does comes from its fields.</em></p></div>';
-			if (editable) buf += '<p><small>Change the highlighted numbers and names to change what the code does.</small></p>';
-			var sources = {};
-			$.each(info.source || [], function (i, entry) { sources[entry[0]] = entry[1]; });
+			var editables = info.handlers.filter(function (handler) { return handler.editable && handler.slots.length; });
+			if (editables.length && editable) buf += '<p><small>Change the highlighted numbers and names to change what the code does.</small></p>';
+			var grouping = this.dexEffectSlotGroups();
+			var colors = grouping.colors;
+			var mark = function (key, html) {
+				return '<mark class="dexmark" style="--hue: ' + colors[key] + '">' + html + '</mark>';
+			};
+			var lineHTML = function (key, slot, pair) {
+				var line = slot.line;
+				var length = pair ? pair.slot.start + pair.slot.length - slot.start : slot.length;
+				var start = Math.max(0, slot.column - 25);
+				var end = Math.min(line.length, slot.column + length + 25);
+				return '<code title="' + escape(line.trim()) + '">' + (start ? '&hellip;' : '') + escape(line.slice(start, slot.column)) +
+					mark(key, escape(line.slice(slot.column, slot.column + length))) + escape(line.slice(slot.column + length, end)) +
+					(end < line.length ? '&hellip;' : '') + '</code>';
+			};
+			var rowHTML = function (members, label) {
+				var slot = members[0].slot;
+				var pair = members[0].pair;
+				var value = self.dexEffectSlotValue(members[0].key, slot);
+				var original = slot.original;
+				var text = escape(String(value));
+				var was = escape(String(original));
+				var control = slot.kind === 'number' ? 'code' : 'select';
+				var options = slot.kind === 'ref' ? (slot.form === 'name' ? 'name:' : 'ref:') + slot.tables.join(',') :
+					{ type: 'type', category: CATEGORIES, stat: 'stat', status: 'status', flag: 'flag' }[slot.kind];
+				if (pair) {
+					value = pairValue(pair.kind, value, self.dexEffectSlotValue(pair.key, pair.slot));
+					original = pairValue(pair.kind, slot.original, pair.slot.original);
+					text = pairText(pair.kind, value);
+					was = pairText(pair.kind, original);
+					control = Array.isArray(value) ? 'codepair' : 'code';
+					options = { suffix: pair.kind === 'ratio' ? '' : '%', sep: pair.kind === 'range' ? '&ndash;' : '/' };
+				}
+				if (slot.kind === 'number') options = $.extend({ step: Array.isArray(original) || original % 1 === 0 ? 1 : 0.1 }, options);
+				var keys = members.map(function (member) { return member.key + (member.pair ? ' ' + member.pair.key : ''); }).join(' ');
+				return '<tr><th>' + label + '</th><td>' + (editable ? wrap('data-slot', keys, control, controlHTML(control, value, options, view)) : text) +
+					(String(value) !== String(original) ? ' <small>(was ' + was + ')</small>' : '') + '</td></tr>';
+			};
+			if (!lines && editables.length) {
+				var sections = { values: '', numbers: '' };
+				$.each(grouping.groups, function (i, group) {
+					var values = group.map(function (member) { return toID(self.dexEffectSlotValue(member.key, member.slot)); });
+					var split = values.some(function (value) { return value !== values[0]; });
+					$.each(split ? group.map(function (member) { return [member]; }) : [group], function (j, members) {
+						var slot = members[0].slot;
+						var paths = members.map(function (member) { return member.path; }).filter(function (path, k, list) { return list.indexOf(path) === k; });
+						var label = lineHTML(members[0].key, slot, members[0].pair);
+						if (members.length > 1 || slot.kind !== 'number' && !split) {
+							label = '<code title="' + escape(paths.join(', ')) + '">' + mark(members[0].key, escape(slot.line.slice(slot.column, slot.column + slot.length))) + '</code>';
+							if (members.length > 1) label += ' <small>&times;' + members.length + '</small>';
+						}
+						sections[slot.kind === 'number' ? 'numbers' : 'values'] += rowHTML(members, label);
+					});
+				});
+				$.each([['values', "Values"], ['numbers', "Numbers"]], function (i, section) {
+					if (sections[section[0]]) {
+						buf += '<div class="resultheader"><h3>' + section[1] + '</h3></div><table class="dexdetails dexcodeslots">' + sections[section[0]] + '</table>';
+					}
+				});
+				buf += '<div class="resultheader"><h3>Code</h3></div>';
+			}
 			$.each(info.handlers, function (i, handler) {
 				var original = handler.path.slice(handler.path.lastIndexOf('.') + 1);
 				buf += '<h3>' + escape(handler.path) + '</h3>';
 				if (handler.events.length) {
-					var current = Object.prototype.hasOwnProperty.call(events, handler.path) ? events[handler.path] || original : handler.event;
+					var event = Object.prototype.hasOwnProperty.call(events, handler.path) ? events[handler.path] || original : handler.event;
 					buf += '<p><label class="label">Runs on:</label> ' + (editable ? wrap('data-event', handler.path, 'select',
-						'<select class="button">' + optionsHTML([original].concat(handler.events), current) + '</select>') : escape(current)) + '</p>';
+						'<select class="button">' + optionsHTML([original].concat(handler.events), event) + '</select>') : escape(event)) + '</p>';
 				}
 				if (!handler.editable) {
 					buf += '<p><small>This code can\'t be changed here.</small></p>';
-				} else if (handler.slots.length) {
+				} else if (lines && handler.slots.length) {
 					buf += '<table class="dexdetails dexcodeslots">';
+					var pairs = numberPairs(handler);
 					$.each(handler.slots, function (j, slot) {
+						if (pairs[slot.index] === null) return;
 						var key = handler.path + ':' + slot.index;
-						var value = Object.prototype.hasOwnProperty.call(slots, key) ? slots[key] === null ? slot.original : slots[key] : slot.value;
-						var line = slot.line;
-						var code = escape(line.slice(0, slot.column)) + '<mark>' + escape(line.slice(slot.column, slot.column + slot.length)) + '</mark>' +
-							escape(line.slice(slot.column + slot.length));
-						var control = slot.kind === 'number' ? 'num' : ['type', 'category', 'stat', 'status'].indexOf(slot.kind) >= 0 ? 'select' : 'text';
-						var options = { type: 'type', category: CATEGORIES, stat: 'stat', status: 'status' }[slot.kind];
-						buf += '<tr><th><code>' + code + '</code></th><td>' + (editable ? wrap('data-slot', key, control, controlHTML(control, value, options, view)) : escape(String(value))) +
-							(String(value) !== String(slot.original) ? ' <small>(was ' + escape(String(slot.original)) + ')</small>' : '') + '</td></tr>';
+						var found = pairs[slot.index];
+						var pair = found && { key: handler.path + ':' + found.slot.index, slot: found.slot, kind: found.kind };
+						buf += rowHTML([{ key: key, slot: slot, pair: pair }], lineHTML(key, slot, pair));
 					});
 					buf += '</table>';
 				}
-				buf += '<pre>' + escape(sources[handler.path] || handler.code || '') + '</pre>';
+				buf += '<pre data-code="' + escape(handler.path) + '">' + self.dexEffectCodeBlockHTML(handler, colors) + '</pre>';
 			});
+			if (editables.length) {
+				buf += '<p><button class="button" name="toggleDexCodeLines">' + (lines ? "Group repeated values" : "Show each line") + '</button></p>';
+			}
 			return buf + '</div>';
+		},
+		toggleDexCodeLines: function () {
+			this.dexCodeLines = !this.dexCodeLines;
+			this.$('.dexmonpage [data-panel=code]').html(this.dexEffectCodeHTML());
 		},
 		setupDexEffectList: function () {
 			var effect = this.dexEffect;
@@ -708,12 +964,24 @@
 			var value = readField($wrap);
 			var fields = {};
 			if ($wrap.attr('data-slot')) {
-				var key = $wrap.attr('data-slot');
-				var split = key.lastIndexOf(':');
-				var slot = this.dexEffectData.handlers.filter(function (handler) { return handler.path === key.slice(0, split); })[0]
-					.slots[Number(key.slice(split + 1))];
+				var handlers = this.dexEffectData.handlers;
+				var slotOf = function (key) {
+					var split = key.lastIndexOf(':');
+					return handlers.filter(function (handler) { return handler.path === key.slice(0, split); })[0].slots[Number(key.slice(split + 1))];
+				};
+				var keys = $wrap.attr('data-slot').split(' ');
+				var values = keys.map(function () { return value; });
+				var first = slotOf(keys[0]);
+				var second = keys[1] && slotOf(keys[1]);
+				var handler = handlers.filter(function (other) { return other.path === keys[0].slice(0, keys[0].lastIndexOf(':')); })[0];
+				var kind = second && pairKind(handler.code || '', first, second);
+				if (kind) values = value === null ? [null, null] : pairSlots(kind, value, this.dexEffectSlotValue(keys[1], second));
 				fields.slots = {};
-				fields.slots[key] = value === null || String(value) === String(slot.original) ? null : value;
+				$.each(keys, function (i, key) {
+					var slot = slotOf(key);
+					var same = slot.kind === 'number' ? String(values[i]) === String(slot.original) : toID(values[i]) === toID(slot.original);
+					fields.slots[key] = values[i] === null || same ? null : values[i];
+				});
 			} else if ($wrap.attr('data-event')) {
 				var path = $wrap.attr('data-event');
 				fields.events = {};
@@ -724,6 +992,13 @@
 				else setPath(fields, field, value);
 			}
 			this.saveDexEffect(fields);
+			if (fields.slots) {
+				var self = this;
+				var colors = this.dexEffectSlotGroups().colors;
+				$.each(this.dexEffectData.handlers, function (i, handler) {
+					self.$('.dexmonpage pre[data-code]').filter(function () { return this.dataset.code === handler.path; }).html(self.dexEffectCodeBlockHTML(handler, colors));
+				});
+			}
 			var data = this.dexEffectValues();
 			if ($wrap.attr('data-path') === 'type' || $wrap.attr('data-path') === 'category') return this.renderDexEffect();
 			this.$('.dexmonpage .dexmoveicons').html(this.dexEffectIconHTML(data));

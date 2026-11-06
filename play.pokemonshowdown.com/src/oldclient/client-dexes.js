@@ -57,7 +57,7 @@
 	function loadEntries(dexid) {
 		if (DexViews.entries[dexid] || !dexid || missingEntries[dexid]) return;
 		request('dexentries', dexid).then(function (data) {
-			var entries = { custom: data.custom, modified: data.modified, names: data.names };
+			var entries = { custom: data.custom, modified: data.modified, names: data.names, choices: data.choices, species: data.Pokedex };
 			$.each(['Moves', 'Abilities', 'Items', 'Conditions'], function (i, table) {
 				var ids = entries[table] = {};
 				for (var j = 0; j < data[table].length; j++) ids[data[table][j]] = 1;
@@ -73,6 +73,7 @@
 				if (room.dexFormatSearch && room.dexFormatKind) room.showDexFormatList(room.dexFormatKind);
 				if (room.dexSpecies) room.updateDexLearnsetCount(true);
 				if (room.dexSummary && room.dexSummary.counts[room.dexTab] && room.dexSummary.counts[room.dexTab].table === 'Conditions') room.showDexTab(room.dexTab);
+				if (room.dexEffect && room.dexEffectData) room.renderDexEffect();
 			});
 		}, function () {
 			missingEntries[dexid] = true;
