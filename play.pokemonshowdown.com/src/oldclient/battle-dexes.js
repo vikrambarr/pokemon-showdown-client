@@ -81,6 +81,7 @@
 			genOf: genOf,
 			load: loadDex,
 			draft: draftView,
+			mergeEffect: mergeEffect,
 			tierData: tierData,
 			indexSearch: indexSearch
 		};
@@ -201,13 +202,38 @@
 			return view;
 		}
 
-		function draftView(view, pokemon, previous) {
+		function mergeEffect(target, fields, keepNull) {
+			for (var key in fields) {
+				var value = fields[key];
+				if (value === null && !keepNull) {
+					delete target[key];
+				} else if ($.isPlainObject(value)) {
+					var merged = $.isPlainObject(target[key]) && ['megaStone', 'boosts', 'boost'].indexOf(key) < 0 ? $.extend({}, target[key]) : {};
+					target[key] = mergeEffect(merged, value, keepNull);
+				} else {
+					target[key] = value;
+				}
+			}
+			return target;
+		}
+
+		function draftView(view, pokemon, previous, effects) {
 			if (previous && previous.draftOf) {
 				delete Dex.moddedDexes[previous.modid];
 				delete BattleTeambuilderTable[previous.modid];
 			}
 			var draft = $.extend({}, view, {
-				draftOf: view, modid: view.modid + 'draft' + (++drafts), Pokedex: $.extend({}, view.Pokedex), Learnsets: $.extend({}, view.Learnsets)
+				draftOf: view, modid: view.modid + 'draft' + (++drafts), Pokedex: $.extend({}, view.Pokedex), Learnsets: $.extend({}, view.Learnsets),
+				Moves: $.extend({}, view.Moves), Abilities: $.extend({}, view.Abilities), Items: $.extend({}, view.Items)
+			});
+			$.each(effects || {}, function (table, entries) {
+				if (!draft[table]) return;
+				for (var id in entries) {
+					var fields = $.extend({}, entries[id]);
+					$.each(['name', 'inheritsFrom', 'slots', 'replace', 'events', 'spriteFrom'], function (i, key) { delete fields[key]; });
+					var data = view[table][id] || window[GLOBALS[table][0]][id] || {};
+					draft[table][id] = mergeEffect($.extend(true, {}, data), fields);
+				}
 			});
 			for (var id in pokemon) {
 				var fields = $.extend({}, pokemon[id]);

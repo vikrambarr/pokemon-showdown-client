@@ -9,8 +9,8 @@
 	var TAB_ICONS = { Pokedex: 'paw', Moves: 'bolt', Abilities: 'star', Items: 'shopping-bag', Conditions: 'cloud', TypeChart: 'th' };
 	var VIEW_METHODS = [
 		'setupDexSearch', 'createDexList', 'showDexTab', 'renderDexTypes', 'scaleDexList', 'updateDexScroll', 'searchPokemon', 'searchPokemonKey', 'clickDexEntry',
-		'openDexPokemon', 'dexAbilityChipsHTML', 'dexEvoChipsHTML', 'updateDexLearnsetCount', 'scaleDexPokemon', 'closeDexPokemon', 'clickDexMove', 'openDexMove', 'renderDexMove', 'showDexMoveList',
-		'showDexMoveDetails', 'closeDexMove', 'dexStatsHTML', 'showDexStats', 'showDexLearnset', 'selectDexFormat', 'scaleDexFormat',
+		'openDexPokemon', 'dexAbilityChipsHTML', 'dexEvoChipsHTML', 'updateDexLearnsetCount', 'scaleDexPokemon', 'closeDexPokemon', 'clickDexMove',
+		'dexStatsHTML', 'showDexStats', 'showDexLearnset', 'selectDexFormat', 'scaleDexFormat',
 		'openDexFormat', 'renderDexFormat', 'showDexFormatList', 'renderDexFormatTree', 'renderDexFormatBans', 'searchDexFormat'
 	];
 	var view = _.pick(RoomsRoom.prototype, VIEW_METHODS);
@@ -18,6 +18,7 @@
 	var DOUBLES_TIERS = ['DUber', '(DUber)', 'DOU', 'DBL', '(DOU)', 'DUU', '(DUU)', 'NFE', 'LC', 'Illegal', 'Unreleased'];
 	var TIER_STYLES = [['singles', "Singles", 'tier'], ['natdex', "National Dex", 'natDexTier'], ['doubles', "Doubles", 'doublesTier'], ['vgc', "VGC", '']];
 	var EVO_TYPES = ['', 'trade', 'useItem', 'levelMove', 'levelExtra', 'levelFriendship', 'levelHold', 'other'];
+	var EFFECT_KINDS = { Moves: 'move', Abilities: 'ability', Items: 'item', Conditions: 'condition' };
 	var SPRITE_KINDS = { front: 'Front', back: 'Back', 'front-shiny': 'Shiny front', 'back-shiny': 'Shiny back', icon: 'Icon' };
 
 	function baseValue(summary) {
@@ -433,6 +434,7 @@
 			'input input[name=pokemonsearch]': 'searchPokemon',
 			'keydown input[name=pokemonsearch]': 'searchPokemonKey',
 			'click .dexpokemon a[data-entry]': 'clickDexEntry',
+			'click .dextabempty a[data-entry]': 'clickDexEntry',
 			'click .dexmonpage .utilichart a[data-entry]': 'clickDexMonEntry',
 			'input input[name=formatsearch]': 'searchDexFormat',
 			'input input[name=tiersearch]': 'searchDexTiers',
@@ -544,7 +546,7 @@
 			this.dexView = null;
 			this.dexSearch = null;
 			this.dexSpecies = null;
-			this.dexMove = null;
+			this.dexEffect = null;
 			this.dexFormat = '';
 			this.dexFormatId = '';
 			this.dexEditable = true;
@@ -553,7 +555,8 @@
 			buf += '<div class="dexpage"><div class="dexbuildertabs"></div><div class="dexbuildersub" style="display:none">' +
 				'<p><button class="button" name="closeDexTab"><i class="fa fa-chevron-left"></i> Dex</button> <strong class="dexsubtitle"></strong></p>' +
 				'<p class="dexpokemonsearch"><input type="search" class="textbox" name="pokemonsearch" placeholder="Search Pok&eacute;mon" size="30" autocomplete="off" />' +
-				' <button class="button" name="newDexPokemon"><i class="fa fa-plus"></i> New Pok&eacute;mon</button></p>' +
+				' <button class="button" name="newDexPokemon"><i class="fa fa-plus"></i> New Pok&eacute;mon</button>' +
+				'<button class="button" name="newDexEffect"><i class="fa fa-plus"></i> <span></span></button></p>' +
 				'<div class="dextabempty"></div><div class="dexpokemon"></div><div class="dexformatpage"></div><div class="dextierpage" style="display:none"></div></div></div>' +
 				'<div class="dexmonpage" style="display:none"></div>';
 			this.$('.teampane').html(buf);
@@ -607,8 +610,14 @@
 			var pending = this.pendingSpecies;
 			this.pendingSpecies = null;
 			var species = this.dexSpecies;
+			var pendingEffect = this.pendingEffect;
+			this.pendingEffect = null;
 			if (pending && dexView.species[toID(pending)]) {
 				this.openDexPokemon(pending);
+			} else if (pendingEffect) {
+				this.openDexEffect(pendingEffect[0], pendingEffect[1]);
+			} else if (this.dexEffect) {
+				this.openDexEffect(this.dexEffect.table, this.dexEffect.id, this.dexEffect.from, true);
 			} else if (species) {
 				if (dexView.species[species.id]) {
 					this.reopenDexPokemon(species.name, statsOpen);
@@ -851,7 +860,9 @@
 			}
 			view.showDexTab.call(this, tab);
 			this.$('.dexsubtitle').text(this.$('.dexbuildertab[value="' + this.dexTab + '"]').contents().filter(function () { return this.nodeType === 3; }).text());
-			this.$('button[name=newDexPokemon]').toggle(this.dexTab === '0');
+			var table = this.dexSummary.counts[this.dexTab] && this.dexSummary.counts[this.dexTab].table;
+			this.$('button[name=newDexPokemon]').toggle(table === 'Pokedex');
+			this.$('button[name=newDexEffect]').toggle(!!EFFECT_KINDS[table]).find('span').text('New ' + EFFECT_KINDS[table]);
 			if (this.dexTab !== 'formats' || this.dexFormat) return;
 			this.$('.dexformatpage').html('<div class="pad"><p><em>This dex has no formats yet.</em></p>' +
 				'<p><button class="button" name="newDexFormat"><i class="fa fa-plus"></i> New format</button></p></div>');
@@ -1034,6 +1045,7 @@
 		},
 		clickDexMonEntry: function (e) {
 			e.preventDefault();
+			if (this.dexEffect) return this.clickDexEffectEntry(e);
 			var entry = e.currentTarget.dataset.entry.split('|');
 			var field = this.dexEditField;
 			var dexView = this.dexView;
@@ -1287,21 +1299,28 @@
 			app.addPopup(DexCreatePopup, { sourceEl: sourceEl });
 		},
 		draftDex: function (kind, key, fields) {
-			var draft = this.dexDraft || (this.dexDraft = { pokemon: {}, tiers: [], formats: {} });
+			var draft = this.dexDraft || (this.dexDraft = { pokemon: {}, tiers: [], formats: {}, effects: {} });
 			if (kind === 'tiers') draft.tiers.push(fields);
+			else if (kind === 'effects') draft.effects[key] = DexViews.mergeEffect(draft.effects[key] || {}, fields, true);
 			else mergeFields(draft[kind][key] || (draft[kind][key] = {}), fields);
 			this.applyDexDraft();
 		},
 		applyDexDraft: function () {
 			var draft = this.dexDraft;
-			if (draft && $.isEmptyObject(draft.pokemon) && !draft.tiers.length && $.isEmptyObject(draft.formats)) this.dexDraft = null;
+			if (draft && $.isEmptyObject(draft.pokemon) && !draft.tiers.length && $.isEmptyObject(draft.formats) && $.isEmptyObject(draft.effects)) this.dexDraft = null;
 			var pokemon = {};
+			var effects = {};
 			$.each([this.dexSaving, this.dexDraft], function (i, layer) {
 				if (!layer) return;
 				for (var id in layer.pokemon) mergeFields(pokemon[id] || (pokemon[id] = {}), layer.pokemon[id]);
+				for (var key in layer.effects) {
+					var split = key.split(':');
+					var table = effects[split[0]] || (effects[split[0]] = {});
+					table[split[1]] = DexViews.mergeEffect(table[split[1]] || {}, layer.effects[key], true);
+				}
 			});
 			var base = this.dexBaseView;
-			if (base) this.dexView = DexViews.current = $.isEmptyObject(pokemon) ? base : DexViews.draft(base, pokemon, this.dexView);
+			if (base) this.dexView = DexViews.current = $.isEmptyObject(pokemon) && $.isEmptyObject(effects) ? base : DexViews.draft(base, pokemon, this.dexView, effects);
 			this.updateDexDraftBar();
 		},
 		dexTierOps: function () {
@@ -1316,7 +1335,7 @@
 		},
 		updateDexDraftBar: function () {
 			var draft = this.dexDraft;
-			var count = draft ? Object.keys(draft.pokemon).length + draft.tiers.length + Object.keys(draft.formats).length : 0;
+			var count = draft ? Object.keys(draft.pokemon).length + draft.tiers.length + Object.keys(draft.formats).length + Object.keys(draft.effects).length : 0;
 			this.$el.toggleClass('dexdrafting', !!(count || this.dexSaving));
 			if (!count && !this.dexSaving) return this.$('.dexdraftbar').empty();
 			var buf = this.dexSaving ? '<button class="button" disabled><i class="fa fa-refresh"></i> Saving...</button>' :
@@ -1327,6 +1346,7 @@
 			this.$('.dexdraftbar').html(buf);
 		},
 		refreshDexPage: function () {
+			if (this.dexEffect) return this.renderDexEffect();
 			if (this.dexSpecies) return this.reopenDexPokemon(this.dexSpecies.name, this.$('.dexmonpage .dexstatresults').is(':visible'));
 			if (this.dexTab === 'tiers') return this.renderDexTierPage(this.tierDetails);
 			if (this.dexTab === 'formats') return this.refreshDexFormat();
@@ -1373,6 +1393,11 @@
 			});
 			$.each(draft.formats, function (id, fields) {
 				room.editDex({ format: fields }, fields.name, ['formats', id, fields]);
+			});
+			$.each(draft.effects, function (key, fields) {
+				var edit = {};
+				edit[EFFECT_KINDS[key.split(':')[0]]] = fields;
+				room.editDex(edit, fields.name, ['effects', key, fields]);
 			});
 			this.updateDexDraftBar();
 			return true;
@@ -1451,6 +1476,7 @@
 					$.each(['pokemon', 'formats'], function (i, kind) {
 						for (var key in later[kind]) mergeFields(draft[kind][key] || (draft[kind][key] = {}), later[kind][key]);
 					});
+					for (var key in later.effects) draft.effects[key] = DexViews.mergeEffect(draft.effects[key] || {}, later.effects[key], true);
 				}
 			}
 			if (this.dexSaving && answers.saved) {

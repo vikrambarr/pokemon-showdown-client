@@ -57,8 +57,8 @@
 	function loadEntries(dexid) {
 		if (DexViews.entries[dexid] || !dexid || missingEntries[dexid]) return;
 		request('dexentries', dexid).then(function (data) {
-			var entries = { custom: data.custom, modified: data.modified };
-			$.each(['Moves', 'Abilities', 'Items'], function (i, table) {
+			var entries = { custom: data.custom, modified: data.modified, names: data.names };
+			$.each(['Moves', 'Abilities', 'Items', 'Conditions'], function (i, table) {
 				var ids = entries[table] = {};
 				for (var j = 0; j < data[table].length; j++) ids[data[table][j]] = 1;
 			});
@@ -72,6 +72,7 @@
 				if (typedSearch && typedSearch.searchType !== 'pokemon') room.dexSearch.setType(typedSearch.searchType, 'gen' + room.dexView.gen);
 				if (room.dexFormatSearch && room.dexFormatKind) room.showDexFormatList(room.dexFormatKind);
 				if (room.dexSpecies) room.updateDexLearnsetCount(true);
+				if (room.dexSummary && room.dexSummary.counts[room.dexTab] && room.dexSummary.counts[room.dexTab].table === 'Conditions') room.showDexTab(room.dexTab);
 			});
 		}, function () {
 			missingEntries[dexid] = true;
@@ -654,6 +655,7 @@
 			'input input[name=pokemonsearch]': 'searchPokemon',
 			'keydown input[name=pokemonsearch]': 'searchPokemonKey',
 			'click .dexpokemon a[data-entry]': 'clickDexEntry',
+			'click .dextabempty a[data-entry]': 'clickDexEntry',
 			'click .dexmonpage .utilichart a[data-entry]': 'clickDexMove',
 			'input input[name=formatsearch]': 'searchDexFormat',
 			'click .dexformatpage .utilichart a[data-entry]': 'clickDexFormatEntry'
@@ -832,10 +834,9 @@
 			var kind = count && { Pokedex: 'pokemon', Moves: 'move', Abilities: 'ability', Items: 'item' }[count.table];
 			var pokemon = !!kind;
 			var formats = tab === 'formats';
-			var buf = pokemon || formats ? '' : count.table === 'TypeChart' ? this.renderDexTypes() :
-				'<p><em>' + count.name + ' view coming soon.</em></p>';
+			var buf = pokemon || formats ? '' : count.table === 'TypeChart' ? this.renderDexTypes() : this.dexConditionsHTML();
 			this.$('.dexpage button[name=showDexTab]').removeClass('cur').filter('[value="' + tab + '"]').addClass('cur');
-			if (kind && kind !== 'pokemon') loadEntries(this.dexid);
+			if (count && count.table !== 'Pokedex') loadEntries(this.dexid);
 			if (kind && this.dexSearch.engine.typedSearch.searchType !== kind) {
 				this.$('input[name=pokemonsearch]').val('').attr('placeholder', 'Search ' + BattleLog.unescapeHTML(count.name));
 				this.dexSearch.setType(kind, 'gen' + this.dexView.gen);
@@ -908,8 +909,9 @@
 				this.openDexPokemon(entry[1]);
 				return;
 			}
-			if (entry[0] === 'move') {
-				this.openDexMove(entry[1]);
+			var table = { move: 'Moves', ability: 'Abilities', item: 'Items', condition: 'Conditions' }[entry[0]];
+			if (table) {
+				this.openDexEffect(table, entry[1]);
 				return;
 			}
 			if (!this.dexSearch.addFilter(e.currentTarget)) return;

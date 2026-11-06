@@ -420,7 +420,12 @@
 }
 .dexmoveattributes .statrow em {
 	width: auto;
+	max-width: 90px;
+	height: 15px;
 	margin-left: auto;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 .dexpicker {
 	position: relative;
@@ -852,4 +857,71 @@
 }
 .dexmonchart .dexchip small {
 	opacity: 0.6;
+}
+.dexmonchart .dexflagbox {
+	width: 228px;
+}
+.dexmoveicons .dexitemicon {
+	display: inline-block;
+	width: 24px;
+	height: 24px;
+	zoom: 2;
+	image-rendering: pixelated;
+}
+.dexmoveicons .dexeffecticon {
+	font-size: 36px;
+	color: #888888;
+}
+.dexmonchart .setcol-moves select.dexfield {
+	display: block;
+	box-sizing: border-box;
+	width: 133px;
+	height: 24px;
+	margin: 2px 3px 1px 1px;
+}
+.dexeffectfields input[type=number] {
+	width: 60px;
+}
+.dexeffectfields input[type=text] {
+	width: 160px;
+}
+.dexeffectfields textarea {
+	width: 320px;
+	resize: vertical;
+}
+.dexeffectfields .dexboost {
+	display: inline-block;
+	white-space: nowrap;
+}
+.dexeffectfields .dexboost input[type=number] {
+	width: 40px;
+}
+.dexsecondary {
+	margin: 2px 0 6px 0;
+	padding: 4px;
+	border: 1px solid #BBBBBB;
+	border-radius: 4px;
+}
+.dark .dexsecondary {
+	border-color: #555555;
+}
+.dexcodeslots th {
+	text-align: left;
+}
+.dexcodeslots code {
+	font-size: 8pt;
+	white-space: pre;
+}
+.dexcodeslots mark {
+	background: #FFE8A0;
+}
+.dark .dexcodeslots mark {
+	background: #6A5A20;
+	color: #FFFFFF;
+}
+.dexcodeslots input[type=number] {
+	width: 70px;
+}
+.dexcode pre {
+	margin-bottom: 6px;
 }
