@@ -8,9 +8,9 @@
 	var PICKER_CARET = ' <i class="fa fa-caret-down dexpickercaret"></i>';
 	var TAB_ICONS = { Pokedex: 'paw', Moves: 'bolt', Abilities: 'star', Items: 'shopping-bag', Conditions: 'cloud', TypeChart: 'th' };
 	var VIEW_METHODS = [
-		'setupDexSearch', 'createDexList', 'showDexTab', 'renderDexTypes', 'scaleDexList', 'updateDexScroll', 'searchPokemon', 'searchPokemonKey', 'clickDexEntry',
-		'openDexPokemon', 'dexAbilityChipsHTML', 'dexEvoChipsHTML', 'updateDexLearnsetCount', 'scaleDexPokemon', 'closeDexPokemon', 'clickDexMove',
-		'dexStatsHTML', 'showDexStats', 'showDexLearnset', 'selectDexFormat', 'scaleDexFormat', 'dexEditsHTML', 'toggleDexEdits', 'dexSpeciesBase',
+		'dexScrollerWidth', 'setupDexSearch', 'createDexList', 'showDexTab', 'renderDexTypes', 'scaleDex', 'updateDexScroll', 'searchPokemon', 'searchPokemonKey', 'clickDexEntry',
+		'openDexPokemon', 'dexAbilityChipsHTML', 'dexEvoChipsHTML', 'updateDexLearnsetCount', 'closeDexPokemon', 'clickDexMove',
+		'dexStatsHTML', 'showDexStats', 'showDexLearnset', 'selectDexFormat', 'dexEditsHTML', 'toggleDexEdits', 'dexSpeciesBase',
 		'dexSpeciesChanged', 'markDexEdits', 'dexMoveEdited', 'setDexLearnsetList', 'focusDexMonSearch', 'searchDexMonSearch', 'blurDexMonSearch',
 		'focusDexMoveSearch', 'searchDexMoveSearch',
 		'openDexFormat', 'renderDexFormat', 'showDexFormatList', 'renderDexFormatTree', 'renderDexFormatBans', 'searchDexFormat'
@@ -702,15 +702,11 @@
 			this.$('.dextierpage').html(buf);
 			var $list = this.$('.dextierlist');
 			var search = this.tierSearch = this.createDexList($list, 'dexListZoom');
-			this.scaleDexList();
-			search.renderRow = function (id, type, matchStart, matchLength, errorMessage, attrs) {
-				if (type === 'pokemon') {
-					var speciesid = toID(id);
-					var classes = (own[speciesid] && own[speciesid][info[2]] ? ' dextieroverride' : '') + (room.tierSelected[speciesid] ? ' cur' : '');
-					if (classes) attrs = (attrs || '') + ' class="' + classes.slice(1) + '"';
-				}
-				return BattleSearch.prototype.renderRow.call(this, id, type, matchStart, matchLength, errorMessage, attrs);
-			};
+			this.scaleDex();
+			DexViews.ui.rowClasses(search, function (id, type) {
+				var speciesid = toID(id);
+				return type !== 'pokemon' ? '' : (own[speciesid] && own[speciesid][info[2]] ? ' dextieroverride' : '') + (room.tierSelected[speciesid] ? ' cur' : '');
+			});
 			DexViews.ui.viewSearch(search, this.dexView, function (typedSearch) {
 				typedSearch.isNatDex = style === 'natdex';
 				typedSearch.isDoubles = style === 'doubles' || style === 'vgc';
@@ -840,6 +836,10 @@
 		dexScroller: function () {
 			return this.$('.teampane');
 		},
+		show: function () {
+			Room.prototype.show.apply(this, arguments);
+			this.scaleDex();
+		},
 		showDexTab: function (tab) {
 			var home = tab === '' || tab === null || tab === undefined;
 			this.$el.toggleClass('dexsubpage', !home);
@@ -857,8 +857,7 @@
 			}
 			var tiers = String(tab) === 'tiers';
 			this.$('.dextierpage').toggle(tiers);
-			this.scaleDexList();
-			this.scaleDexFormat();
+			this.scaleDex();
 			if (tiers) {
 				this.dexTab = 'tiers';
 				this.$('.dexpokemonsearch, .dexpokemon, .dextabempty, .dexformatpage').hide();

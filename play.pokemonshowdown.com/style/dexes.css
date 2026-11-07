@@ -110,10 +110,6 @@
 .dexmonchart .setrow-abilities .dexfield {
 	width: calc(100% - 4px);
 }
-.dexmonpage .teambuilder-results {
-	bottom: 0;
-	overflow-y: scroll;
-}
 .formatsettings {
 	margin: 0 0 8px 0;
 }
@@ -582,6 +578,18 @@
 	min-width: 640px;
 	overflow-y: auto;
 }
+@media (max-height:410px), (max-width:639px) {
+	.dexstatresults {
+		bottom: auto;
+		overflow-y: visible;
+		background: #EEF2F5;
+		color: black;
+	}
+	.dark .dexstatresults {
+		background: #0E1215;
+		color: #DDD;
+	}
+}
 .dexstatresults .evslider:not([name]) {
 	pointer-events: none;
 }
@@ -823,6 +831,9 @@
 .dexsubpage .teampane > .dexpicker {
 	display: none;
 }
+.teampane > .dexmonpage {
+	margin: -5px 0 -5px -8px;
+}
 .dexsubpage .dexmonpage .teambar {
 	left: 120px;
 	min-width: 0;
@@ -924,6 +935,40 @@
 .dexmoveicons .dexeffecticon {
 	font-size: 36px;
 	color: #888888;
+}
+.dexfieldsection {
+	margin-top: 8px;
+}
+.dexfieldsection table,
+.dexfieldsection tr,
+.dexfieldsection th,
+.dexfieldsection td {
+	display: block;
+	text-align: left;
+}
+.dexfieldsection th {
+	padding-top: 6px;
+}
+.dexfieldsection[data-section=Description] input[type=text],
+.dexfieldsection[data-section=Description] textarea {
+	box-sizing: border-box;
+	width: 367px;
+}
+.dexfieldsection[data-section=Description] textarea {
+	height: 110px;
+}
+.dexfieldsection[data-section=Properties] tbody {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 4px;
+	margin-top: 6px;
+}
+.dextoggle {
+	display: block;
+	text-align: center;
+}
+.dextoggle input {
+	display: none;
 }
 .dexeffectfields input[type=number] {
 	width: 60px;

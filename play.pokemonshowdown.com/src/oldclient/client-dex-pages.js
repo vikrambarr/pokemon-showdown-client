@@ -221,20 +221,15 @@
 			this.$('.dexmonpage').html('<div class="teamwrapper">' + buf + '</div>');
 
 			var $results = this.$('.teambuilder-results');
-			var search = this.dexPokemonSearch = new BattleSearch($results, $results);
+			var search = this.dexPokemonSearch = DexViews.ui.panelSearch($results);
 			var room = this;
-			search.renderRow = function (id, type, matchStart, matchLength, errorMessage, attrs) {
-				var classes = type !== 'move' ? '' : (room.dexMoveEdited(id) ? ' dexedited' : '') + (room.dexEditable && room.dexLearnset[id] ? ' cur' : '');
-				if (classes) attrs = attrs ? attrs.replace('class="', 'class="' + classes.slice(1) + ' ') : ' class="' + classes.slice(1) + '"';
-				return BattleSearch.prototype.renderRow.call(this, id, type, matchStart, matchLength, errorMessage, attrs);
-			};
-			this.markDexEdits();
-			$results.on('scroll', function () {
-				search.updateScroll();
+			DexViews.ui.rowClasses(search, function (id, type) {
+				return type !== 'move' ? '' : (room.dexMoveEdited(id) ? ' dexedited' : '') + (room.dexEditable && room.dexLearnset[id] ? ' cur' : '');
 			});
+			this.markDexEdits();
 			this.setDexLearnsetList();
 			this.updateDexLearnsetCount();
-			this.scaleDexPokemon();
+			this.scaleDex();
 		},
 		setDexLearnsetList: function () {
 			var search = this.dexPokemonSearch;
@@ -401,17 +396,6 @@
 			var count = search.engine.results.filter(function (row) { return row[0] === 'move'; }).length;
 			this.$('.dexmonpage .dexlearnsetlabel').text('Learnset (' + count + ')');
 			if (entriesLoaded && !this.dexEditField) this.setDexLearnsetList();
-		},
-		scaleDexPokemon: function () {
-			var $teamwrapper = this.$('.dexmonpage .teamwrapper');
-			var width = this.dexScroller().width();
-			if (!$teamwrapper.length || !width) return;
-			if (width < 640) {
-				var scale = width / 640;
-				$teamwrapper.css({ transform: 'scale(' + scale + ')', width: '640px', height: (this.dexScroller().height() / scale) + 'px' });
-			} else {
-				$teamwrapper.css({ transform: '', width: '', height: '' });
-			}
 		},
 		closeDexPokemon: function () {
 			this.dexSpecies = null;

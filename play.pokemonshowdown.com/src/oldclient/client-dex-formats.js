@@ -37,14 +37,6 @@
 				room.openDexFormat(newFormat);
 			} });
 		},
-		scaleDexFormat: function () {
-			var width = this.dexScroller().width();
-			this.dexFormatZoom = this.dexFormatZoom || 1;
-			if (!width) return;
-			this.dexFormatZoom = width < 670 ? width / 670 : 1;
-			this.$('.dexformatwrapper').css({ zoom: this.dexFormatZoom === 1 ? '' : this.dexFormatZoom, width: this.dexFormatZoom === 1 ? '' : '670px' });
-			this.updateDexScroll();
-		},
 		openDexFormat: function (formatid) {
 			this.dexFormat = formatid;
 			this.dexFormatId = formatid;
@@ -126,7 +118,7 @@
 			buf += '<p class="dexformatsearch" style="display:none"><input type="search" class="textbox" name="formatsearch" size="30" autocomplete="off" /></p></div>';
 			buf += '<div class="dexformatlist"></div>';
 			$page.html('<div class="dexformatwrapper">' + buf + '</div>');
-			this.scaleDexFormat();
+			this.scaleDex();
 			this.showDexFormatList(this.dexFormatKind || 'rule');
 		},
 		showDexFormatList: function (kind) {
@@ -158,10 +150,9 @@
 			var onTop = kind === 'pokemon' ? outright : banned;
 			var $list = $page.find('.dexformatlist');
 			var search = this.dexFormatSearch = this.createDexList($list, 'dexFormatZoom');
-			search.renderRow = function (id, type, matchStart, matchLength, errorMessage, attrs) {
-				if (type === kind && banned[id]) attrs = attrs ? attrs.replace('class="', 'class="banned ') : ' class="banned"';
-				return BattleSearch.prototype.renderRow.call(this, id, type, matchStart, matchLength, errorMessage, attrs);
-			};
+			DexViews.ui.rowClasses(search, function (id, type) {
+				return type === kind && banned[id] ? ' banned' : '';
+			});
 			var room = this;
 			viewSearch(search, view, function (typedSearch, searchType) {
 				typedSearch.dexid = room.dexid;

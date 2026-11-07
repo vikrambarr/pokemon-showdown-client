@@ -603,6 +603,30 @@
 		};
 	}
 
+	function panelSearch($results) {
+		var search = new BattleSearch($results, $results);
+		$results.off('scroll').on('scroll', function () {
+			search.updateScroll();
+		});
+		search.$viewport = {
+			scrollTop: function () {
+				return $results.scrollTop();
+			},
+			height: function () {
+				return $results.css('overflow-y') === 'visible' ? 0 : $results.height();
+			}
+		};
+		return search;
+	}
+
+	function rowClasses(search, getClasses) {
+		search.renderRow = function (id, type, matchStart, matchLength, errorMessage, attrs) {
+			var classes = getClasses(id, type);
+			if (classes) attrs = attrs ? attrs.replace('class="', 'class="' + classes.slice(1) + ' ') : ' class="' + classes.slice(1) + '"';
+			return BattleSearch.prototype.renderRow.call(this, id, type, matchStart, matchLength, errorMessage, attrs);
+		};
+	}
+
 	function setTierStyle(search, details) {
 		var isChampions = details.mod.startsWith('champions');
 		search.isNatDex = details.rules.includes('natdexmod') || NATDEX_MODS.includes(details.mod);
@@ -761,6 +785,10 @@
 		dexScroller: function () {
 			return this.$el;
 		},
+		dexScrollerWidth: function () {
+			var $scroller = this.dexScroller();
+			return $scroller.length && $scroller[0].clientWidth - parseFloat($scroller.css('padding-left')) - parseFloat($scroller.css('padding-right'));
+		},
 		renderDex: function (summary, view) {
 			DexViews.current = view;
 			var sameView = this.dexView === view;
@@ -825,7 +853,7 @@
 					}));
 				};
 			});
-			this.scaleDexList();
+			this.scaleDex();
 			search.setType('pokemon', 'gen' + view.gen);
 			this.showDexTab(this.dexTab);
 		},
@@ -867,12 +895,15 @@
 			}
 			return buf + '</table></div>';
 		},
-		scaleDexList: function () {
-			var width = this.dexScroller().width();
-			this.dexListZoom = this.dexListZoom || 1;
+		scaleDex: function () {
+			var monWidth = this.$('.dexmonpage').width();
+			if (monWidth) this.$('.dexmonpage .teamwrapper').css('transform', monWidth < 640 ? 'scale(' + monWidth / 640 + ')' : 'none').toggleClass('scaled', monWidth < 640);
+			var width = this.dexScrollerWidth();
 			if (!width) return;
 			this.dexListZoom = width < 640 ? width / 640 : 1;
+			this.dexFormatZoom = width < 670 ? width / 670 : 1;
 			this.$('.dexpokemon, .dextierlist').css({ zoom: this.dexListZoom === 1 ? '' : this.dexListZoom, width: this.dexListZoom === 1 ? '' : '640px' });
+			this.$('.dexformatwrapper').css({ zoom: this.dexFormatZoom === 1 ? '' : this.dexFormatZoom, width: this.dexFormatZoom === 1 ? '' : '670px' });
 			this.updateDexScroll();
 		},
 		createDexList: function ($list, zoom) {
@@ -946,9 +977,7 @@
 		},
 		show: function () {
 			roomsShow.apply(this, arguments);
-			this.scaleDexList();
-			this.scaleDexPokemon();
-			this.scaleDexFormat();
+			this.scaleDex();
 		}
 	});
 
@@ -1011,7 +1040,7 @@
 
 	DexViews.ui = {
 		request: request, compareFormats: compareFormats, openDexPage: openDexPage, DexConfirmPopup: DexConfirmPopup,
-		HIDE_BUTTON: HIDE_BUTTON, OFFICIAL_BADGE: OFFICIAL_BADGE, canEdit: canEdit, viewSearch: viewSearch,
+		HIDE_BUTTON: HIDE_BUTTON, OFFICIAL_BADGE: OFFICIAL_BADGE, canEdit: canEdit, viewSearch: viewSearch, panelSearch: panelSearch, rowClasses: rowClasses,
 		dropEmptyHeaders: dropEmptyHeaders, setTierStyle: setTierStyle, tierHeader: tierHeader, changedValue: changedValue
 	};
 
