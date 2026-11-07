@@ -249,14 +249,12 @@
 .ruletree .button:not([name]) {
 	cursor: default;
 }
-.ruletree .button.ruleon,
-.button.dextoggle.ruleon {
+.ruletree .button.ruleon {
 	background: #d9f2d9;
 	border-color: #5f9f5f;
 	color: #206020;
 }
-.ruletree .button[name].ruleon:hover,
-.button.dextoggle.ruleon:hover {
+.ruletree .button[name].ruleon:hover {
 	background: #c2e8c2;
 }
 .ruletree .button.ruleoff {
@@ -286,14 +284,12 @@
 .dark .ruletree li::after {
 	border-color: #777777;
 }
-.dark .ruletree .button.ruleon,
-.dark .button.dextoggle.ruleon {
+.dark .ruletree .button.ruleon {
 	background: #2c4a2c;
 	border-color: #5f9f5f;
 	color: #b8e6b8;
 }
-.dark .ruletree .button[name].ruleon:hover,
-.dark .button.dextoggle.ruleon:hover {
+.dark .ruletree .button[name].ruleon:hover {
 	background: #365c36;
 }
 .dark .ruletree .button.ruleoff {
@@ -967,26 +963,21 @@
 .dexfieldsection th {
 	padding-top: 6px;
 }
-.dexfieldsection[data-section=Description] input[type=text],
-.dexfieldsection[data-section=Description] textarea {
+.dexfieldsection [data-path=shortDesc] input[type=text],
+.dexfieldsection [data-path=desc] textarea {
 	box-sizing: border-box;
 	width: 367px;
 }
-.dexfieldsection[data-section=Description] textarea {
+.dexfieldsection [data-path=desc] textarea {
 	height: 110px;
 }
-.dexfieldsection[data-section=Properties] tbody {
-	display: inline-grid;
-	grid-template-columns: repeat(2, 1fr);
-	gap: 4px;
-	margin-top: 6px;
+.dexremoveattr {
+	float: right;
+	padding: 0 4px;
+	font-size: 8pt;
 }
-.dextoggle {
-	display: block;
-	text-align: center;
-}
-.dextoggle input {
-	display: none;
+.dexmovegrid [data-attr] {
+	cursor: pointer;
 }
 .dexeffectfields input[type=number] {
 	width: 60px;
@@ -998,54 +989,95 @@
 	width: 320px;
 	resize: vertical;
 }
-.dexfieldsection .dexboostgrid {
-	display: table;
-	border-collapse: collapse;
-}
-.dexfieldsection .dexboostgrid tr {
-	display: table-row;
-}
-.dexfieldsection .dexboostgrid th,
-.dexfieldsection .dexboostgrid td {
-	display: table-cell;
+.dexboostcell {
 	padding: 1px 2px;
 }
-.dexboostgrid th {
-	font-weight: normal;
-	text-align: center;
-}
-.dexfieldsection .dexboostgrid tr + tr > * {
-	border-top: 1px solid #888888;
-	padding: 3px 2px;
-}
-.dark .dexfieldsection .dexboostgrid tr + tr > * {
-	border-top-color: #555555;
-}
-.dexboostgrid th:first-child {
-	padding-right: 6px;
-	text-align: left;
-}
-.dexboostgrid .dexboostcell {
-	width: 44px;
-	padding: 1px 2px;
-}
-.dexboostgrid .dexboostup {
+.dexboostup {
 	background: #d9f2d9;
 	border-color: #5f9f5f;
 	color: #206020;
 }
-.dexboostgrid .dexboostdown {
+.dexboostdown {
 	background: #f7dcdc;
 	border-color: #b06060;
 	color: #903030;
 }
-.dark .dexboostgrid .dexboostup {
+.dark .dexboostup {
 	background: #2c4a2c;
 	color: #b8e6b8;
 }
-.dark .dexboostgrid .dexboostdown {
+.dark .dexboostdown {
 	background: #4a2c2c;
 	color: #e6b8b8;
+}
+[data-panel=fields] > .pad {
+	padding-left: 7px;
+}
+[data-panel=fields] .dexfieldsection {
+	width: 631px;
+}
+.dexsentence {
+	box-sizing: border-box;
+	margin: 6px 0;
+	padding: 3px 8px 5px;
+	border: 1px solid #999999;
+	border-radius: 5px;
+	background: #DAE5F0;
+	box-shadow: inset 1px 1px 0 rgba(255, 255, 255, .6);
+	line-height: 26px;
+}
+.dark .dexsentence {
+	background: #5A6570;
+	box-shadow: none;
+}
+[data-panel=description] .label {
+	margin-top: 8px;
+}
+.dexsentencehead {
+	display: block;
+	font-size: 8pt;
+	font-weight: bold;
+	line-height: 16px;
+	color: #555555;
+}
+.dark .dexsentencehead {
+	color: #BBBBBB;
+}
+.dexsentence .dexfield {
+	display: inline-block;
+	width: auto;
+	min-width: 30px;
+}
+.dexsentence input[type=number] {
+	width: 50px;
+}
+.dexsecondary div {
+	line-height: 26px;
+}
+.dexattrlist {
+	max-height: 320px;
+	margin-top: 4px;
+	overflow-y: auto;
+	background: #FFFFFF;
+	border: 1px solid #AAAAAA;
+	border-radius: 3px;
+	line-height: normal;
+}
+.dark .dexattrlist {
+	background: #34373B;
+	border-color: #555555;
+}
+.dexattrlist .movenamecol {
+	width: 180px;
+	white-space: nowrap;
+}
+.dexattrsentence {
+	white-space: normal;
+}
+.dexblank {
+	display: inline-block;
+	width: 36px;
+	border-bottom: 1px solid #888888;
 }
 .dexsecondary {
 	margin: 2px 0 6px 0;
@@ -1110,19 +1142,18 @@
 .dexshowedits [data-panel=fields] .dexeffectfield.dexedited {
 	background: none;
 }
-.dexshowedits [data-panel=fields] .dexeffectfield.dexedited:not([data-control=boosts]):not([data-control=secondaries]) input:not([type=checkbox]),
-.dexshowedits [data-panel=fields] .dexeffectfield.dexedited:not([data-control=boosts]):not([data-control=secondaries]) select,
-.dexshowedits [data-panel=fields] .dexeffectfield.dexedited:not([data-control=boosts]):not([data-control=secondaries]) textarea {
+.dexshowedits [data-panel=fields] .dexeffectfield.dexedited:not([data-control=boostlist]):not([data-control=secondaries]) input:not([type=checkbox]),
+.dexshowedits [data-panel=fields] .dexeffectfield.dexedited:not([data-control=boostlist]):not([data-control=secondaries]) select,
+.dexshowedits [data-panel=fields] .dexeffectfield.dexedited:not([data-control=boostlist]):not([data-control=secondaries]) textarea {
 	background: #FBE7A1;
 }
-.dark .dexshowedits [data-panel=fields] .dexeffectfield.dexedited:not([data-control=boosts]):not([data-control=secondaries]) input:not([type=checkbox]),
-.dark .dexshowedits [data-panel=fields] .dexeffectfield.dexedited:not([data-control=boosts]):not([data-control=secondaries]) select,
-.dark .dexshowedits [data-panel=fields] .dexeffectfield.dexedited:not([data-control=boosts]):not([data-control=secondaries]) textarea {
+.dark .dexshowedits [data-panel=fields] .dexeffectfield.dexedited:not([data-control=boostlist]):not([data-control=secondaries]) input:not([type=checkbox]),
+.dark .dexshowedits [data-panel=fields] .dexeffectfield.dexedited:not([data-control=boostlist]):not([data-control=secondaries]) select,
+.dark .dexshowedits [data-panel=fields] .dexeffectfield.dexedited:not([data-control=boostlist]):not([data-control=secondaries]) textarea {
 	background: #5A4A16;
 }
 .dexshowedits [data-panel=fields] .dexeffectfield.dexedited > input[type=checkbox],
-.dexshowedits [data-panel=fields] .dexeffectfield.dexedited > .dextoggle,
-.dexshowedits .dexboostgrid .dexboostcell.dexedited {
+.dexshowedits .dexboostcell.dexedited {
 	box-shadow: 0 0 0 2px #E2B53A;
 }
 .dexshowedits .dexmonchart .setcell-typeicons .dexedited,
