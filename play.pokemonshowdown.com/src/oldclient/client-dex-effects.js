@@ -179,7 +179,7 @@
 
 	function selectOptions(options, view) {
 		if (options === 'status') return STATUSES;
-		if (options === 'stat') return STATS;
+		if (options === 'stat') return STATS.slice(1, 6);
 		if (options === 'flag') return Object.keys(FLAGS.Moves).concat(Object.keys(FLAGS.Abilities)).sort();
 		if (options.slice(0, 4) === 'ref:') return refOptions(options.slice(4).split(','), 'id', view);
 		if (options.slice(0, 5) === 'name:') return refOptions(options.slice(5).split(','), 'name', view);
@@ -189,7 +189,7 @@
 			var used = choices[options.slice(10)] || [];
 			var label = function (id) { return [id, escape(choices.names[id] || id)]; };
 			var field = ['weather', 'terrain', 'pseudoWeather', 'sideCondition', 'slotCondition'].indexOf(options.slice(10)) >= 0;
-			var rest = field ? [] : choices.all.filter(function (id) { return used.indexOf(id) < 0; });
+			var rest = field ? [] : choices.all;
 			return used.map(label).concat(used.length && rest.length ? [{ group: "Other" }] : [], rest.map(label));
 		}
 		var types = view.dex.types.names().filter(function (name) { return view.dex.types.get(name).exists !== false; });
@@ -960,8 +960,9 @@
 					return wrap('data-slot', key, 'num', '<input type="number" class="dexinline dexmark" step="' + (slot.original % 1 ? 0.1 : 1) +
 						'" value="' + value + '"' + style(key, String(value).length + 3) + was + ' />');
 				}
-				var options = slot.kind === 'ref' ? (slot.form === 'name' ? 'name:' : 'ref:') + slot.tables.join(',') :
-					{ type: 'type', category: CATEGORIES, stat: 'stat', status: 'status', flag: 'flag' }[slot.kind];
+				var options = slot.condition ? 'condition:' + slot.condition : slot.kind === 'ref' ? (slot.form === 'name' ? 'name:' : 'ref:') + slot.tables.join(',') :
+					{ type: 'type', category: CATEGORIES, status: 'status', flag: 'flag' }[slot.kind] || (slot.original === 'hp' ? STATS.slice(0, 6) :
+					slot.key || ['accuracy', 'evasion'].indexOf(slot.original) >= 0 ? Object.keys(BOOSTS) : STATS.slice(1, 6));
 				var choices = selectOptions(options, view);
 				var listed = choices && choices.some(function (choice) { return toID(Array.isArray(choice) ? choice[0] : choice) === toID(value); });
 				if (choices && !listed && slot.kind === 'ref') {
