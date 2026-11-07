@@ -1091,7 +1091,7 @@
 .dexcode pre .dexinline:focus {
 	outline: 1px solid #6688AA;
 }
-.dexshowedits .dexedited:not(.dexmark),
+.dexshowedits .dexedited:not(.dexmark):not(.dexboostcell),
 .dexshowedits .dexmonchart .dexedited,
 .dexshowedits .utilichart .result a.dexedited,
 .dexshowedits .dexeffectfield.dexedited > input:not([type=checkbox]),
@@ -1099,13 +1099,31 @@
 .dexshowedits .dexeffectfield.dexedited > textarea {
 	background: #FBE7A1;
 }
-.dark .dexshowedits .dexedited:not(.dexmark),
+.dark .dexshowedits .dexedited:not(.dexmark):not(.dexboostcell),
 .dark .dexshowedits .dexmonchart .dexedited,
 .dark .dexshowedits .utilichart .result a.dexedited,
 .dark .dexshowedits .dexeffectfield.dexedited > input:not([type=checkbox]),
 .dark .dexshowedits .dexeffectfield.dexedited > select,
 .dark .dexshowedits .dexeffectfield.dexedited > textarea {
 	background: #5A4A16;
+}
+.dexshowedits [data-panel=fields] .dexeffectfield.dexedited {
+	background: none;
+}
+.dexshowedits [data-panel=fields] .dexeffectfield.dexedited:not([data-control=boosts]):not([data-control=secondaries]) input:not([type=checkbox]),
+.dexshowedits [data-panel=fields] .dexeffectfield.dexedited:not([data-control=boosts]):not([data-control=secondaries]) select,
+.dexshowedits [data-panel=fields] .dexeffectfield.dexedited:not([data-control=boosts]):not([data-control=secondaries]) textarea {
+	background: #FBE7A1;
+}
+.dark .dexshowedits [data-panel=fields] .dexeffectfield.dexedited:not([data-control=boosts]):not([data-control=secondaries]) input:not([type=checkbox]),
+.dark .dexshowedits [data-panel=fields] .dexeffectfield.dexedited:not([data-control=boosts]):not([data-control=secondaries]) select,
+.dark .dexshowedits [data-panel=fields] .dexeffectfield.dexedited:not([data-control=boosts]):not([data-control=secondaries]) textarea {
+	background: #5A4A16;
+}
+.dexshowedits [data-panel=fields] .dexeffectfield.dexedited > input[type=checkbox],
+.dexshowedits [data-panel=fields] .dexeffectfield.dexedited > .dextoggle,
+.dexshowedits .dexboostgrid .dexboostcell.dexedited {
+	box-shadow: 0 0 0 2px #E2B53A;
 }
 .dexshowedits .dexmonchart .setcell-typeicons .dexedited,
 .dexshowedits .dexmoveicons .dexedited {

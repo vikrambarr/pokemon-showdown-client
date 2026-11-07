@@ -83,31 +83,14 @@
 	];
 	var SECTIONS = {
 		Moves: [
-			["Attributes", MOVE_NUMBERS.concat([
-				['critRatio', "Crit ratio", 'int', [0, 6]], ['willCrit', "Always crits", 'bool'],
+			["Basics", MOVE_NUMBERS],
+			["Hits", [
 				['multihit', "Hits", 'range'], ['multiaccuracy', "Checks accuracy every hit", 'bool'],
-				['damage', "Fixed damage", 'damage'], ['ohko', "One-hit KO", 'select', 'ohko']
-			])],
-			["Effects", [
-				['status', "Status", 'select', 'status'], ['volatileStatus', "Volatile status", 'select', 'condition:volatileStatus'], ['boosts', "Target", 'boosts'],
-				['self.boosts', "User, each hit", 'boosts'], ['selfBoost.boosts', "User, once after the move", 'boosts'],
-				['self.volatileStatus', "User's volatile status", 'select', 'condition:volatileStatus'], ['drain', "Drain", 'fraction'], ['recoil', "Recoil", 'fraction'],
-				['hasCrashDamage', "Boosted by Reckless", 'bool'], ['heal', "Heal", 'fraction'],
-				['selfSwitch', "User switches out", 'select', YES.concat(['copyvolatile', 'shedtail'])], ['forceSwitch', "Forces the target out", 'bool'],
-				['selfdestruct', "User faints", 'select', [['always', "Always"], ['ifHit', "If it hits"]]]
+				['critRatio', "Crit ratio", 'int', [0, 6]], ['willCrit', "Always crits", 'bool']
 			]],
-			["Field", [
-				['weather', "Weather", 'select', 'condition:weather'], ['terrain', "Terrain", 'select', 'condition:terrain'],
-				['pseudoWeather', "Field condition", 'select', 'condition:pseudoWeather'],
-				['sideCondition', "Side condition", 'select', 'condition:sideCondition'],
-				['slotCondition', "Slot condition", 'select', 'condition:slotCondition']
-			]],
-			["Secondary", [['secondaries', "", 'secondaries'], ['hasSheerForceBoost', "Boosted by Sheer Force", 'bool']]],
 			["Damage", [
-				['overrideOffensiveStat', "Attacks with", 'select', 'stat'], ['overrideDefensiveStat', "Hits against", 'select', 'stat'],
-				['overrideOffensivePokemon', "Attacking stat from", 'select', [['target', "Target"], ['source', "User"]]],
-				['overrideDefensivePokemon', "Defending stat from", 'select', [['target', "Target"], ['source', "User"]]],
-				['ignoreImmunity', "Ignores immunities", 'select', [['true', "Yes"], ['false', "No"]]]
+				['overrideOffensivePokemon', "Stats", 'damagestats'], ['ignoreImmunity', "Type immunities", 'immunity'],
+				['damage', "Fixed damage", 'damage'], ['ohko', "One-hit KO", 'select', 'ohko']
 			]],
 			["Properties", [
 				['breaksProtect', "Breaks Protect", 'toggle', "Breaks protection"], ['infiltrates', "Infiltrates", 'toggle', "Goes through screens and Substitute"],
@@ -116,13 +99,31 @@
 				['thawsTarget', "Thaws target", 'toggle', "Thaws a frozen target"], ['sleepUsable', "Sleep usable", 'toggle', "Usable while asleep"],
 				['stealsBoosts', "Steals boosts", 'toggle', "Steals the target's stat boosts"]
 			]],
+			["Target", [
+				['status', "Status", 'select', 'status'], ['volatileStatus', "Volatile status", 'select', 'condition:volatileStatus'],
+				['boosts', "Target", 'boosts'], ['forceSwitch', "Forces the target out", 'bool']
+			]],
+			["User", [
+				['self.boosts', "User, each hit", 'boosts'], ['selfBoost.boosts', "User, once after the move", 'boosts'],
+				['self.volatileStatus', "User's volatile status", 'select', 'condition:volatileStatus'], ['drain', "Drain", 'fraction'],
+				['recoil', "Recoil", 'fraction'], ['hasCrashDamage', "Boosted by Reckless", 'bool'], ['heal', "Heal", 'fraction'],
+				['selfSwitch', "User switches out", 'select', YES.concat(['copyvolatile', 'shedtail'])],
+				['selfdestruct', "User faints", 'select', [['always', "Always"], ['ifHit', "If it hits"]]]
+			]],
+			["Chance", [['secondaries', "", 'secondaries'], ['hasSheerForceBoost', "Boosted by Sheer Force", 'bool']]],
+			["Field", [
+				['weather', "Weather", 'select', 'condition:weather'], ['terrain', "Terrain", 'select', 'condition:terrain'],
+				['pseudoWeather', "Field condition", 'select', 'condition:pseudoWeather'],
+				['sideCondition', "Side condition", 'select', 'condition:sideCondition'],
+				['slotCondition', "Slot condition", 'select', 'condition:slotCondition']
+			]],
 			["Animation", [['animations', "Animation", 'animations']]]
 		],
 		Abilities: [["Attributes", [['suppressWeather', "Suppresses weather", 'bool']]]],
 		Items: [
 			["Fling", [['fling.basePower', "Power", 'int', [0, 250]], ['fling.status', "Status", 'select', 'status'], ['fling.volatileStatus', "Volatile status", 'select', 'condition:volatileStatus']]],
 			["Natural Gift", [['naturalGift.basePower', "Power", 'int', [0, 250]], ['naturalGift.type', "Type", 'select', 'type']]],
-			["Effects", [['boosts', "Holder", 'boosts'], ['ignoreKlutz', "Works with Klutz", 'bool']]],
+			["Held", [['boosts', "Holder", 'boosts'], ['ignoreKlutz', "Works with Klutz", 'bool']]],
 			["Icon", [['spriteFrom', "Use the icon of", 'select', 'ref:Items'], ['spritenum', "Sprite number", 'int', [0, 761]]]]
 		],
 		Conditions: [["Attributes", [
@@ -302,6 +303,11 @@
 
 	function valueText(control, value, options) {
 		if (control === 'animations') value = value || options;
+		if (control === 'immunity') {
+			var ignores = blank(value) ? options : value;
+			if (!ignores) return "Respects type immunities";
+			return "Ignores type immunities" + (ignores === true ? '' : " when its type is " + escape(Object.keys(ignores).filter(function (type) { return ignores[type]; }).join(" or ")));
+		}
 		if (control === 'secondaries') {
 			return (value || []).map(function (secondary) { return escape(secondaryText(secondary)); }).join('<br />') || '&mdash;';
 		}
@@ -368,6 +374,14 @@
 				' <label class="checkbox"><input type="checkbox"' + (value === 'level' ? ' checked' : '') + ' /> Equal to the user\'s level</label>';
 		case 'bool':
 			return '<input type="checkbox"' + (value ? ' checked' : '') + ' />';
+		case 'immunity':
+			var ignored = blank(value) ? options : value;
+			var only = $.isPlainObject(ignored) ? Object.keys(ignored).filter(function (type) { return ignored[type]; })[0] : '';
+			return 'This move <select class="button' + cls + '" data-default="' + options + '">' +
+				optionsHTML([['false', "respects"], ['true', "ignores"]], ignored ? 'true' : 'false') + '</select> type immunities' +
+				(ignored ? ' when its type is <select class="button">' + optionsHTML(selectOptions('type', view), only, "any type") + '</select>' : '');
+		case 'pick':
+			return '<select class="button' + cls + '" data-default="' + options[1] + '">' + optionsHTML(options[0], blank(value) ? options[1] : value) + '</select>';
 		case 'animations':
 			var moves = animationOptions();
 			var animations = Array.isArray(value) ? value : options;
@@ -480,6 +494,13 @@
 		case 'bool':
 		case 'toggle':
 			return inputs[0].checked;
+		case 'immunity':
+			var type = inputs.eq(1).val();
+			var immunity = inputs.eq(0).val() === 'false' ? false : type ? {} : true;
+			if (type && immunity) immunity[type] = true;
+			return String(immunity) === inputs.eq(0).attr('data-default') ? null : immunity;
+		case 'pick':
+			return inputs.val() === inputs.attr('data-default') ? null : inputs.val();
 		case 'animations':
 			var chosen = inputs.map(function () { return this.value; }).get().filter(Boolean);
 			return chosen.length && chosen.join(' ') !== inputs.first().attr('data-default') ? chosen : null;
@@ -703,9 +724,22 @@
 				if (path === 'countsAs') return !!object.countsAs;
 				return getPath(object, path);
 			};
+			var mark = function ($field, now, was) {
+				if (!DexViews.ui.changedValue(now, was)) return;
+				$field.addClass('dexedited');
+				$field.filter('[data-control=boosts]').find('select[data-stat]').each(function () {
+					if ((now || {})[this.dataset.stat] !== (was || {})[this.dataset.stat]) $(this).addClass('dexedited');
+				});
+			};
 			$page.find('[data-path], [data-edit]').each(function () {
 				var path = this.getAttribute('data-path') || this.getAttribute('data-edit');
-				if (DexViews.ui.changedValue(valueOf(data, path), valueOf(original, path))) $(this).addClass('dexedited');
+				mark($(this), valueOf(data, path), valueOf(original, path));
+			});
+			var secondaries = [valueOf(data, 'secondaries'), valueOf(original, 'secondaries')];
+			$page.find('.dexsecondary').each(function (i) {
+				$(this).find('[data-sub]').each(function () {
+					mark($(this), getPath(secondaries[0][i] || {}, this.dataset.sub), getPath(secondaries[1][i] || {}, this.dataset.sub));
+				});
 			});
 			var flags = data.flags || {};
 			if (Object.keys(original.flags || {}).some(function (flag) { return original.flags[flag] && !flags[flag]; })) $page.find('.dexflagbox').addClass('dexedited');
@@ -713,7 +747,13 @@
 			$.each(info.handlers, function (i, handler) {
 				$.each(handler.slots, function (j, slot) { slots[handler.path + ':' + slot.index] = slot; });
 			});
-			if ($page.find('[data-panel=fields] .dexedited').not('[data-path=shortDesc], [data-path=desc], [data-path=countsAs], [data-edit=shortDesc], [data-edit=desc], [data-edit=countsAs]').length) $page.find('.setstats').addClass('dexedited');
+			var inMain = {};
+			$page.find('.setchart [data-path], .setchart [data-edit]').each(function () {
+				inMain[this.getAttribute('data-path') || this.getAttribute('data-edit')] = true;
+			});
+			if ($page.find('[data-panel=fields] .dexedited').filter(function () {
+				return !inMain[this.getAttribute('data-path') || this.getAttribute('data-edit')];
+			}).length) $page.find('.setstats').addClass('dexedited');
 			$page.find('[data-slotkeys]').each(function () {
 				if (this.getAttribute('data-slotkeys').split(' ').some(function (key) {
 					return slots[key] && String(self.dexEffectSlotValue(key, slots[key])) !== String(slots[key].original);
@@ -818,7 +858,7 @@
 					});
 				};
 				collect(data.condition, 'condition.');
-				if (leaves.length) sections.push(["Its condition", leaves]);
+				if (leaves.length) sections.push(["Condition", leaves]);
 			}
 			sections.unshift(["Description", [['shortDesc', "Short description", 'shortdesc', this.dexEffect.table === 'Moves' ? 55 : 90], ['desc', "Description", 'textarea']]]);
 			var info = this.dexEffectData;
@@ -835,10 +875,12 @@
 			var panes = '';
 			$.each(sections, function (i, section) {
 				var rows = boostRows(section[1], function (field) {
-					if (!self.dexEffectCanEdit(field[0]) && blank(field[2] === 'secondaries' ? data.secondaries || data.secondary : getPath(data, field[0]))) return '';
-					var options = field[2] === 'toggle' ? [field[1], field[3]] : field[2] === 'animations' ? defaultAnimations(self.dexEffect.id) : field[3];
+					if (field[2] !== 'damagestats' && !self.dexEffectCanEdit(field[0]) && blank(field[2] === 'secondaries' ? data.secondaries || data.secondary : getPath(data, field[0]))) return '';
+					var options = field[2] === 'toggle' ? [field[1], field[3]] : field[2] === 'animations' ? defaultAnimations(self.dexEffect.id) :
+						field[2] === 'immunity' ? data.category === 'Status' : field[3];
 					var html = self.dexEffectFieldHTML(field[0], field[2], options, data);
 					if (field[2] === 'toggle' && self.dexEffectCanEdit(field[0])) return '<tr><td>' + html + '</td></tr>';
+					if (field[2] === 'damagestats') return '<tr><th><label class="label">' + field[1] + '</label></th><td>' + self.dexDamageStatsHTML(data) + '</td></tr>';
 					if (field[2] === 'bool' && self.dexEffectCanEdit(field[0])) return '<tr><td><label class="checkbox">' + html + ' ' + field[1] + '</label></td></tr>';
 					return '<tr>' + (field[1] ? '<th><label class="label">' + field[1] + '</label></th>' : '') + '<td>' + html + '</td></tr>';
 				}, function (field) {
@@ -855,11 +897,25 @@
 			});
 			return buf + '<ul class="dexformattabs">' + tabs + '</ul>' + panes + '</div>';
 		},
+		dexDamageStatsHTML: function (data) {
+			var self = this;
+			var special = data.category === 'Special';
+			var who = [['source', "User's"], ['target', "Target's"]];
+			var stats = STATS.slice(1, 6).map(function (stat) { return [stat, BOOSTS[stat]]; });
+			var pick = function (path, choices, fallback) {
+				if (self.dexEffectCanEdit(path)) return self.dexEffectFieldHTML(path, 'pick', [choices, fallback], data);
+				var value = getPath(data, path) || fallback;
+				return '<strong>' + choices.filter(function (choice) { return choice[0] === value; })[0][1] + '</strong>';
+			};
+			return 'Attacks with ' + pick('overrideOffensivePokemon', who, 'source') + ' ' + pick('overrideOffensiveStat', stats, special ? 'spa' : 'atk') +
+				' against ' + pick('overrideDefensivePokemon', who, 'target') + ' ' + pick('overrideDefensiveStat', stats, special ? 'spd' : 'def');
+		},
 		showDexFieldSection: function (section) {
 			var $panel = this.$('.dexmonpage [data-panel=fields]');
-			if (!$panel.find('[data-section="' + section + '"]').length) section = $panel.find('[data-section=Attributes]').length ? 'Attributes' : $panel.find('[data-section]').attr('data-section');
+			var $buttons = $panel.find('.dexformattabs button');
+			if (!$buttons.filter('[value="' + section + '"]').length) section = $buttons.not('[value=Description], [value="Counts as"]').first().val();
 			this.dexFieldSection = section;
-			$panel.find('.dexformattabs button').removeClass('cur').filter('[value="' + section + '"]').addClass('cur');
+			$buttons.removeClass('cur').filter('[value="' + section + '"]').addClass('cur');
 			$panel.find('.dexfieldsection').each(function () {
 				$(this).toggle(this.dataset.section === section);
 			});
@@ -1160,6 +1216,7 @@
 			var table = { move: 'Moves', ability: 'Abilities', item: 'Items', condition: 'Conditions' }[entry[0]];
 			if (table && $(e.currentTarget).closest('[data-panel=effects]').length) {
 				this.openDexEffect(table, entry[1], this.dexEffect.from);
+				this.dexEffectPanel = 'effects';
 				return;
 			}
 			if (entry[0] === 'flag') {
@@ -1289,7 +1346,7 @@
 			$(e.currentTarget).filter('.dexboostcell').toggleClass('dexboostup', Number(e.currentTarget.value) > 0).toggleClass('dexboostdown', Number(e.currentTarget.value) < 0);
 			if ($wrap.attr('data-control') === 'toggle') $wrap.children('.dextoggle').toggleClass('ruleon', value);
 			var data = this.dexEffectValues();
-			if ($wrap.attr('data-path') === 'type' || $wrap.attr('data-path') === 'category') return this.renderDexEffect();
+			if (['type', 'category', 'ignoreImmunity'].indexOf($wrap.attr('data-path')) >= 0) return this.renderDexEffect();
 			if (this.$('.dexmonpage [data-path="' + $wrap.attr('data-path') + '"]').length > 1) return this.renderDexEffect();
 			this.$('.dexmonpage .dexmoveicons').html(this.dexEffectIconHTML(data));
 			this.$('.dexmonpage .setcol-stats').html(this.dexEffectStatsHTML(data));
