@@ -89,8 +89,8 @@
 				['damage', "Fixed damage", 'damage'], ['ohko', "One-hit KO", 'select', 'ohko']
 			])],
 			["Effects", [
-				['status', "Status", 'select', 'status'], ['volatileStatus', "Volatile status", 'select', 'condition:volatileStatus'], ['boosts', "Target's stats", 'boosts'],
-				['self.boosts', "User's stats, each hit", 'boosts'], ['selfBoost.boosts', "User's stats, once after the move", 'boosts'],
+				['status', "Status", 'select', 'status'], ['volatileStatus', "Volatile status", 'select', 'condition:volatileStatus'], ['boosts', "Target", 'boosts'],
+				['self.boosts', "User, each hit", 'boosts'], ['selfBoost.boosts', "User, once after the move", 'boosts'],
 				['self.volatileStatus', "User's volatile status", 'select', 'condition:volatileStatus'], ['drain', "Drain", 'fraction'], ['recoil', "Recoil", 'fraction'],
 				['hasCrashDamage', "Boosted by Reckless", 'bool'], ['heal', "Heal", 'fraction'],
 				['selfSwitch', "User switches out", 'select', YES.concat(['copyvolatile', 'shedtail'])], ['forceSwitch', "Forces the target out", 'bool'],
@@ -115,13 +115,14 @@
 				['ignoreDefensive ignoreEvasion', "Ignores boosts", 'toggle', "Ignores the target's defense and evasion boosts"],
 				['thawsTarget', "Thaws target", 'toggle', "Thaws a frozen target"], ['sleepUsable', "Sleep usable", 'toggle', "Usable while asleep"],
 				['stealsBoosts', "Steals boosts", 'toggle', "Steals the target's stat boosts"]
-			]]
+			]],
+			["Animation", [['animations', "Animation", 'animations']]]
 		],
 		Abilities: [["Attributes", [['suppressWeather', "Suppresses weather", 'bool']]]],
 		Items: [
 			["Fling", [['fling.basePower', "Power", 'int', [0, 250]], ['fling.status', "Status", 'select', 'status'], ['fling.volatileStatus', "Volatile status", 'select', 'condition:volatileStatus']]],
 			["Natural Gift", [['naturalGift.basePower', "Power", 'int', [0, 250]], ['naturalGift.type', "Type", 'select', 'type']]],
-			["Effects", [['boosts', "Stat changes", 'boosts'], ['ignoreKlutz', "Works with Klutz", 'bool']]],
+			["Effects", [['boosts', "Holder", 'boosts'], ['ignoreKlutz', "Works with Klutz", 'bool']]],
 			["Icon", [['spriteFrom', "Use the icon of", 'select', 'ref:Items'], ['spritenum', "Sprite number", 'int', [0, 761]]]]
 		],
 		Conditions: [["Attributes", [
@@ -131,8 +132,9 @@
 	};
 	var SECONDARY = [
 		['chance', "Chance (%)", 'int', [1, 100]], ['status', "Status", 'select', 'status'], ['volatileStatus', "Volatile status", 'select', 'condition:volatileStatus'],
-		['boosts', "Target's stats", 'boosts'], ['self.boosts', "User's stats", 'boosts']
+		['boosts', "Target", 'boosts'], ['self.boosts', "User", 'boosts']
 	];
+	var BOOST_CHOICES = [6, 5, 4, 3, 2, 1, 0, -1, -2, -3, -4, -5, -6].map(function (amount) { return [amount, amount ? priorityText(amount) : '']; });
 	var GETTERS = { Moves: 'moves', Abilities: 'abilities', Items: 'items', Pokedex: 'species' };
 	var CARET = '<svg class="dextypecaret" width="10" height="7" viewBox="0 0 14 9"><path d="M1 1H13L7 8Z" fill="#fff" stroke="#000" stroke-width="1.5" stroke-linejoin="round" /></svg>';
 
@@ -186,7 +188,8 @@
 			if (!choices) return null;
 			var used = choices[options.slice(10)] || [];
 			var label = function (id) { return [id, escape(choices.names[id] || id)]; };
-			var rest = choices.all.filter(function (id) { return used.indexOf(id) < 0; });
+			var field = ['weather', 'terrain', 'pseudoWeather', 'sideCondition', 'slotCondition'].indexOf(options.slice(10)) >= 0;
+			var rest = field ? [] : choices.all.filter(function (id) { return used.indexOf(id) < 0; });
 			return used.map(label).concat(used.length && rest.length ? [{ group: "Other" }] : [], rest.map(label));
 		}
 		var types = view.dex.types.names().filter(function (name) { return view.dex.types.get(name).exists !== false; });
@@ -232,6 +235,21 @@
 		return parts.join(' ') || "(code)";
 	}
 
+	function boostRows(fields, rowHTML, boostHTML) {
+		var buf = '';
+		var grid = '';
+		$.each(fields, function (i, field) {
+			if (field[2] === 'boosts') grid += boostHTML(field);
+			if (grid && (field[2] !== 'boosts' || i === fields.length - 1)) {
+				buf += '<tr><th><label class="label">Stat changes</label></th><td><table class="dexboostgrid"><tr><th></th>' +
+					Object.keys(BOOSTS).map(function (stat) { return '<th>' + BOOSTS[stat] + '</th>'; }).join('') + '</tr>' + grid + '</table></td></tr>';
+				grid = '';
+			}
+			if (field[2] !== 'boosts') buf += rowHTML(field);
+		});
+		return buf;
+	}
+
 	function priorityText(priority) {
 		return (priority > 0 ? '+' : priority < 0 ? '\u2212' : '\u2007\u2009') + Math.abs(priority);
 	}
@@ -259,7 +277,31 @@
 		];
 	}
 
+	function animationOptions() {
+		return Object.keys(BattleMovedex).filter(function (id) {
+			return BattleMovedex[id].num > 0 && !DexViews.custom.Moves[id];
+		}).map(function (id) {
+			return [id, escape(BattleMovedex[id].name)];
+		}).sort(function (a, b) {
+			return a[1] < b[1] ? -1 : 1;
+		});
+	}
+
+	function defaultAnimations(id) {
+		var anims = window.BattleMoveAnims;
+		if (!anims || !anims[id]) return ['tackle'];
+		var match = /^function\s*\w*\(scene,(\w+)\)\{var attacker=\1\[0\],defender=\1\[1\];((?:\s*BattleMoveAnims\['\w+'\]\.anim\(scene,\[attacker,defender\]\);)+)\s*\}$/.exec(String(anims[id].anim));
+		if (match) return match[2].match(/'\w+'/g).map(function (quoted) { return quoted.slice(1, -1); }).slice(0, 2);
+		for (var generic in BattleOtherAnims) {
+			if (BattleOtherAnims[generic].anim === anims[id].anim) return [id];
+		}
+		for (var other in anims) {
+			if (anims[other].anim === anims[id].anim) return [other];
+		}
+	}
+
 	function valueText(control, value, options) {
+		if (control === 'animations') value = value || options;
 		if (control === 'secondaries') {
 			return (value || []).map(function (secondary) { return escape(secondaryText(secondary)); }).join('<br />') || '&mdash;';
 		}
@@ -269,6 +311,9 @@
 		if (control === 'boosts') return escape(boostsText(value)) || '&mdash;';
 		if (control === 'fraction' && Array.isArray(value)) return value.join('/');
 		if (control === 'range' && Array.isArray(value)) return value.join('&ndash;');
+		if (control === 'animations' && Array.isArray(value)) {
+			return value.map(function (id) { return escape(BattleMovedex[id] ? BattleMovedex[id].name : id); }).join(', then ');
+		}
 		if (typeof value === 'boolean') return value ? "Yes" : "No";
 		if (typeof value === 'object') return escape(JSON.stringify(value));
 		if (control === 'select' && typeof options === 'string' && options.slice(0, 10) === 'condition:' && entries && entries.choices) {
@@ -313,16 +358,23 @@
 			var parts = Array.isArray(value) ? value : [];
 			return number(parts[0], [1, 100]) + ' / ' + number(parts[1], [1, 100]);
 		case 'boosts':
-			return Object.keys(BOOSTS).map(function (stat) {
-				return '<label class="dexboost">' + BOOSTS[stat] + ' ' + number(value && value[stat], [-6, 6], ' data-stat="' + stat + '"') + '</label>';
-			}).join(' ');
+			return '<th>' + options + '</th>' + Object.keys(BOOSTS).map(function (stat) {
+				var amount = value && value[stat];
+				return '<td><select class="button dexboostcell' + (amount > 0 ? ' dexboostup' : amount < 0 ? ' dexboostdown' : '') + '" data-stat="' + stat + '">' +
+					optionsHTML(BOOST_CHOICES, amount || 0) + '</select></td>';
+			}).join('');
 		case 'damage':
 			return number(value === 'level' ? '' : value, [1, 1000], value === 'level' ? ' disabled' : '') +
 				' <label class="checkbox"><input type="checkbox"' + (value === 'level' ? ' checked' : '') + ' /> Equal to the user\'s level</label>';
 		case 'bool':
 			return '<input type="checkbox"' + (value ? ' checked' : '') + ' />';
+		case 'animations':
+			var moves = animationOptions();
+			var animations = Array.isArray(value) ? value : options;
+			return '<select class="button' + cls + '" data-default="' + options.join(' ') + '">' + optionsHTML(moves, animations[0], '&mdash;') + '</select> then ' +
+				'<select class="button' + cls + '">' + optionsHTML(moves, animations[1], '&mdash;') + '</select>';
 		case 'toggle':
-			return '<label class="button dextoggle' + (value ? ' cur' : '') + '" title="' + escape(options[1]) + '"><input type="checkbox"' + (value ? ' checked' : '') + ' />' + options[0] + '</label>';
+			return '<label class="button dextoggle' + (value ? ' ruleon' : '') + '" title="' + escape(options[1]) + '"><input type="checkbox"' + (value ? ' checked' : '') + ' />' + options[0] + '</label>';
 		case 'textarea':
 			return '<textarea class="textbox" rows="3">' + escape(blank(value) ? '' : String(value)) + '</textarea>';
 		case 'select':
@@ -428,6 +480,9 @@
 		case 'bool':
 		case 'toggle':
 			return inputs[0].checked;
+		case 'animations':
+			var chosen = inputs.map(function () { return this.value; }).get().filter(Boolean);
+			return chosen.length && chosen.join(' ') !== inputs.first().attr('data-default') ? chosen : null;
 		case 'damage':
 			$(inputs[0]).prop('disabled', inputs[1].checked);
 			return inputs[1].checked ? 'level' : readNumber(inputs[0]);
@@ -541,13 +596,15 @@
 			if (control === 'secondaries') {
 				var view = this.dexView;
 				var rows = value.map(function (secondary, i) {
-					return '<div class="dexsecondary"><table class="dexdetails">' + SECONDARY.map(function (field) {
+					return '<div class="dexsecondary"><table class="dexdetails">' + boostRows(SECONDARY, function (field) {
 						return '<tr><th><label class="label">' + field[1] + '</label></th><td>' + wrap('data-sub', field[0], field[2], controlHTML(field[2], getPath(secondary, field[0]), field[3], view)) + '</td></tr>';
-					}).join('') + '</table><button class="button" name="removeDexSecondary" value="' + i + '"><i class="fa fa-times"></i> Remove</button></div>';
+					}, function (field) {
+						return wrap('data-sub', field[0], field[2], controlHTML(field[2], getPath(secondary, field[0]), field[1], view), 'tr');
+					}) + '</table><button class="button" name="removeDexSecondary" value="' + i + '"><i class="fa fa-times"></i> Remove</button></div>';
 				}).join('');
 				return wrap('data-path', path, control, rows + '<p><button class="button" name="addDexSecondary"><i class="fa fa-plus"></i> Add a secondary effect</button></p>', 'div');
 			}
-			return wrap('data-path', path, control, controlHTML(control, value, options, this.dexView, className));
+			return wrap('data-path', path, control, controlHTML(control, value, options, this.dexView, className), control === 'boosts' ? 'tr' : '');
 		},
 		renderDexEffect: function () {
 			var effect = this.dexEffect;
@@ -777,17 +834,19 @@
 			var tabs = '';
 			var panes = '';
 			$.each(sections, function (i, section) {
-				var rows = '';
-				$.each(section[1], function (j, field) {
-					if (!self.dexEffectCanEdit(field[0]) && blank(field[2] === 'secondaries' ? data.secondaries || data.secondary : getPath(data, field[0]))) return;
-					var html = self.dexEffectFieldHTML(field[0], field[2], field[2] === 'toggle' ? [field[1], field[3]] : field[3], data);
-					if (field[2] === 'toggle' && self.dexEffectCanEdit(field[0])) {
-						rows += '<tr><td>' + html + '</td></tr>';
-					} else if (field[2] === 'bool' && self.dexEffectCanEdit(field[0])) {
-						rows += '<tr><td><label class="checkbox">' + html + ' ' + field[1] + '</label></td></tr>';
-					} else {
-						rows += '<tr>' + (field[1] ? '<th><label class="label">' + field[1] + '</label></th>' : '') + '<td>' + html + '</td></tr>';
+				var rows = boostRows(section[1], function (field) {
+					if (!self.dexEffectCanEdit(field[0]) && blank(field[2] === 'secondaries' ? data.secondaries || data.secondary : getPath(data, field[0]))) return '';
+					var options = field[2] === 'toggle' ? [field[1], field[3]] : field[2] === 'animations' ? defaultAnimations(self.dexEffect.id) : field[3];
+					var html = self.dexEffectFieldHTML(field[0], field[2], options, data);
+					if (field[2] === 'toggle' && self.dexEffectCanEdit(field[0])) return '<tr><td>' + html + '</td></tr>';
+					if (field[2] === 'bool' && self.dexEffectCanEdit(field[0])) return '<tr><td><label class="checkbox">' + html + ' ' + field[1] + '</label></td></tr>';
+					return '<tr>' + (field[1] ? '<th><label class="label">' + field[1] + '</label></th>' : '') + '<td>' + html + '</td></tr>';
+				}, function (field) {
+					if (!self.dexEffectCanEdit(field[0])) {
+						if (blank(getPath(data, field[0]))) return '';
+						return '<tr><th>' + field[1] + '</th><td colspan="7">' + self.dexEffectFieldHTML(field[0], 'boosts', field[1], data) + '</td></tr>';
 					}
+					return self.dexEffectFieldHTML(field[0], 'boosts', field[1], data);
 				});
 				if (!rows) return;
 				tabs += '<li><button class="button" name="showDexFieldSection" value="' + section[0] + '">' + section[0] + '</button></li>';
@@ -1226,7 +1285,8 @@
 				else setPath(fields, field, value);
 			}
 			this.saveDexEffect(fields);
-			if ($wrap.attr('data-control') === 'toggle') $wrap.children('.dextoggle').toggleClass('cur', value);
+			$(e.currentTarget).filter('.dexboostcell').toggleClass('dexboostup', Number(e.currentTarget.value) > 0).toggleClass('dexboostdown', Number(e.currentTarget.value) < 0);
+			if ($wrap.attr('data-control') === 'toggle') $wrap.children('.dextoggle').toggleClass('ruleon', value);
 			var data = this.dexEffectValues();
 			if ($wrap.attr('data-path') === 'type' || $wrap.attr('data-path') === 'category') return this.renderDexEffect();
 			if (this.$('.dexmonpage [data-path="' + $wrap.attr('data-path') + '"]').length > 1) return this.renderDexEffect();

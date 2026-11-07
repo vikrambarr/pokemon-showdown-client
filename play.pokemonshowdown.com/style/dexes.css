@@ -245,17 +245,27 @@
 .ruletree .button {
 	padding: 1px 6px;
 	font-size: 9pt;
+}
+.ruletree .button:not([name]) {
 	cursor: default;
 }
-.ruletree .button.ruleon {
+.ruletree .button.ruleon,
+.button.dextoggle.ruleon {
 	background: #d9f2d9;
 	border-color: #5f9f5f;
 	color: #206020;
+}
+.ruletree .button[name].ruleon:hover,
+.button.dextoggle.ruleon:hover {
+	background: #c2e8c2;
 }
 .ruletree .button.ruleoff {
 	background: #f7dcdc;
 	border-color: #b06060;
 	color: #903030;
+}
+.ruletree .button[name].ruleoff:hover {
+	background: #f2c4c4;
 }
 .ruletree .button.ruleelsewhere {
 	background: #f2f2f2;
@@ -276,15 +286,23 @@
 .dark .ruletree li::after {
 	border-color: #777777;
 }
-.dark .ruletree .button.ruleon {
+.dark .ruletree .button.ruleon,
+.dark .button.dextoggle.ruleon {
 	background: #2c4a2c;
 	border-color: #5f9f5f;
 	color: #b8e6b8;
+}
+.dark .ruletree .button[name].ruleon:hover,
+.dark .button.dextoggle.ruleon:hover {
+	background: #365c36;
 }
 .dark .ruletree .button.ruleoff {
 	background: #4a2c2c;
 	border-color: #b06060;
 	color: #e6b8b8;
+}
+.dark .ruletree .button[name].ruleoff:hover {
+	background: #5c3636;
 }
 .dark .ruletree .button.ruleelsewhere {
 	background: #333333;
@@ -958,7 +976,7 @@
 	height: 110px;
 }
 .dexfieldsection[data-section=Properties] tbody {
-	display: grid;
+	display: inline-grid;
 	grid-template-columns: repeat(2, 1fr);
 	gap: 4px;
 	margin-top: 6px;
@@ -980,12 +998,54 @@
 	width: 320px;
 	resize: vertical;
 }
-.dexeffectfields .dexboost {
-	display: inline-block;
-	white-space: nowrap;
+.dexfieldsection .dexboostgrid {
+	display: table;
+	border-collapse: collapse;
 }
-.dexeffectfields .dexboost input[type=number] {
-	width: 40px;
+.dexfieldsection .dexboostgrid tr {
+	display: table-row;
+}
+.dexfieldsection .dexboostgrid th,
+.dexfieldsection .dexboostgrid td {
+	display: table-cell;
+	padding: 1px 2px;
+}
+.dexboostgrid th {
+	font-weight: normal;
+	text-align: center;
+}
+.dexfieldsection .dexboostgrid tr + tr > * {
+	border-top: 1px solid #888888;
+	padding: 3px 2px;
+}
+.dark .dexfieldsection .dexboostgrid tr + tr > * {
+	border-top-color: #555555;
+}
+.dexboostgrid th:first-child {
+	padding-right: 6px;
+	text-align: left;
+}
+.dexboostgrid .dexboostcell {
+	width: 44px;
+	padding: 1px 2px;
+}
+.dexboostgrid .dexboostup {
+	background: #d9f2d9;
+	border-color: #5f9f5f;
+	color: #206020;
+}
+.dexboostgrid .dexboostdown {
+	background: #f7dcdc;
+	border-color: #b06060;
+	color: #903030;
+}
+.dark .dexboostgrid .dexboostup {
+	background: #2c4a2c;
+	color: #b8e6b8;
+}
+.dark .dexboostgrid .dexboostdown {
+	background: #4a2c2c;
+	color: #e6b8b8;
 }
 .dexsecondary {
 	margin: 2px 0 6px 0;

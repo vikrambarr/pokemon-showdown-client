@@ -613,6 +613,19 @@
 			};
 		});
 
+		whenLoaded(['BattleScene', 'BattleMoveAnims'], function () {
+			var runMoveAnim = window.BattleScene.prototype.runMoveAnim;
+			window.BattleScene.prototype.runMoveAnim = function (moveid, participants) {
+				var view = viewOf(this.battle.dex);
+				var animations = view && view.Moves[moveid] && view.Moves[moveid].animations;
+				if (!animations || !this.animating || this.acceleration >= 3) return runMoveAnim.apply(this, arguments);
+				var sprites = participants.map(function (pokemon) { return pokemon.sprite; });
+				for (var i = 0; i < animations.length; i++) {
+					(BattleMoveAnims[animations[i]] || BattleMoveAnims['tackle']).anim(this, sprites);
+				}
+			};
+		});
+
 		whenLoaded(['PokemonSprite'], function () {
 			var updateStatbar = window.PokemonSprite.prototype.updateStatbar;
 			window.PokemonSprite.prototype.updateStatbar = function (pokemon) {
