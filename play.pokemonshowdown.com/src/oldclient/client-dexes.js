@@ -900,8 +900,9 @@
 			if (monWidth) this.$('.dexmonpage .teamwrapper').css('transform', monWidth < 640 ? 'scale(' + monWidth / 640 + ')' : 'none').toggleClass('scaled', monWidth < 640);
 			var width = this.dexScrollerWidth();
 			if (!width) return;
-			this.dexListZoom = width < 640 ? width / 640 : 1;
-			this.dexFormatZoom = width < 670 ? width / 670 : 1;
+			var bleed = parseFloat(this.dexScroller().css('padding-left'));
+			this.dexListZoom = width < 640 ? (width + bleed) / 640 : 1;
+			this.dexFormatZoom = width < 670 ? (width + bleed) / 670 : 1;
 			var observer = this.dexScaleObserver || (this.dexScaleObserver = new ResizeObserver(function (entries) {
 				for (var i = 0; i < entries.length; i++) {
 					var el = entries[i].target;
@@ -915,6 +916,7 @@
 				}).css({
 					transform: zoom === 1 ? '' : 'scale(' + zoom + ')',
 					width: zoom === 1 ? '' : boxWidth + 'px',
+					marginLeft: zoom === 1 ? '' : -bleed + 'px',
 					marginRight: zoom === 1 ? '' : -boxWidth * (1 - zoom) + 'px',
 				}).each(function () {
 					this.style.marginBottom = zoom === 1 ? '' : -this.offsetHeight * (1 - zoom) + 'px';
