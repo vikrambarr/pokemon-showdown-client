@@ -1,8 +1,6 @@
 (function ($) {
 
 	var DexViews = window.DexViews;
-	var DexConfirmPopup = DexViews.ui.DexConfirmPopup;
-	var HIDE_BUTTON = DexViews.ui.HIDE_BUTTON;
 	var viewSearch = DexViews.ui.viewSearch;
 
 	function editableDexes() {
@@ -89,42 +87,90 @@
 		return !!(window.BattlePokedex && BattlePokedex[id]) && !DexViews.custom.Pokedex[id];
 	}
 
-	var DexForkPopup = Popup.extend({
+	var DexCopyPopup = Popup.extend({
 		type: 'semimodal',
+		events: {
+			'change select[name=target]': 'updateTarget'
+		},
 		initialize: function (data) {
-			this.callback = data.callback;
-			var buf = '<form class="dexcreate"><p><label class="label">Fork ' + BattleLog.escapeHTML(data.name) + (data.line ? '\'s evolution line' : '') + ' into:<br /><select name="target" class="button">';
-			for (var i = 0; i < data.targets.length; i++) {
-				var target = data.targets[i];
-				buf += '<option value="' + BattleLog.escapeHTML(target.id) + '"' + (target.id === data.target ? ' selected' : '') + '>' + BattleLog.escapeHTML(target.name) + '</option>';
+			this.room = data.room;
+			this.kind = data.kind;
+			this.name = data.name;
+			var room = this.room;
+			var source = room.dexSummary;
+			var targets = editableDexes().filter(function (dex) { return dex.id !== source.id && dex.parents.indexOf(source.id) < 0; });
+			if (room.dexEditable) targets.unshift(source);
+			var buf = '<form class="dexcreate"><p><label class="label">Copy ' + BattleLog.escapeHTML(data.name) + ' into:<br /><select name="target" class="button">';
+			for (var i = 0; i < targets.length; i++) {
+				var target = targets[i];
+				buf += '<option value="' + BattleLog.escapeHTML(target.id) + '"' + (target.id === room.copyTarget ? ' selected' : '') + '>' +
+					BattleLog.escapeHTML(target.name) + (target.id === source.id ? ' (this dex)' : '') + '</option>';
 			}
 			buf += '</select></label></p>';
-			buf += '<p class="buttonbar"><button type="submit" class="button"><strong>Fork</strong></button> <button type="button" name="close" class="button">Cancel</button></p></form>';
-			this.$el.html(buf);
+			buf += '<p class="dexcopyname"><label class="label">New name:<br /><input type="text" class="textbox" name="name" maxlength="40" /></label></p>';
+			if (data.line) buf += '<p class="dexcopyline"><label class="checkbox"><input type="checkbox" name="line" /> With its evolution line</label></p>';
+			buf += '<p class="buttonbar"><button type="submit" class="button"><strong>Copy</strong></button> <button type="button" name="close" class="button">Cancel</button></p></form>';
+			this.$el.html(targets.length ? buf : '<p>You don\'t have a dex to copy ' + BattleLog.escapeHTML(data.name) + ' into yet.</p>' +
+				'<p class="buttonbar"><button type="button" name="close" class="button">Close</button></p>');
+			this.updateTarget();
+		},
+		updateTarget: function () {
+			var here = this.$('select[name=target]').val() === this.room.dexid;
+			this.$('.dexcopyname').toggle(here);
+			this.$('.dexcopyline').toggle(!here);
+			if (here) this.$('input[name=name]').focus();
 		},
 		submit: function (data) {
+			var room = this.room;
+			var source = room.dexSummary;
+			if (data.target !== source.id) {
+				this.close();
+				room.copyTarget = data.target;
+				app.send(data.line ? '/crq dexforkline ' + data.target + ', ' + source.id + ', ' + this.name :
+					'/crq dexfork ' + data.target + ', ' + source.id + ', ' + this.kind + ', ' + this.name);
+				return;
+			}
+			var name = $.trim(data.name);
+			if (!name) return;
 			this.close();
-			this.callback(data.target);
+			room.copyTarget = data.target;
+			var fields = { name: name, inheritsFrom: this.name };
+			var edit = {};
+			if (this.kind === 'pokemon') {
+				if (room.dexView.species[toID(name)]) return room.openDexPokemon(name);
+				room.pendingSpecies = name;
+			} else {
+				var table = room.dexEffect.table;
+				var entries = DexViews.entries[room.dexid];
+				if (entries && entries[table][toID(name)]) return room.openDexEffect(table, toID(name));
+				room.pendingEffect = [table, toID(name)];
+				fields.countsAs = true;
+			}
+			edit[this.kind] = fields;
+			room.editDex(edit);
 		}
 	});
 
 	DexViews.ui.abilitySlotsOf = abilitySlotsOf;
+	DexViews.ui.DexCopyPopup = DexCopyPopup;
 
-	_.extend(RoomsRoom.prototype, {
-		openDexPokemon: function (name) {
+	_.extend(window.DexBuilderRoom.prototype, {
+		openDexPokemon: function (name, picked) {
 			var view = DexViews.current = this.dexView;
 			var species = view.dex.species.get(name);
 			if (!view.species[species.id]) return;
 			if (this.$('.dexpage').is(':visible')) this.dexScrollTop = this.dexScroller().scrollTop();
 			this.dexSpecies = species;
 			this.dexEffect = null;
+			this.dexEditField = null;
+			this.dexPicker = null;
 			this.$('.dexsearchpage, .dexpage').hide();
 			this.$('.dexmonpage').show();
 			this.dexScroller().scrollTop(0);
 
 			var editable = this.dexEditable;
 			var buf = '<div class="pad">';
-			buf += (editable ? '' : HIDE_BUTTON) + '<button name="closeDexPokemon" class="button"><i class="fa fa-chevron-left"></i> ' + (editable ? 'Pok&eacute;mon' : 'Dex') + '</button></div>';
+			buf += '<button name="closeDexPokemon" class="button"><i class="fa fa-chevron-left"></i> Pok&eacute;mon</button></div>';
 			buf += '<div class="teambar">';
 			var prevoOf = function (child) {
 				if (child.prevo && view.species[toID(child.prevo)]) return view.dex.species.get(child.prevo);
@@ -158,6 +204,7 @@
 				family = line(true);
 				if (family.length > 6) family = line(false);
 			}
+			this.dexFamilySize = family.length;
 			var start = 0;
 			var end = family.length;
 			if (end > 6) {
@@ -183,9 +230,7 @@
 				buf += this.dexSaveHTML('dexsave') + this.dexEditsHTML() + ' <button name="copyDexPokemon"><i class="fa fa-clone"></i>Copy</button> <button name="deleteDexPokemon" value="' + BattleLog.escapeHTML(species.name) + '"><i class="fa fa-trash"></i>' +
 					(DexViews.custom.Pokedex[species.id] ? 'Delete' : 'Reset to base') + '</button></div>';
 			} else {
-				buf += this.dexEditsHTML() + ' ';
-				if (family.length > 1) buf += '<button name="forkLine" value="' + BattleLog.escapeHTML(species.name) + '"><i class="fa fa-code-fork"></i>Fork evo line</button> ';
-				buf += '<button name="forkSpecies" value="' + BattleLog.escapeHTML(species.name) + '"><i class="fa fa-code-fork"></i>Fork</button></div>';
+				buf += this.dexEditsHTML() + ' <button name="copyDexPokemon"><i class="fa fa-clone"></i>Copy</button></div>';
 			}
 			var sprites = view.sprites[species.id] || {};
 			var standard = hasStandardSprites(species.id);
@@ -199,7 +244,7 @@
 			buf += '<div class="setchart dexmonchart' + (spriteData.pixelated ? ' pixelated' : '') + '" style="' + Dex.getTeambuilderSprite({ species: species.name }, view.dex) + ';">';
 
 			buf += '<div class="setcol setcol-icon"><div class="setcell-sprite"></div>';
-			buf += '<div class="setcell setcell-pokemon"><label>Pok&eacute;mon</label><input type="text" class="textbox dexfield" name="monsearch" value="' + BattleLog.escapeHTML(species.name) + '" autocomplete="off" /></div></div>';
+			buf += '<div class="setcell setcell-pokemon"><label>Pok&eacute;mon</label><input type="text" class="textbox dexfield" name="namesearch" value="' + BattleLog.escapeHTML(species.name) + '" autocomplete="off" /></div></div>';
 
 			var ratio = species.genderRatio;
 			buf += '<div class="setcol setcol-details"><div class="setrow">';
@@ -254,7 +299,7 @@
 				if (m) buf += '<div class="setcell">';
 				buf += (editable ? rows[m] : fieldHTML(BattleLog.escapeHTML(rows[m]))) + '</div>';
 			}
-			buf += '<div class="setcell setcell-learnset"><label class="dexlearnsetlabel">Learnset</label><input type="text" class="textbox dexfield learnsetcount" name="movesearch" placeholder="Moves" autocomplete="off" /></div>';
+			buf += '<div class="setcell setcell-learnset"><label class="dexlearnsetlabel">Learnset</label><input type="text" class="textbox dexfield learnsetcount" name="listsearch" placeholder="Moves" autocomplete="off" /></div>';
 			buf += '</div>';
 
 			buf += '<div class="setcol setcol-stats"><div class="setrow"><label>Stats</label><button class="textbox setstats" tabindex="-1" name="showDexStats">';
@@ -269,14 +314,14 @@
 			}
 			buf += '</button></div></div>';
 			buf += '</div></li></ol></div>';
-			buf += '<div class="teambuilder-results"></div>';
+			buf += '<div class="teambuilder-results" data-panel="list"></div><div class="teambuilder-results" data-panel="picker"></div>';
+			if (editable) buf += '<div class="teambuilder-results" data-panel="field"></div>';
 			buf += '<div class="dexstatresults" data-panel="stats" style="display:none">' + this.dexStatsHTML(species, bst) + '</div>';
 			buf += '<div class="dexstatresults dexeffectpanel" data-panel="details" style="display:none">' + this.dexDetailsHTML() + '</div>';
 			this.dexSpeciesBST = bst;
 			this.$('.dexmonpage').html('<div class="teamwrapper">' + buf + '</div>');
 
-			var $results = this.$('.teambuilder-results');
-			var search = this.dexPokemonSearch = DexViews.ui.panelSearch($results);
+			var search = this.dexListSearch = DexViews.ui.panelSearch(this.$('.dexmonpage [data-panel=list]'));
 			var room = this;
 			DexViews.ui.rowClasses(search, function (id, type) {
 				return type !== 'move' ? '' : (room.dexMoveEdited(id) ? ' dexedited' : '') + (room.dexEditable && room.dexLearnset[id] ? ' cur' : '');
@@ -284,14 +329,14 @@
 			this.markDexEdits();
 			this.setDexLearnsetList();
 			this.updateDexLearnsetCount();
+			this.showDexMonPanel(picked ? 'picker' : 'list', true);
 			this.scaleDex();
 		},
 		setDexLearnsetList: function () {
-			var search = this.dexPokemonSearch;
+			var search = this.dexListSearch;
 			var dexView = this.dexView;
 			var species = this.dexSpecies;
 			var editable = this.dexEditable;
-			this.dexEditField = null;
 			var own = this.dexLearnset = {};
 			var learnset = DexViews.learnsetOf(dexView, species.id) || {};
 			for (var id in learnset) {
@@ -319,16 +364,11 @@
 						seen[move.id] = 1;
 						others.push(['move', move.id]);
 					}
-					$.each([learned, inherited, others], function (k, list) {
-						list.sort(function (a, b) { return a[1] < b[1] ? -1 : 1; });
-					});
-					var results = [['header', "Learnset (" + learned.length + ")"]].concat(learned);
-					if (inherited.length) results = results.concat([['header', "From pre-evolutions (" + inherited.length + ")"]], inherited);
-					return editable ? results.concat([['header', "Other moves"]], others) : results;
+					return DexViews.ui.learnRows(["Learnset", "Other moves"], learned, inherited, others, editable);
 				};
 			});
 			search.setType('move', 'gen' + dexView.gen + 'ag', { species: species.name, moves: [] });
-			var query = $.trim(this.$('.dexmonpage input[name=movesearch]').val() || '');
+			var query = $.trim(this.$('.dexmonpage input[name=listsearch]').val() || '');
 			if (query) search.find(query);
 		},
 		dexEditsHTML: function () {
@@ -338,11 +378,8 @@
 		toggleDexEdits: function () {
 			Storage.prefs('dexshowedits', !Storage.prefs('dexshowedits'));
 			var self = this;
-			$.each([app.rooms.rooms, app.rooms.dexbuilder], function (i, room) {
-				if (!room || !room.markDexEdits) return;
-				room.$('button[name=toggleDexEdits]').replaceWith(self.dexEditsHTML());
-				room.markDexEdits();
-			});
+			this.$('button[name=toggleDexEdits]').replaceWith(self.dexEditsHTML());
+			this.markDexEdits();
 		},
 		dexSpeciesBase: function () {
 			var species = this.dexSpecies;
@@ -422,7 +459,7 @@
 				mark($page.find('input[name=stat-' + stat + ']'), edited);
 				mark($page.find('.basestatscol > div').eq(i + 1).children('b'), edited);
 			});
-			$page.find('.teambuilder-results a[data-entry^="move|"]').each(function () {
+			$page.find('[data-panel=list] a[data-entry^="move|"]').each(function () {
 				mark($(this), self.dexMoveEdited(toID(this.dataset.entry.slice(5))));
 			});
 		},
@@ -453,48 +490,16 @@
 			search.setType('move', 'gen' + view.gen + 'ag', { species: species.name, moves: [] });
 			var count = search.engine.results.filter(function (row) { return row[0] === 'move'; }).length;
 			this.$('.dexmonpage .dexlearnsetlabel').text('Learnset (' + count + ')');
-			if (entriesLoaded && !this.dexEditField) this.setDexLearnsetList();
+			if (entriesLoaded) this.setDexLearnsetList();
 		},
-		closeDexPokemon: function () {
+		closeDexPokemon: function (value, button) {
+			if (button) return this.leaveDex(button, function () { this.closeDexPokemon(); });
 			this.dexSpecies = null;
 			this.dexEffect = null;
 			this.$('.dexmonpage').hide().empty();
 			this.$('.dexpage').show();
+			if (this.dexSearch && this.dexSearchView !== this.dexView) this.setupDexSearch(this.dexView);
 			this.dexScroller().scrollTop(this.dexScrollTop || 0);
-		},
-		focusDexMonSearch: function (e) {
-			e.currentTarget.select();
-			if (this.dexEditField === 'monsearch') return;
-			this.dexEditField = 'monsearch';
-			this.$('.dexmonpage .dexstatresults').hide();
-			this.$('.dexmonpage .teambuilder-results').show();
-			this.$('.dexmonpage .setstats').removeClass('cur');
-			var dexid = this.dexid;
-			viewSearch(this.dexPokemonSearch, this.dexView, function (typedSearch) {
-				typedSearch.dexid = dexid;
-			});
-			this.dexPokemonSearch.setType('pokemon', 'gen' + this.dexView.gen);
-		},
-		searchDexMonSearch: function (e) {
-			if (this.dexEditField !== 'monsearch') this.focusDexMonSearch(e);
-			this.dexPokemonSearch.find($.trim(e.currentTarget.value));
-		},
-		focusDexMoveSearch: function () {
-			if (this.dexEditField || this.$('.dexmonpage .dexstatresults').is(':visible')) this.showDexLearnset();
-		},
-		searchDexMoveSearch: function (e) {
-			if (this.dexEditField || this.$('.dexmonpage .dexstatresults').is(':visible')) this.showDexLearnset();
-			this.dexPokemonSearch.find($.trim(e.currentTarget.value));
-		},
-		blurDexMonSearch: function (e) {
-			if (this.dexSpecies) e.currentTarget.value = this.dexSpecies.name;
-		},
-		clickDexMove: function (e) {
-			e.preventDefault();
-			if (this.dexEffect) return this.clickDexEffectEntry(e);
-			var entry = e.currentTarget.dataset.entry.split('|');
-			if (entry[0] === 'move') this.openDexEffect('Moves', entry[1], this.dexSpecies && this.dexSpecies.name);
-			if (entry[0] === 'pokemon') this.openDexPokemon(entry[1]);
 		},
 		dexDetailsHTML: function () {
 			var species = this.dexSpecies;
@@ -510,10 +515,9 @@
 			};
 			if (this.dexDetailList) {
 				var rows = DETAILS.filter(function (detail) { return !shown(detail[0]); }).map(function (detail) {
-					return '<li class="result"><a data-entry="detail|' + detail[0] + '"><span class="col movenamecol">' + detail[1] + '</span> ' +
-						'<span class="col dexattrsentence">' + detail[2].replace(/___/g, '<span class="dexblank"></span>') + '</span></a></li>';
-				}).join('');
-				return '<ul class="utilichart dexattrlist">' + (rows || '<li class="result"><p><em>No more attributes to add.</em></p></li>') + '</ul>';
+					return DexViews.ui.sentenceRowHTML('detail|' + detail[0], detail[1], detail[2]);
+				});
+				return '<div class="dexattrlist">' + DexViews.ui.chartHTML([['', rows]], "No more attributes to add.") + '</div>';
 			}
 			var boxes = DETAILS.filter(function (detail) { return shown(detail[0]); }).map(function (detail) {
 				var removable = editable && ALWAYS_DETAILS.indexOf(detail[0]) < 0;
@@ -531,15 +535,26 @@
 			if (editable) buf += '<p><button class="button" name="showDexDetailList"><i class="fa fa-plus"></i> New attribute</button></p>';
 			return buf + '</div>';
 		},
-		dexMonPanel: function () {
-			var $open = this.$('.dexmonpage .dexstatresults:visible');
-			return $open.length ? $open.attr('data-panel') : '';
+		showDexPanel: function (panel) {
+			this.dexPanel = panel;
+			this.$('.dexmonpage [data-panel]').each(function () {
+				$(this).toggle(this.dataset.panel === panel);
+			});
+			if (panel === 'picker' && !this.dexPicker) this.setupDexPicker();
+			var search = { list: this.dexListSearch, picker: this.dexPicker }[panel];
+			if (search) search.updateScroll();
+		},
+		showDexMonPanel: function (panel, keep) {
+			if (!keep && panel === this.dexPanel) panel = 'list';
+			this.showDexPanel(panel);
+			this.$('.dexmonpage .setstats').toggleClass('cur', panel === 'stats');
+			this.$('.dexmonpage .setdetails').toggleClass('cur', panel === 'details');
 		},
 		showDexDetails: function () {
 			this.dexDetailList = false;
 			this.$('.dexmonpage [data-panel=details]').html(this.dexDetailsHTML());
 			this.markDexEdits();
-			this.showDexLearnset(this.dexMonPanel() === 'details' ? '' : 'details');
+			this.showDexMonPanel('details');
 		},
 		dexStatsHTML: function (species, bst) {
 			var buf = '<div class="resultheader"><h3>Stats</h3></div><div class="statform">';
@@ -562,17 +577,7 @@
 			return buf + '<div style="clear:both"></div></div>';
 		},
 		showDexStats: function () {
-			this.showDexLearnset(this.dexMonPanel() === 'stats' ? '' : 'stats');
-		},
-		showDexLearnset: function (panel) {
-			panel = typeof panel === 'string' ? panel : '';
-			this.$('.dexmonpage .dexstatresults').each(function () {
-				$(this).toggle(this.getAttribute('data-panel') === panel);
-			});
-			this.$('.dexmonpage .teambuilder-results').toggle(!panel);
-			this.$('.dexmonpage .setstats').toggleClass('cur', panel === 'stats');
-			this.$('.dexmonpage .setdetails').toggleClass('cur', panel === 'details');
-			if (this.dexEditField === 'monsearch') this.setDexLearnsetList();
+			this.showDexMonPanel('stats');
 		},
 		dexStandardSprite: function (kind) {
 			if (!hasStandardSprites(this.dexSpecies.id)) return null;
@@ -588,53 +593,8 @@
 				html: '<img src="' + data.url + '" width="' + data.w * 2 + '" height="' + data.h * 2 + '" alt="' + kind + '"' + (data.pixelated ? ' class="pixelated"' : '') + ' />'
 			};
 		},
-		showDexSprite: function (kind) {
-			var uploadid = (this.dexView.sprites[this.dexSpecies.id] || {})[kind];
-			var image = uploadid && this.dexView.images[uploadid];
-			var standard = !image && this.dexStandardSprite(kind);
-			if (standard) {
-				app.addPopup(Popup, {
-					htmlMessage: '<strong>' + kind + '</strong> <small>(' + standard.size + ')</small>\n' + standard.html,
-					sourceEl: app.dispatchingButton
-				});
-				return;
-			}
-			if (!image) {
-				app.addPopup(Popup, { message: "No " + kind + " sprite.", sourceEl: app.dispatchingButton });
-				return;
-			}
-			app.addPopup(Popup, {
-				htmlMessage: '<strong>' + kind + '</strong> <small>(' + image.width + '&times;' + image.height + ')</small>\n' +
-					'<img src="' + Dex.resourcePrefix + 'sprites/custom/' + BattleLog.escapeHTML(image.file) + '" width="' + image.width * 2 + '" height="' + image.height * 2 + '" alt="' + kind + '"' +
-					(image.pixelated ? ' class="pixelated"' : '') + ' />' +
-					(image.artist ? '\n<small>by ' + BattleLog.escapeHTML(image.artist) + '</small>' : ''),
-				sourceEl: app.dispatchingButton
-			});
-		},
-		forkSpecies: function (name, button) {
-			this.forkInto(name, false, button);
-		},
-		forkLine: function (name, button) {
-			this.forkInto(name, true, button);
-		},
-		forkInto: function (name, line, button, kind) {
-			var room = this;
-			var source = this.dexSummary;
-			var targets = editableDexes().filter(function (dex) { return dex.id !== source.id && dex.parents.indexOf(source.id) < 0; });
-			var send = function (target) {
-				room.forkTarget = target;
-				app.send(line ? '/crq dexforkline ' + target + ', ' + source.id + ', ' + name : '/crq dexfork ' + target + ', ' + source.id + ', ' + (kind || 'pokemon') + ', ' + name);
-			};
-			if (!targets.length) {
-				app.addPopup(DexConfirmPopup, {
-					message: "You don't have a dex to fork " + BattleLog.escapeHTML(name) + " into yet.",
-					button: "Open Dexbuilder",
-					sourceEl: button,
-					callback: function () { app.joinRoom('dexbuilder', window.DexBuilderRoom); }
-				});
-				return;
-			}
-			app.addPopup(DexForkPopup, { name: name, line: line, targets: targets, target: this.forkTarget, sourceEl: button, callback: send });
+		copyDexPokemon: function (value, button) {
+			app.addPopup(DexCopyPopup, { room: this, kind: 'pokemon', name: this.dexSpecies.name, line: this.dexFamilySize > 1, sourceEl: button });
 		}
 	});
 

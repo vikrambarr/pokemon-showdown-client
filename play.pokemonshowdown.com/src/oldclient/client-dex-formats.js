@@ -26,10 +26,7 @@
 	var FORMAT_BAN_STATES = { '': "Allowed", banned: "Banned", restricted: "Restricted", unbanned: "Unbanned" };
 	var FORMAT_GAME_TYPES = { singles: 'Singles', doubles: 'Doubles', triples: 'Triples', multi: 'Multi', freeforall: 'Free-for-all' };
 
-	_.extend(RoomsRoom.prototype, {
-		dexFormatTarget: function (formatid) {
-			return formatid;
-		},
+	_.extend(window.DexBuilderRoom.prototype, {
 		selectDexFormat: function (format, button) {
 			var room = this;
 			app.addPopup(DexFormatPopup, { format: format, sourceEl: button, section: this.dexSummary.name, dexid: this.dexSummary.id, onselect: function (newFormat) {
@@ -150,7 +147,7 @@
 			var onTop = kind === 'pokemon' ? outright : banned;
 			var $list = $page.find('.dexformatlist');
 			var search = this.dexFormatSearch = this.createDexList($list, 'dexFormatZoom');
-			DexViews.ui.rowClasses(search, function (id, type) {
+			window.DexViews.ui.rowClasses(search, function (id, type) {
 				return type === kind && banned[id] ? ' banned' : '';
 			});
 			var room = this;
@@ -250,13 +247,6 @@
 			} else if (this.dexFormatKind === 'ban') {
 				this.renderDexFormatBans(e.currentTarget.value);
 			}
-		},
-		clickDexFormatEntry: function (e) {
-			e.preventDefault();
-			var entry = e.currentTarget.dataset.entry.split('|');
-			if (['pokemon', 'move', 'ability', 'item'].includes(entry[0]) || !this.dexFormatSearch.addFilter(e.currentTarget)) return;
-			this.$('input[name=formatsearch]').val('');
-			this.dexFormatSearch.find('');
 		}
 	});
 
