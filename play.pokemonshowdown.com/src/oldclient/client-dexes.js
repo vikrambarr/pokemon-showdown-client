@@ -902,8 +902,26 @@
 			if (!width) return;
 			this.dexListZoom = width < 640 ? width / 640 : 1;
 			this.dexFormatZoom = width < 670 ? width / 670 : 1;
-			this.$('.dexpokemon, .dextierlist').css({ zoom: this.dexListZoom === 1 ? '' : this.dexListZoom, width: this.dexListZoom === 1 ? '' : '640px' });
-			this.$('.dexformatwrapper').css({ zoom: this.dexFormatZoom === 1 ? '' : this.dexFormatZoom, width: this.dexFormatZoom === 1 ? '' : '670px' });
+			var observer = this.dexScaleObserver || (this.dexScaleObserver = new ResizeObserver(function (entries) {
+				for (var i = 0; i < entries.length; i++) {
+					var el = entries[i].target;
+					el.style.marginBottom = el.dexZoom === 1 ? '' : -el.offsetHeight * (1 - el.dexZoom) + 'px';
+				}
+			}));
+			var scale = function ($box, zoom, boxWidth) {
+				$box.each(function () {
+					this.dexZoom = zoom;
+					observer.observe(this);
+				}).css({
+					transform: zoom === 1 ? '' : 'scale(' + zoom + ')',
+					width: zoom === 1 ? '' : boxWidth + 'px',
+					marginRight: zoom === 1 ? '' : -boxWidth * (1 - zoom) + 'px',
+				}).each(function () {
+					this.style.marginBottom = zoom === 1 ? '' : -this.offsetHeight * (1 - zoom) + 'px';
+				});
+			};
+			scale(this.$('.dexpokemon, .dextierlist'), this.dexListZoom, 640);
+			scale(this.$('.dexformatwrapper'), this.dexFormatZoom, 670);
 			this.updateDexScroll();
 		},
 		createDexList: function ($list, zoom) {

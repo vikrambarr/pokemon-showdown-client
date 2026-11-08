@@ -1,8 +1,13 @@
 .dexpokemon,
 .dextierlist,
 .dexformatwrapper {
-	-webkit-text-size-adjust: 100%;
-	text-size-adjust: 100%;
+	transform-origin: top left;
+}
+.dexpage,
+.dexbuildersub,
+.dexformatpage,
+.dextierpage {
+	display: flow-root;
 }
 .dexpokemon .result a,
 .dextabempty .result a,
