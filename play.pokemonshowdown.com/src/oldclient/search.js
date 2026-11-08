@@ -344,7 +344,7 @@
 		var gen = this.engine ? this.engine.dex.gen : 9;
 
 		// type
-		buf += '<span class="col typecol">';
+		buf += '<span class="col typecol"' + (pokemon.types.length > 2 ? ' style="padding-top:0;"' : '') + '>';
 		var types = pokemon.types;
 		for (var i = 0; i < types.length; i++) {
 			buf += Dex.getTypeIcon(types[i]);
