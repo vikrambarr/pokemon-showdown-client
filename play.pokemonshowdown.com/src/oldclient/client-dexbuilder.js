@@ -12,14 +12,13 @@
 		'openDexPokemon', 'dexAbilityChipsHTML', 'dexEvoChipsHTML', 'updateDexLearnsetCount', 'closeDexPokemon', 'clickDexMove',
 		'dexStatsHTML', 'showDexStats', 'showDexLearnset', 'selectDexFormat', 'dexEditsHTML', 'toggleDexEdits', 'dexSpeciesBase',
 		'dexSpeciesChanged', 'markDexEdits', 'dexMoveEdited', 'setDexLearnsetList', 'focusDexMonSearch', 'searchDexMonSearch', 'blurDexMonSearch',
-		'focusDexMoveSearch', 'searchDexMoveSearch',
+		'focusDexMoveSearch', 'searchDexMoveSearch', 'dexDetailsHTML', 'dexMonPanel', 'showDexDetails', 'dexStandardSprite',
 		'openDexFormat', 'renderDexFormat', 'showDexFormatList', 'renderDexFormatTree', 'renderDexFormatBans', 'searchDexFormat'
 	];
 	var view = _.pick(RoomsRoom.prototype, VIEW_METHODS);
 	var SINGLES_TIERS = ['AG', 'Uber', '(Uber)', 'OU', '(OU)', 'UUBL', 'UU', 'RUBL', 'RU', 'NUBL', 'NU', '(NU)', 'PUBL', 'PU', '(PU)', 'ZUBL', 'ZU', 'NFE', 'LC', 'Illegal', 'Unreleased'];
 	var DOUBLES_TIERS = ['DUber', '(DUber)', 'DOU', 'DBL', '(DOU)', 'DUU', '(DUU)', 'NFE', 'LC', 'Illegal', 'Unreleased'];
 	var TIER_STYLES = [['singles', "Singles", 'tier'], ['natdex', "National Dex", 'natDexTier'], ['doubles', "Doubles", 'doublesTier'], ['vgc', "VGC", '']];
-	var EVO_TYPES = ['', 'trade', 'useItem', 'levelMove', 'levelExtra', 'levelFriendship', 'levelHold', 'other'];
 	var EFFECT_KINDS = { Moves: 'move', Abilities: 'ability', Items: 'item', Conditions: 'condition' };
 	var SPRITE_KINDS = { front: 'Front', back: 'Back', 'front-shiny': 'Shiny front', 'back-shiny': 'Shiny back', icon: 'Icon' };
 
@@ -92,6 +91,7 @@
 			buf += '<p><label class="checkbox"><input type="checkbox" name="private"' + (summary.visibility === 'private' ? ' checked' : '') + locked + ' /> Private (unlisted)</label></p>';
 			buf += '<p><label class="label">World:<br /><select name="base" class="button"' + locked + '>' + baseOptions(summary) + '</select></label></p>';
 			buf += '<p><label class="label">Description:<br /><textarea class="textbox" name="description" rows="4" maxlength="512">' + BattleLog.escapeHTML(summary.description || '') + '</textarea></label></p></form>';
+			buf += '<p class="dexdatasize">' + this.dataSizeHTML() + '</p>';
 			buf += '<div class="dexrest">' + this.dexRestHTML() + '</div>';
 			this.$el.html(buf);
 		},
@@ -118,6 +118,13 @@
 			var $description = $form.find('textarea[name=description]');
 			if (!$description.is(':focus') && !this.descriptionTimer) $description.val(summary.description || '');
 			this.$('.dexrest').html(this.dexRestHTML());
+			this.$('.dexdatasize').html(this.dataSizeHTML());
+		},
+		dataSizeHTML: function () {
+			var summary = this.room.curSummary;
+			var storage = this.room.dexStorage;
+			if (summary.official || !storage) return '';
+			return '<small>Battle data: ' + Math.ceil(summary.size / 1024) + ' KB of ' + Math.round(storage.data / 1024) + ' KB</small>';
 		},
 		dexRestHTML: function () {
 			var summary = this.room.curSummary;
@@ -217,74 +224,38 @@
 		return text.split(',').map(function (part) { return $.trim(part); }).filter(Boolean);
 	}
 
-	var DexDetailsPopup = Popup.extend({
-		initialize: function (data) {
-			this.room = data.room;
-			var species = this.species = this.room.dexSpecies;
-			var ratio = species.genderRatio;
-			var room = this.room;
-			var edited = function (name) {
-				return room.dexSpeciesChanged(name === 'male' || name === 'gender' ? ['gender', 'genderRatio'] : [name]) ? ' dexedited' : '';
+	function megabytes(bytes) {
+		return bytes < 1024 * 1024 ? Math.ceil(bytes / 1024) + ' KB' : (bytes / 1024 / 1024).toFixed(1).replace(/\.0$/, '') + ' MB';
+	}
+
+	function storageHTML(storage, bare) {
+		return storage ? (bare ? '' : 'Your storage: ') + megabytes(storage.used) + ' of ' + megabytes(storage.limit) : '';
+	}
+
+	function shrinkSprite(file, kind) {
+		var box = kind.slice(0, 4) === 'icon' ? { max: 64, width: 40, height: 30 } : { max: 192, width: 96, height: 96 };
+		return new Promise(function (resolve) {
+			var image = new Image();
+			var url = URL.createObjectURL(file);
+			image.onerror = function () {
+				URL.revokeObjectURL(url);
+				resolve(file);
 			};
-			var text = function (label, name, value, size) {
-				return '<p><label class="label">' + label + ':<br /><input type="text" class="textbox' + edited(name) + '" name="' + name + '" value="' + BattleLog.escapeHTML(value === undefined || value === null ? '' : String(value)) + '" size="' + (size || 20) + '" /></label></p>';
+			image.onload = function () {
+				URL.revokeObjectURL(url);
+				if (image.naturalWidth <= box.max && image.naturalHeight <= box.max) return resolve(file);
+				var scale = Math.min(box.width / image.naturalWidth, box.height / image.naturalHeight);
+				var canvas = document.createElement('canvas');
+				canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+				canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+				var context = canvas.getContext('2d');
+				context.imageSmoothingEnabled = false;
+				context.drawImage(image, 0, 0, canvas.width, canvas.height);
+				canvas.toBlob(function (blob) { resolve(blob || file); }, 'image/png');
 			};
-			var buf = '<form class="dexdetailsform' + (Storage.prefs('dexshowedits') ? ' dexshowedits' : '') + '">';
-			buf += text('Weight (kg)', 'weightkg', species.weightkg, 8) + text('Height (m)', 'heightm', species.heightm, 8);
-			buf += '<p><label class="label">Gender:<br /><select name="gender" class="button' + edited('gender') + '">';
-			buf += [['', 'Ratio'], ['M', 'Always male'], ['F', 'Always female'], ['N', 'Genderless']].map(function (option) {
-				return '<option value="' + option[0] + '"' + ((species.gender || '') === option[0] ? ' selected' : '') + '>' + option[1] + '</option>';
-			}).join('') + '</select></label></p>';
-			buf += text('Male %', 'male', ratio ? ratio.M * 100 : 50, 6);
-			buf += text('Egg groups', 'eggGroups', (species.eggGroups || []).join(', '));
-			buf += text('Color', 'color', species.color || '');
-			buf += text('Tags', 'tags', (species.tags || []).join(', '));
-			buf += '<p><label class="label">Evo type:<br /><select name="evoType" class="button' + edited('evoType') + '">' + EVO_TYPES.map(function (type) {
-				return '<option value="' + type + '"' + ((species.evoType || '') === type ? ' selected' : '') + '>' + (type || '(level)') + '</option>';
-			}).join('') + '</select></label></p>';
-			buf += text('Evo level', 'evoLevel', species.evoLevel || '', 6) + text('Evo item', 'evoItem', species.evoItem || '');
-			buf += text('Evo move', 'evoMove', species.evoMove || '') + text('Evo condition', 'evoCondition', species.evoCondition || '');
-			buf += '<p class="buttonbar"><button type="submit" class="button"><strong>Save</strong></button> <button type="button" name="close" class="button">Cancel</button></p></form>';
-			this.old = this.values(species);
-			this.$el.html(buf);
-		},
-		values: function (species) {
-			var ratio = species.genderRatio;
-			return {
-				weightkg: String(species.weightkg || ''), heightm: String(species.heightm || ''), gender: species.gender || '',
-				male: String(ratio ? ratio.M * 100 : 50), eggGroups: (species.eggGroups || []).join(', '), color: species.color || '',
-				tags: (species.tags || []).join(', '), evoType: species.evoType || '', evoLevel: String(species.evoLevel || ''),
-				evoItem: species.evoItem || '', evoMove: species.evoMove || '', evoCondition: species.evoCondition || ''
-			};
-		},
-		submit: function (data) {
-			var old = this.old;
-			var edit = {};
-			var changed = function (key) { return $.trim(data[key]) !== old[key]; };
-			for (var key in old) {
-				if (!changed(key) || key === 'male' || key === 'gender') continue;
-				var value = $.trim(data[key]);
-				if (['weightkg', 'heightm', 'evoLevel'].includes(key)) {
-					edit[key] = value ? Number(value) : null;
-				} else if (['eggGroups', 'tags'].includes(key)) {
-					edit[key] = value ? listValue(value) : key === 'eggGroups' ? [] : null;
-				} else {
-					edit[key] = value || null;
-				}
-			}
-			if (changed('gender') || changed('male')) {
-				if (data.gender) {
-					edit.gender = data.gender;
-				} else {
-					var male = Math.min(100, Math.max(0, Number(data.male) || 0)) / 100;
-					edit.gender = null;
-					edit.genderRatio = { M: male, F: Math.round((1 - male) * 1000) / 1000 };
-				}
-			}
-			this.close();
-			if (Object.keys(edit).length) this.room.saveDexPokemon(edit, true);
-		}
-	});
+			image.src = url;
+		});
+	}
 
 	var DexSpritePopup = Popup.extend({
 		initialize: function (data) {
@@ -293,15 +264,20 @@
 			var room = this.room;
 			var uploadid = (room.dexView.sprites[room.dexSpecies.id] || {})[data.kind];
 			var image = uploadid && room.dexView.images[uploadid];
+			var standard = !image && room.dexStandardSprite(data.kind);
 			var buf = '<form><p><strong>' + SPRITE_KINDS[data.kind] + ' sprite</strong></p>';
 			if (image) {
 				buf += '<p><img src="' + Dex.resourcePrefix + 'sprites/custom/' + BattleLog.escapeHTML(image.file) + '" width="' + image.width * 2 + '" height="' + image.height * 2 + '" alt=""' +
 					(image.pixelated ? ' class="pixelated"' : '') + ' /></p>';
+			} else if (standard) {
+				buf += '<p>' + standard.html + '</p><p><small>Standard sprite (' + standard.size + ')</small></p>';
 			} else {
-				buf += '<p><em>No custom sprite.</em></p>';
+				buf += '<p><em>No sprite.</em></p>';
 			}
 			buf += '<p><input type="file" name="file" accept="image/png,image/gif" /></p>';
-			buf += '<p><label class="checkbox"><input type="checkbox" name="pixelated"' + (!image || image.pixelated ? ' checked' : '') + ' /> Pixel art</label></p>';
+			buf += '<p><small>' + (room.dexSummary.official ? 'Official dex: any size' : data.kind.slice(0, 4) === 'icon' ? 'Best at 40&times;30. Bigger than 64&times;64 is shrunk to 40&times;30' :
+				'Best at 96&times;96. Bigger than 192&times;192 is shrunk to 96&times;96') + '. Pixel art only.</small></p>';
+			if (!room.dexSummary.official && room.dexStorage) buf += '<p><small>' + storageHTML(room.dexStorage) + '</small></p>';
 			buf += '<p class="buttonbar"><button type="submit" class="button"><strong>Upload</strong></button>' +
 				(image ? ' <button type="button" name="clearSprite" class="button">Remove</button>' : '') +
 				' <button type="button" name="close" class="button">Cancel</button></p></form>';
@@ -312,10 +288,13 @@
 			if (!file) return;
 			var room = this.room;
 			var name = room.dexSpecies.name;
-			var settings = { pixelated: this.$('input[name=pixelated]').is(':checked') };
+			var kind = this.kind;
 			this.close();
 			room.setSaveState('saving');
-			DexViews.ui.request('dexupload', room.dexid + ', ' + name + ', ' + this.kind + ', ' + JSON.stringify(settings)).then(function (data) {
+			(room.dexSummary.official ? Promise.resolve(file) : shrinkSprite(file, kind)).then(function (shrunk) {
+				file = shrunk;
+				return DexViews.ui.request('dexupload', room.dexid + ', ' + name + ', ' + kind);
+			}).then(function (data) {
 				return new Promise(function (resolve) {
 					$.ajax({ url: data.url, method: 'POST', data: file, processData: false, contentType: file.type, dataType: 'json' }).done(resolve).fail(function (xhr) {
 						resolve(xhr.responseJSON || { error: "The upload didn't work." });
@@ -455,6 +434,7 @@
 			'input .dexmonpage input[type=number][name^=stat-]': 'typeDexStat',
 			'change .dexmonpage input[name^=stat]': 'saveDexStats',
 			'change .dexmonpage select[name=dextype]': 'changeDexType',
+			'change .dexmonpage [data-detail] input, .dexmonpage [data-detail] select': 'changeDexDetail',
 			'click .dexmonpage .dexchipbox': 'focusDexChips',
 			'dragstart .dexmonpage .dexabilitybox .dexchip': 'dragDexAbility',
 			'dragover .dexmonpage .dexabilitybox': 'dragOverDexAbility',
@@ -468,6 +448,15 @@
 		},
 		focus: function () {
 			app.send('/crq dexes');
+		},
+		loadDexStorage: function () {
+			var room = this;
+			if (!app.user.get('registered')) return;
+			DexViews.ui.request('dexstorage', '').then(function (storage) {
+				room.dexStorage = storage;
+				room.$('.dexstorage').text(storageHTML(storage, true));
+				if (room.settingsPopup) room.settingsPopup.sync();
+			}, function () {});
 		},
 		update: function () {
 			if (!this.$('.folderpane').length) {
@@ -484,6 +473,7 @@
 			if (folders.indexOf(this.curFolder) < 0) this.curFolder = folders[0] || '';
 			this.free = Math.max(0, DEX_SLOTS - slots.length);
 			this.updateFolderList(slots, shared, official);
+			this.loadDexStorage();
 			var summary = all[folders.indexOf(this.curFolder)];
 			var key = JSON.stringify([userid, summary, this.free]);
 			this.dexOptions = this.dexOptionsHTML(slots, shared, official);
@@ -500,6 +490,7 @@
 			buf += '<div class="folder"><h3>Dexes</h3></div>';
 			for (var i = 0; i < slots.length; i++) buf += this.folderHTML(slots[i]);
 			buf += '<div class="folder"><div class="selectFolder" data-value="+"><i class="fa fa-plus"></i><em>(new dex)</em></div></div>';
+			buf += '<div class="foldersep"></div><div class="folder"><h3>Storage</h3><small class="dexstorage">' + storageHTML(this.dexStorage, true) + '</small></div>';
 			if (shared.length) buf += '<div class="foldersep"></div><div class="folder"><h3>Shared with you</h3></div>';
 			for (var i = 0; i < shared.length; i++) buf += this.folderHTML(shared[i]);
 			if (official.length) buf += '<div class="foldersep"></div><div class="folder"><h3>Official</h3></div>';
@@ -610,7 +601,7 @@
 				if (this.dexTab === 'tiers') this.renderDexTiers();
 				return;
 			}
-			var statsOpen = this.$('.dexmonpage .dexstatresults').is(':visible');
+			var panel = this.dexMonPanel();
 			this.dexFormatId = '';
 			this.dexFormatSearch = null;
 			this.setupDexSearch(dexView);
@@ -627,7 +618,7 @@
 				this.openDexEffect(this.dexEffect.table, this.dexEffect.id, this.dexEffect.from, true);
 			} else if (species) {
 				if (dexView.species[species.id]) {
-					this.reopenDexPokemon(species.name, statsOpen);
+					this.reopenDexPokemon(species.name, panel);
 				} else {
 					this.closeDexPokemon();
 				}
@@ -885,24 +876,24 @@
 			this.setupDexSearch(this.dexView);
 			this.dexScroller().scrollTop(this.dexScrollTop || 0);
 		},
-		reopenDexPokemon: function (name, statsOpen) {
+		reopenDexPokemon: function (name, panel) {
 			var self = this;
 			if (this.$('.dexmonpage input[type=range]:active').length) {
 				$(document).one('mouseup', function () {
 					setTimeout(function () {
-						if (self.dexSpecies && self.dexSpecies.name === name) self.reopenDexPokemon(name, statsOpen);
+						if (self.dexSpecies && self.dexSpecies.name === name) self.reopenDexPokemon(name, panel);
 					});
 				});
 				return;
 			}
 			var focused = this.$('.dexmonpage input:focus').attr('name');
 			this.openDexPokemon(name);
-			if (statsOpen) this.showDexLearnset(true);
+			if (panel) this.showDexLearnset(panel);
 			if (focused) this.$('.dexmonpage input[name="' + focused + '"]').focus();
 		},
-		showDexLearnset: function (stats) {
-			view.showDexLearnset.call(this, stats);
-			if (stats !== true) this.setDexLearnsetList();
+		showDexLearnset: function (panel) {
+			view.showDexLearnset.call(this, panel);
+			if (typeof panel !== 'string' || !panel) this.setDexLearnsetList();
 		},
 		focusDexField: function (e) {
 			var name = e.currentTarget.name;
@@ -1009,6 +1000,7 @@
 			e.preventDefault();
 			if (this.dexEffect) return this.clickDexEffectEntry(e);
 			var entry = e.currentTarget.dataset.entry.split('|');
+			if (entry[0] === 'detail') return this.addDexDetail(entry[1]);
 			var field = this.dexEditField;
 			var dexView = this.dexView;
 			if (entry[0] === 'move' && !field) {
@@ -1101,8 +1093,40 @@
 			types[Number(e.currentTarget.dataset.index)] = e.currentTarget.value;
 			this.saveDexPokemon({ types: types.filter(Boolean) }, true);
 		},
-		showDexDetails: function (value, button) {
-			app.addPopup(DexDetailsPopup, { room: this, sourceEl: button, maxWidth: 320 });
+		showDexDetailList: function () {
+			this.dexDetailList = true;
+			this.$('.dexmonpage [data-panel=details]').html(this.dexDetailsHTML());
+		},
+		addDexDetail: function (key) {
+			this.dexAddedDetails[key] = true;
+			this.dexDetailList = false;
+			this.$('.dexmonpage [data-panel=details]').html(this.dexDetailsHTML());
+			this.markDexEdits();
+			this.$('.dexmonpage [data-detail=' + key + ']').find('input, select').first().focus();
+		},
+		removeDexDetail: function (key) {
+			delete this.dexAddedDetails[key];
+			var edit = {};
+			edit[key] = key === 'eggGroups' ? [] : null;
+			this.saveDexPokemon(edit, true);
+		},
+		changeDexDetail: function (e) {
+			var key = $(e.currentTarget).closest('[data-detail]').attr('data-detail');
+			var value = $.trim(e.currentTarget.value);
+			var edit = {};
+			if (key === 'gender') {
+				var gender = this.$('.dexmonpage [data-detail=gender] select').val();
+				var male = Math.min(100, Math.max(0, Number(this.$('.dexmonpage [data-detail=gender] input').val()) || 0)) / 100;
+				edit.gender = gender || null;
+				if (!gender) edit.genderRatio = { M: male, F: Math.round((1 - male) * 1000) / 1000 };
+			} else if (['weightkg', 'heightm', 'evoLevel'].includes(key)) {
+				edit[key] = value ? Number(value) : null;
+			} else if (['eggGroups', 'tags'].includes(key)) {
+				edit[key] = value ? listValue(value) : key === 'eggGroups' ? [] : null;
+			} else {
+				edit[key] = value || null;
+			}
+			this.saveDexPokemon(edit, true);
 		},
 		showDexSprite: function (kind, button) {
 			app.addPopup(DexSpritePopup, { room: this, kind: kind, sourceEl: button });
@@ -1319,7 +1343,7 @@
 		},
 		refreshDexPage: function () {
 			if (this.dexEffect) return this.renderDexEffect();
-			if (this.dexSpecies) return this.reopenDexPokemon(this.dexSpecies.name, this.$('.dexmonpage .dexstatresults').is(':visible'));
+			if (this.dexSpecies) return this.reopenDexPokemon(this.dexSpecies.name, this.dexMonPanel());
 			if (this.dexTab === 'tiers') return this.renderDexTierPage(this.tierDetails);
 			if (this.dexTab === 'formats') return this.refreshDexFormat();
 			if (!this.dexSearch || this.dexSearchView === this.dexView) return;
