@@ -329,7 +329,7 @@
 			app.addPopup(Popup, { htmlMessage: data.error ? BattleLog.escapeHTML(data.error) : BattleLog.sanitizeHTML(data.html) });
 			app.send('/crq dexes');
 		});
-		$.each(['dex', 'dexentries', 'dexeffect', 'dexformat', 'dexupload'], function (i, cmd) {
+		$.each(['dex', 'dexentries', 'dexeffect', 'dexformat', 'dexupload', 'dexstorage'], function (i, cmd) {
 			app.on('response:' + cmd, function (data) {
 				answer(cmd, data);
 			});
@@ -917,7 +917,7 @@
 					transform: zoom === 1 ? '' : 'scale(' + zoom + ')',
 					width: zoom === 1 ? '' : boxWidth + 'px',
 					marginLeft: zoom === 1 ? '' : -bleed + 'px',
-					marginRight: zoom === 1 ? '' : -boxWidth * (1 - zoom) + 'px',
+					marginRight: zoom === 1 ? '' : -boxWidth * (1 - zoom) + 'px'
 				}).each(function () {
 					this.style.marginBottom = zoom === 1 ? '' : -this.offsetHeight * (1 - zoom) + 'px';
 				});

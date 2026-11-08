@@ -577,8 +577,11 @@
 	position: relative;
 	z-index: 1;
 }
-.dexmovechart .setcol-moves .setcell:first-child {
+.dexeffectchart .setcol-moves .setcell:first-child {
 	margin-top: 42px;
+}
+.dexeffectchart .setcol-moves .setcell:only-child {
+	margin-top: 84px;
 }
 .dexmonchart .dexunit {
 	position: absolute;
@@ -1012,10 +1015,12 @@
 	background: #4a2c2c;
 	color: #e6b8b8;
 }
-[data-panel=fields] > .pad {
+[data-panel=fields] > .pad,
+[data-panel=details] > .pad {
 	padding-left: 7px;
 }
-[data-panel=fields] .dexfieldsection {
+[data-panel=fields] .dexfieldsection,
+[data-panel=details] .dexfieldsection {
 	width: 631px;
 }
 .dexsentence {
@@ -1063,19 +1068,28 @@
 .dexattrsentence {
 	white-space: normal;
 }
+[data-panel=flags] .result {
+	height: auto;
+	contain: none;
+}
+[data-panel=flags] .result a {
+	display: flow-root;
+	height: auto;
+	min-height: 30px;
+}
+[data-panel=flags] .movedesccol {
+	float: none;
+	overflow: hidden;
+	width: auto;
+	height: auto;
+	min-height: 18px;
+	padding-bottom: 3px;
+	white-space: normal;
+}
 .dexblank {
 	display: inline-block;
 	width: 36px;
 	border-bottom: 1px solid #888888;
-}
-.dexsecondary {
-	margin: 2px 0 6px 0;
-	padding: 4px;
-	border: 1px solid #BBBBBB;
-	border-radius: 4px;
-}
-.dark .dexsecondary {
-	border-color: #555555;
 }
 .dexmark {
 	background: hsl(var(--hue), 90%, 72%);
