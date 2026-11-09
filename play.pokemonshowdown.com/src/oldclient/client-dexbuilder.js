@@ -666,6 +666,12 @@
 				} else {
 					this.closeDexPokemon();
 				}
+			} else if (this.dexFamilyOf) {
+				if (dexView.species[toID(this.dexFamilyOf)]) {
+					this.openDexFamily(this.dexFamilyOf);
+				} else {
+					this.closeDexPokemon();
+				}
 			}
 		},
 		closeDexTab: function (value, button) {
@@ -1029,7 +1035,7 @@
 			e.preventDefault();
 			var entry = e.currentTarget.dataset.entry.split('|');
 			if (entry[0] === 'pokemon') {
-				this.openDexPokemon(entry[1]);
+				this.openDexFamily(entry[1]);
 				return;
 			}
 			var table = DexViews.ui.ENTRY_TABLES[entry[0]];
@@ -1163,6 +1169,7 @@
 		refreshDexPage: function () {
 			if (this.dexEffect) return this.renderDexEffect();
 			if (this.dexSpecies) return this.reopenDexPokemon(this.dexSpecies.name, this.dexPanel);
+			if (this.dexFamilyOf) return this.openDexFamily(this.dexFamilyOf);
 			if (this.dexTab === 'tiers') return this.renderDexTierPage(this.tierDetails);
 			if (this.dexTab === 'formats') return this.refreshDexFormat();
 			if (!this.dexSearch || this.dexSearchView === this.dexView) return;
