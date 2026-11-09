@@ -21,6 +21,8 @@
 			Abilities: ['BattleAbilities', 'ability']
 		};
 
+		var TYPE_CODES = { 1: 0, 2: 1, 0.5: 2, 0: 3 };
+
 		var TYPES = [
 			'normal', 'fighting', 'flying', 'poison', 'ground', 'rock', 'bug', 'ghost', 'steel',
 			'fire', 'water', 'grass', 'electric', 'psychic', 'ice', 'dragon', 'dark', 'fairy', 'stellar'
@@ -83,6 +85,8 @@
 			draft: draftView,
 			mergeEffect: mergeEffect,
 			tierData: tierData,
+			typeStyle: typeStyle,
+			typeIconURL: typeIconURL,
 			indexSearch: indexSearch
 		};
 		var unindexed = [];
@@ -217,6 +221,14 @@
 			return target;
 		}
 
+		function draftType(view, id, fields) {
+			var data = $.extend({}, view.TypeChart[id], { damageTaken: $.extend({}, view.dex.types.get(id).damageTaken) });
+			for (var source in fields.damageTaken) data.damageTaken[source] = TYPE_CODES[fields.damageTaken[source]];
+			if (fields.color) data.color = fields.color;
+			if (fields.label) data.label = fields.label;
+			return data;
+		}
+
 		function draftView(view, pokemon, previous, effects) {
 			if (previous && previous.draftOf) {
 				delete Dex.moddedDexes[previous.modid];
@@ -224,11 +236,15 @@
 			}
 			var draft = $.extend({}, view, {
 				draftOf: view, modid: view.modid + 'draft' + (++drafts), Pokedex: $.extend({}, view.Pokedex), Learnsets: $.extend({}, view.Learnsets),
-				Moves: $.extend({}, view.Moves), Abilities: $.extend({}, view.Abilities), Items: $.extend({}, view.Items)
+				Moves: $.extend({}, view.Moves), Abilities: $.extend({}, view.Abilities), Items: $.extend({}, view.Items), TypeChart: $.extend({}, view.TypeChart)
 			});
 			$.each(effects || {}, function (table, entries) {
 				if (!draft[table]) return;
 				for (var id in entries) {
+					if (table === 'TypeChart') {
+						draft.TypeChart[id] = draftType(view, id, entries[id]);
+						continue;
+					}
 					var fields = $.extend({}, entries[id]);
 					$.each(['name', 'inheritsFrom', 'slots', 'replace', 'events', 'spriteFrom'], function (i, key) { delete fields[key]; });
 					var data = view[table][id] || window[GLOBALS[table][0]][id] || {};

@@ -384,6 +384,14 @@
 	position: sticky;
 	left: -1px;
 }
+.dextypeedit td,
+.dextypeedit th[data-type] {
+	cursor: pointer;
+}
+.dextypeedit td:hover,
+.dextypeedit th[data-type]:hover {
+	box-shadow: inset 0 0 0 2px #6688AA;
+}
 .dextypechart td.super {
 	background: #d9f2d9;
 	color: #206020;
@@ -428,6 +436,12 @@
 	width: 64px;
 	height: 32px;
 	object-fit: cover;
+}
+.dexcodetab .setchart {
+	display: none;
+}
+.dexcodetab .dexstatresults {
+	top: 70px;
 }
 .dexcode h3 {
 	margin: 12px 0 4px 0;
@@ -561,10 +575,9 @@
 }
 .dexmonchart .dexmovenumbers .dexfield {
 	width: 45px;
-	margin-right: 1px;
 }
 .dexmonchart .dexmovenumbers .dexunitcell .dexfield {
-	width: 66px;
+	width: 63px;
 }
 .dexmonchart .dexmovenumbers .setcell:first-child .dexfield {
 	padding-right: 17px;
@@ -639,8 +652,28 @@
 .dark .dexstatresults .evslider::-webkit-slider-runnable-track {
 	background: linear-gradient(to right, var(--fill) var(--pct), #222527 var(--pct));
 }
-.dexstatresults .evcol {
+.dexstatresults .evcol,
+.dextypecolor .evcol {
 	margin-left: 8px;
+}
+.dextypecolor {
+	padding: 0 0 6px 0;
+}
+.ps-popup .dextypeform .label {
+	width: auto;
+}
+.dextypecolor .evslidercol {
+	width: 136px;
+	margin-right: 0;
+}
+.dextypecolor .evslider {
+	width: 128px;
+}
+.dextypecolor .evslider::-webkit-slider-runnable-track {
+	background: linear-gradient(to right, #000000, var(--fill));
+}
+.dextypecolor .evslider::-moz-range-track {
+	background: linear-gradient(to right, #000000, var(--fill));
 }
 .dexeditorlist {
 	list-style-type: none;

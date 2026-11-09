@@ -1,10 +1,12 @@
 (function ($) {
 
+	var DexViews = window.DexViews;
 	var request = window.DexViews.ui.request;
 	var viewSearch = window.DexViews.ui.viewSearch;
 	var dropEmptyHeaders = window.DexViews.ui.dropEmptyHeaders;
 	var shownInDex = window.DexViews.ui.shownInDex;
 	var setTierStyle = window.DexViews.ui.setTierStyle;
+	var DexConfirmPopup = DexViews.ui.DexConfirmPopup;
 
 	var DexFormatPopup = FormatPopup.extend({
 		initialize: function (data) {
@@ -249,7 +251,144 @@
 			} else if (this.dexFormatKind === 'ban') {
 				this.renderDexFormatBans(e.currentTarget.value);
 			}
+		},
+		refreshDexFormat: function (changed) {
+			if (changed || !this.dexFormat || !this.dexFormatDetails) {
+				this.dexFormatId = '';
+				this.showDexTab('formats');
+				return;
+			}
+			var self = this;
+			var formatid = this.dexFormat;
+			DexViews.ui.request('dexformat', this.dexFormatTarget(formatid)).then(function (details) {
+				if (self.dexFormat === formatid && self.dexTab === 'formats') self.showDexFormatDetails(details);
+			});
+		},
+		showDexFormatDetails: function (details) {
+			var scroller = this.dexScroller();
+			var top = scroller.scrollTop();
+			var query = this.$('input[name=formatsearch]').val();
+			this.renderDexFormat(details);
+			if (query) this.$('input[name=formatsearch]').val(query).trigger('input');
+			scroller.scrollTop(top);
+		},
+		saveDexFormat: function (fields, tweak) {
+			var room = this;
+			var details = this.dexFormatDetails;
+			var formatid = details.id;
+			var before = this.dexDraft && this.dexDraft.formats[formatid];
+			if (before) before = $.extend({}, before);
+			this.draftDex('formats', formatid, $.extend({ id: formatid, name: details.name }, fields));
+			var local = $.extend($.extend(true, {}, details), fields);
+			if (tweak) tweak(local);
+			this.showDexFormatDetails(local);
+			var target = this.dexFormatTarget(formatid);
+			DexViews.ui.request('dexformat', target).then(function (preview) {
+				if (room.dexFormatTarget(formatid) === target && room.dexFormat === formatid) room.showDexFormatDetails(preview);
+			}, function (err) {
+				if (room.dexFormatTarget(formatid) !== target) return;
+				if (before) room.dexDraft.formats[formatid] = before;
+				else delete room.dexDraft.formats[formatid];
+				room.applyDexDraft();
+				if (room.dexFormat === formatid) room.showDexFormatDetails(details);
+				app.addPopup(Popup, { message: "That change doesn't work for the following reason:\n\n- " + err.message });
+			});
+		},
+		renameDexFormat: function (e) {
+			var name = $.trim(e.currentTarget.value);
+			if (name && name !== this.dexFormatDetails.name) this.saveDexFormat({ name: name });
+		},
+		toggleDexRule: function (ruleid) {
+			var details = this.dexFormatDetails;
+			var rule = this.dexFormatTree.byId[ruleid];
+			var ruleset = details.ruleset.slice();
+			var index = ruleset.findIndex(function (spec) { return !spec.includes('=') && toID(spec.replace(/^[!^]/, '')) === ruleid; });
+			var on = index >= 0 ? ruleset[index].charAt(0) === '!' : !details.rules.includes(ruleid);
+			if (index >= 0) {
+				ruleset.splice(index, 1);
+			} else {
+				ruleset.push((details.rules.includes(ruleid) ? '!' : '') + rule.name);
+			}
+			this.saveDexFormat({ ruleset: ruleset }, function (local) {
+				local.rules = local.rules.filter(function (other) { return other !== ruleid; }).concat(on ? [ruleid] : []);
+			});
+		},
+		toggleDexBan: function (name, button, banned, kind) {
+			var details = this.dexFormatDetails;
+			var id = toID(name);
+			var banlist = details.banlist.slice();
+			var unbanlist = details.unbanlist.slice();
+			var matches = function (spec) { return toID(spec) === id; };
+			if (banlist.some(matches)) {
+				banlist = banlist.filter(function (spec) { return !matches(spec); });
+			} else if (unbanlist.some(matches)) {
+				unbanlist = unbanlist.filter(function (spec) { return !matches(spec); });
+			} else {
+				if (banned === undefined) banned = !!$(button).hasClass('ruleoff');
+				(banned ? unbanlist : banlist).push(name);
+			}
+			var nowBanned = banlist.some(matches) || !unbanlist.some(matches) && !banned;
+			this.saveDexFormat({ banlist: banlist, unbanlist: unbanlist }, function (local) {
+				var state = nowBanned ? 'banned' : 'unbanned';
+				for (var list in local.banned) {
+					local.banned[list] = local.banned[list].filter(function (other) { return other !== id; });
+				}
+				if (nowBanned && kind) local.banned[kind].push(id);
+				if (local.bans.tags[id] || local.tags.some(function (tag) { return tag.id === id; })) local.bans.tags[id] = { state: state };
+				$.each(local.bans.other, function (i, other) {
+					if (toID(other.name) === id) local.bans.other[i] = $.extend({}, other, { state: state, source: '' });
+				});
+			});
+		},
+		clickDexFormatEntry: function (e) {
+			e.preventDefault();
+			var entry = e.currentTarget.dataset.entry.split('|');
+			if (['pokemon', 'move', 'ability', 'item'].includes(entry[0])) {
+				if (!this.dexEditable) return;
+				var name = this.dexView.dex[DexViews.ui.GETTERS[DexViews.ui.ENTRY_TABLES[entry[0]]]].get(entry[1]).name;
+				this.toggleDexBan(name, null, this.dexFormatDetails.banned[entry[0]].includes(entry[1]), entry[0]);
+				return;
+			}
+			if (!this.dexFormatSearch.addFilter(e.currentTarget)) return;
+			this.$('input[name=formatsearch]').val('');
+			this.dexFormatSearch.find('');
+		},
+		newDexFormat: function (value, button) {
+			var room = this;
+			var options = '';
+			for (var id in BattleFormats) {
+				var format = BattleFormats[id];
+				if (format.dexid || format.team || !id.startsWith('gen')) continue;
+				options += '<option value="' + id + '"' + (id === 'gen' + this.dexView.gen + 'ou' ? ' selected' : '') + '>' + BattleLog.escapeHTML(format.name) + '</option>';
+			}
+			app.addPopup(DexViews.ui.DexNamePopup, {
+				fields: '<p><label class="label">Start from:<br /><select name="from" class="button">' + options + '</select></label></p>',
+				sourceEl: button,
+				callback: function (name, data) {
+					room.editDex({ format: { name: name, from: data.from } });
+				}
+			});
+		},
+		deleteDexFormat: function (value, button) {
+			var self = this;
+			var details = this.dexFormatDetails;
+			app.addPopup(DexConfirmPopup, {
+				message: 'Delete the format ' + BattleLog.escapeFormat(details.id) + '?',
+				button: "Delete format",
+				sourceEl: button,
+				callback: function () {
+					if (self.dexDraft) delete self.dexDraft.formats[details.id];
+					self.applyDexDraft();
+					self.editDex({ deleteformat: details.id });
+				}
+			});
 		}
+	});
+
+	_.extend(window.DexBuilderRoom.prototype.events, {
+		'input input[name=formatsearch]': 'searchDexFormat',
+		'click .dexformatpage .utilichart a[data-entry]': 'clickDexFormatEntry',
+		'change input[name=formatname]': 'renameDexFormat'
 	});
 
 })(window.jQuery);
