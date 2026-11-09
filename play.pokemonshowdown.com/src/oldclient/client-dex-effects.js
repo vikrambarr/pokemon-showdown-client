@@ -724,7 +724,6 @@
 			var table = effect.table;
 			DexViews.current = this.dexView;
 			var data = this.dexEffectValues();
-			var editable = !!this.dexEditable;
 			entries = DexViews.entries[this.dexid] || null;
 			var scrolls = {};
 			this.$('.dexmonpage [data-panel]').each(function () { scrolls[this.dataset.panel] = this.scrollTop; });
@@ -732,13 +731,12 @@
 			var focusKey = focused.length && (focused.attr('name') || focused.closest('[data-path]').attr('data-path'));
 
 			var buf = '<div class="pad">' + this.dexEffectBackHTML() + '</div>';
-			buf += '<div class="teambar"><button disabled class="pokemon">' + escape(info.name) + '</button></div>';
-			buf += '<div class="teamchartbox individual"><ol class="teamchart"><li>';
-			buf += '<div class="setmenu">' + (info.handlers.length ? '<button name="showDexEffectPanel" value="code"><i class="fa fa-code"></i>Code</button>' : '') + this.dexEditsHTML();
-			if (editable) buf += this.dexSaveHTML('dexsave');
-			buf += ' <button name="copyDexEffect"><i class="fa fa-clone"></i>Copy</button>';
-			if (editable && info.edited) buf += ' <button name="deleteDexEffect"><i class="fa fa-trash"></i>' + (info.official ? 'Reset to base' : 'Delete') + '</button>';
+			var start = table === 'Moves' || table === 'Abilities' ? 'list' : 'fields';
+			buf += '<div class="teambar"><button name="showDexEffectPanel" value="' + start + '" class="pokemon">' + escape(info.name) + '</button>';
+			if (info.handlers.length) buf += ' <button name="showDexEffectPanel" value="code" class="pokemon"><i class="fa fa-code"></i> Code</button>';
 			buf += '</div>';
+			buf += '<div class="teamchartbox individual"><ol class="teamchart"><li>';
+			buf += this.dexMenuHTML('copyDexEffect', info.edited && ['deleteDexEffect', info.official ? 'Reset to base' : 'Delete']);
 			buf += '<div class="setchart dexmonchart dexeffectchart">';
 
 			buf += '<div class="setcol setcol-icon"><div class="setcell-sprite dexmoveicons">' + this.dexEffectIconHTML(data) + '</div>';
@@ -1294,36 +1292,6 @@
 			var query = $.trim(this.$('.dexmonpage input[name=listsearch]').val() || '');
 			if (query) this.dexListSearch.find(query);
 		},
-		showDexPagePanel: function (panel, keep) {
-			if (this.dexEffect) return this.showDexEffectPanel(panel, keep);
-			this.showDexMonPanel(panel, keep);
-		},
-		focusDexNameSearch: function (e) {
-			e.currentTarget.select();
-			this.showDexPagePanel('picker', true);
-		},
-		searchDexNameSearch: function (e) {
-			if (this.dexPanel !== 'picker') this.showDexPagePanel('picker', true);
-			if (this.dexPicker) this.dexPicker.find($.trim(e.currentTarget.value));
-		},
-		blurDexNameSearch: function (e) {
-			var current = this.dexEffect ? this.dexEffectData : this.dexSpecies;
-			if (current) e.currentTarget.value = current.name;
-		},
-		focusDexListSearch: function () {
-			if (this.dexPanel !== 'list') this.showDexPagePanel('list', true);
-		},
-		searchDexList: function (e) {
-			if (this.dexPanel !== 'list') this.showDexPagePanel('list', true);
-			this.dexListSearch.find($.trim(e.currentTarget.value));
-		},
-		setupDexPicker: function () {
-			var table = this.dexEffect && this.dexEffect.table;
-			var search = this.dexPicker = DexViews.ui.panelSearch(this.$('.dexmonpage [data-panel=picker]'));
-			if (table === 'Conditions') return this.setupDexConditionList(search);
-			viewSearch(search, this.dexView, DexViews.ui.dexEntryResults(this.dexid));
-			search.setType(table ? KINDS[table] : 'pokemon', 'gen' + this.dexView.gen);
-		},
 		showDexEffectPanel: function (panel, keep) {
 			if (!this.dexEffectData) return;
 			var table = this.dexEffect.table;
@@ -1340,7 +1308,10 @@
 				this.$('.dexmonpage .dexattrlist').html(this.dexAttributeListHTML(''));
 			}
 			this.$('.dexmonpage .setstats').toggleClass('cur', panel === 'fields' && start !== 'fields');
-			this.$('.dexmonpage .setmenu button[value=code]').toggleClass('cur', panel === 'code');
+			this.$('.dexmonpage').toggleClass('dexcodetab', panel === 'code');
+			this.$('.dexmonpage .teambar button').each(function () {
+				this.disabled = (this.value === 'code') === (panel === 'code');
+			});
 		},
 		clickDexEffectEntry: function (e) {
 			var entry = e.currentTarget.dataset.entry.split('|');
@@ -1593,6 +1564,10 @@
 			app.addPopup(DexViews.ui.DexNamePopup, {
 				sourceEl: button,
 				callback: function (name) {
+					if (count.table === 'TypeChart') {
+						if (!room.dexView.dex.types.get(name).exists) room.editDex({ type: { name: name } });
+						return;
+					}
 					var entries = DexViews.entries[room.dexid];
 					if (entries && entries[count.table][toID(name)]) return room.openDexEffect(count.table, toID(name));
 					room.pendingEffect = [count.table, toID(name)];
@@ -1607,11 +1582,6 @@
 		}
 	});
 	_.extend(window.DexBuilderRoom.prototype.events, {
-		'focus .dexmonpage input[name=namesearch]': 'focusDexNameSearch',
-		'input .dexmonpage input[name=namesearch]': 'searchDexNameSearch',
-		'blur .dexmonpage input[name=namesearch]': 'blurDexNameSearch',
-		'focus .dexmonpage input[name=listsearch]': 'focusDexListSearch',
-		'input .dexmonpage input[name=listsearch]': 'searchDexList',
 		'click .dexmonpage .dexmoveattributes [data-attr]': 'clickDexAttributeLine',
 		'change .dexmonpage .dexeffectfield input': 'changeDexEffectField',
 		'change .dexmonpage .dexeffectfield select': 'changeDexEffectField',

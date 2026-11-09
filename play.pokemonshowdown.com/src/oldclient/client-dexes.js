@@ -6,7 +6,7 @@
 	];
 	var DOUBLES_TIERS = ['DUber', '(DUber)', 'DOU', 'DBL', '(DOU)', 'DUU', '(DUU)', 'NFE', 'LC', 'Unreleased', 'Illegal'];
 	var NATDEX_MODS = ['gen9insurgence', 'gen9uranium', 'gen9infinity', 'gen9infinitefusion', 'gen9chaos', 'gen9chaosmayhem'];
-	var EFFECT_KINDS = { Moves: 'move', Abilities: 'ability', Items: 'item', Conditions: 'condition' };
+	var EFFECT_KINDS = { Moves: 'move', Abilities: 'ability', Items: 'item', Conditions: 'condition', TypeChart: 'type' };
 	var ENTRY_TABLES = { pokemon: 'Pokedex', move: 'Moves', ability: 'Abilities', item: 'Items', condition: 'Conditions' };
 	var SEARCH_TABLES = { move: 'Moves', ability: 'Abilities', item: 'Items' };
 	var GETTERS = { Pokedex: 'species', Moves: 'moves', Abilities: 'abilities', Items: 'items' };
@@ -61,7 +61,7 @@
 	function loadEntries(dexid) {
 		if (DexViews.entries[dexid] || !dexid || missingEntries[dexid]) return;
 		request('dexentries', dexid).then(function (data) {
-			var entries = { custom: data.custom, modified: data.modified, names: data.names, choices: data.choices, species: data.Pokedex, originals: data.originals || {}, conditions: data.conditions || {} };
+			var entries = { custom: data.custom, modified: data.modified, names: data.names, choices: data.choices, species: data.Pokedex, originals: data.originals || {}, conditions: data.conditions || {}, types: data.types || {} };
 			$.each(['Moves', 'Abilities', 'Items', 'Conditions'], function (i, table) {
 				var ids = entries[table] = {};
 				for (var j = 0; j < data[table].length; j++) ids[data[table][j]] = 1;
@@ -76,7 +76,7 @@
 				if (typedSearch && typedSearch.searchType !== 'pokemon') room.dexSearch.setType(typedSearch.searchType, 'gen' + room.dexView.gen);
 				if (room.dexFormatSearch && room.dexFormatKind) room.showDexFormatList(room.dexFormatKind);
 				if (room.dexSpecies) room.updateDexLearnsetCount(true);
-				if (room.dexSummary && room.dexSummary.counts[room.dexTab] && room.dexSummary.counts[room.dexTab].table === 'Conditions') room.showDexTab(room.dexTab);
+				if (room.dexSummary && room.dexSummary.counts[room.dexTab] && ['Conditions', 'TypeChart'].includes(room.dexSummary.counts[room.dexTab].table)) room.showDexTab(room.dexTab);
 				if (room.dexEffect && room.dexEffectData) room.renderDexEffect();
 			});
 		}, function () {
