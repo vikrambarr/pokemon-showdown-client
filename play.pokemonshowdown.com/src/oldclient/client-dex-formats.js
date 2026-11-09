@@ -3,6 +3,7 @@
 	var request = window.DexViews.ui.request;
 	var viewSearch = window.DexViews.ui.viewSearch;
 	var dropEmptyHeaders = window.DexViews.ui.dropEmptyHeaders;
+	var shownInDex = window.DexViews.ui.shownInDex;
 	var setTierStyle = window.DexViews.ui.setTierStyle;
 
 	var DexFormatPopup = FormatPopup.extend({
@@ -174,7 +175,8 @@
 					}
 					if (!results.some(function (row) { return row[0] === 'header'; })) results.unshift(['header', picker[1]]);
 					if (!bannedRows.length) return results;
-					bannedRows.unshift(['header', "Banned " + picker[2]]);
+					var count = bannedRows.filter(function (row) { return shownInDex(view, row); }).length;
+					bannedRows.unshift(['header', "Banned " + picker[2] + " (" + count + ")"]);
 					return bannedRows.concat(results);
 				};
 			});

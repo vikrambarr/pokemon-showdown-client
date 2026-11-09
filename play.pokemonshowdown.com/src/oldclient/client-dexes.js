@@ -70,8 +70,8 @@
 			var summary = DexViews.list.filter(function (other) { return other.id === dexid; })[0];
 			var view = summary && DexViews.views[summary.hash];
 			if (view && view.dexid) DexViews.entries[view.dexid] = entries;
-			$.each([app.rooms.dexbuilder], function (j, room) {
-				if (!room || room.dexid !== dexid && !(room.dexView && room.dexView.dexid === dexid)) return;
+			$.each(dexRooms(), function (j, room) {
+				if (room.dexid !== dexid && !(room.dexView && room.dexView.dexid === dexid)) return;
 				var typedSearch = room.dexSearch && room.dexSearch.engine.typedSearch;
 				if (typedSearch && typedSearch.searchType !== 'pokemon') room.dexSearch.setType(typedSearch.searchType, 'gen' + room.dexView.gen);
 				if (room.dexFormatSearch && room.dexFormatKind) room.showDexFormatList(room.dexFormatKind);
@@ -304,7 +304,9 @@
 				teambuilder.updateFolderList();
 			}
 			if (app.rooms.rooms) app.rooms.rooms.updateDexSearch();
-			if (app.rooms.dexbuilder) app.rooms.dexbuilder.update();
+			$.each(dexRooms(), function (i, room) {
+				room.update();
+			});
 		});
 		app.on('response:dexcreate response:dexedit', function (data) {
 			if (!data) return;
@@ -400,13 +402,9 @@
 			var changed = find.apply(this, arguments);
 			var view = this.typedSearch && this.typedSearch.dexView;
 			if (!this.results) return changed;
-			var entries = view && DexViews.entries[view.dexid];
-			if (view && !entries) loadEntries(view.dexid);
+			if (view && !DexViews.entries[view.dexid]) loadEntries(view.dexid);
 			this.results = this.results.filter(function (row) {
-				var table = DexViews.custom[ENTRY_TABLES[row[0]]] && ENTRY_TABLES[row[0]];
-				if (!table || !view) return !table || !DexViews.custom[table][row[1]];
-				if (table === 'Pokedex') return !!view.species[row[1]];
-				return entries ? !!entries[table][row[1]] : !DexViews.custom[table][row[1]] || !!view[table][row[1]];
+				return shownInDex(view, row);
 			}).filter(function (row, index, rows) {
 				return row[0] !== 'header' || (rows[index + 1] && rows[index + 1][0] !== 'header');
 			});
@@ -568,19 +566,27 @@
 				if (!entries) return results;
 				var dexRows = [];
 				var listed = {};
-				$.each([[entries.custom[info[1]], " custom "], [entries.modified[info[1]], " modified "]], function (j, group) {
+				$.each([[entries.custom[info[1]], "Custom "], [entries.modified[info[1]], "Modified "]], function (j, group) {
 					var ids = group[0].filter(function (id) { return view[info[1]][id] && !view[info[1]][id].isPokeball; }).sort();
 					for (var k = 0; k < ids.length; k++) listed[ids[k]] = 1;
-					if (ids.length) dexRows.push(['header', view.name + group[1] + info[3]]);
+					if (ids.length) dexRows.push(['header', group[1] + info[3]]);
 					dexRows = dexRows.concat(ids.map(function (id) { return [info[2], id]; }));
 				});
+				if (results.length && results[0][0] !== 'header') results = [['header', info[1]]].concat(results);
 				if (!dexRows.length) return results;
 				results = results.filter(function (row) { return !listed[row[1]]; });
-				if (results.length && results[0][0] !== 'header') results.unshift(['header', info[1]]);
 				return dexRows.concat(results);
 			};
 		});
 	});
+
+	function shownInDex(view, row) {
+		var table = DexViews.custom[ENTRY_TABLES[row[0]]] && ENTRY_TABLES[row[0]];
+		if (!table || !view) return !table || !DexViews.custom[table][row[1]];
+		if (table === 'Pokedex') return !!view.species[row[1]];
+		var entries = DexViews.entries[view.dexid];
+		return entries ? !!entries[table][row[1]] : !DexViews.custom[table][row[1]] || !!view[table][row[1]];
+	}
 
 	function learnRows(titles, learned, inherited, others, editable) {
 		$.each([learned, inherited, others], function (i, list) {
@@ -784,16 +790,20 @@
 
 	function openDexPage(app, dexid) {
 		if (app.workspace !== 'create') app.switchWorkspace('create');
-		app.joinRoom('dexbuilder', window.DexBuilderRoom);
-		app.rooms.dexbuilder.viewDex(dexid);
+		app.joinRoom('dex-' + dexid, window.DexViewRoom);
+	}
+
+	function dexRooms() {
+		return _.filter(app.rooms, function (room) { return room instanceof window.DexBuilderRoom; });
 	}
 
 	var renderRoomTab = Topbar.prototype.renderRoomTab;
 	Topbar.prototype.renderRoomTab = function (room) {
-		if (!room || room.type !== 'dexbuilder') return renderRoomTab.apply(this, arguments);
+		if (!room || !(room instanceof window.DexBuilderRoom)) return renderRoomTab.apply(this, arguments);
 		if (room.workspace && room.workspace !== app.workspace) return '';
-		return '<li><a class="roomtab button closable' + (app.curRoom === room || app.curSideRoom === room ? ' cur' : '') + '" href="' + app.root + 'dexbuilder"><i class="fa fa-pencil-square-o"></i> <span>Dexbuilder</span></a>' +
-			'<button class="closebutton" name="closeRoom" value="dexbuilder" aria-label="Close"><i class="fa fa-times-circle"></i></button></li>';
+		var icon = room.type === 'dexview' ? 'book' : 'pencil-square-o';
+		return '<li><a class="roomtab button closable' + (app.curRoom === room || app.curSideRoom === room ? ' cur' : '') + '" href="' + app.root + room.id + '"><i class="fa fa-' + icon + '"></i> <span>' + BattleLog.escapeHTML(room.title) + '</span></a>' +
+			'<button class="closebutton" name="closeRoom" value="' + room.id + '" aria-label="Close"><i class="fa fa-times-circle"></i></button></li>';
 	};
 
 	var tryJoinRoom = window.App.prototype.tryJoinRoom;
@@ -842,7 +852,7 @@
 		request: request, compareFormats: compareFormats, openDexPage: openDexPage, DexConfirmPopup: DexConfirmPopup,
 		HIDE_BUTTON: HIDE_BUTTON, OFFICIAL_BADGE: OFFICIAL_BADGE, canEdit: canEdit, viewSearch: viewSearch, panelSearch: panelSearch, rowClasses: rowClasses,
 		EFFECT_KINDS: EFFECT_KINDS, ENTRY_TABLES: ENTRY_TABLES, GETTERS: GETTERS, dexEntryResults: dexEntryResults, chartHTML: chartHTML, chartRowHTML: chartRowHTML, sentenceRowHTML: sentenceRowHTML,
-		dropEmptyHeaders: dropEmptyHeaders, learnRows: learnRows, showSaveProblems: showSaveProblems, setTierStyle: setTierStyle, tierHeader: tierHeader, changedValue: changedValue
+		dropEmptyHeaders: dropEmptyHeaders, shownInDex: shownInDex, learnRows: learnRows, showSaveProblems: showSaveProblems, setTierStyle: setTierStyle, tierHeader: tierHeader, changedValue: changedValue
 	};
 
 })(window.jQuery);
