@@ -325,6 +325,23 @@
 		return parts.join(' ') || "(code)";
 	}
 
+	function sentenceText(control, value, options) {
+		if (control === 'flag') return value ? options[1] : options[0];
+		var choice = control === 'select' && Array.isArray(options) && options.filter(function (option) { return String(option[0]) === String(value); })[0];
+		if (choice) return choice[1];
+		if (control === 'select' && blank(value)) return "nothing";
+		return valueText(control, value, options);
+	}
+
+	function secondarySentence(secondary) {
+		var parts = [];
+		if (secondary.status) parts.push('inflict ' + summaryName(secondary.status) + ' on the target');
+		if (secondary.volatileStatus) parts.push('give the target ' + summaryName(secondary.volatileStatus));
+		if (secondary.boosts) parts.push('change the target\'s ' + boostsText(secondary.boosts));
+		if (secondary.self && secondary.self.boosts) parts.push('change the user\'s ' + boostsText(secondary.self.boosts));
+		return escape('Has a ' + (secondary.chance || 100) + '% chance to ' + (parts.join(' and ') || 'run its code'));
+	}
+
 	function priorityText(priority) {
 		return (priority > 0 ? '+' : priority < 0 ? '\u2212' : '\u2007\u2009') + Math.abs(priority);
 	}
@@ -702,6 +719,10 @@
 		dexEffectFieldHTML: function (path, control, options, data, className) {
 			var value = control === 'secondaries' ? [secondaryList(data)[options]] :
 				path.indexOf(' ') >= 0 && control !== 'bool' ? path.split(' ').map(function (each) { return getPath(data, each); }) : getPath(data, path);
+			if (!this.dexEffectCanEdit(path) && !className) {
+				if (control === 'bool') return '<input type="checkbox" disabled' + (value ? ' checked' : '') + ' data-edit="' + escape(path) + '" />';
+				return '<span class="dexvalue" data-edit="' + escape(path) + '">' + (control === 'secondaries' ? secondarySentence(value[0] || {}) : sentenceText(control, value, options)) + '</span>';
+			}
 			if (!this.dexEffectCanEdit(path)) {
 				return '<div class="textbox dexfield' + (className ? ' ' + className : '') + '" data-edit="' + escape(path) + '">' + valueText(control, value, options) + '</div>';
 			}
@@ -782,8 +803,7 @@
 			buf += '<div class="teambuilder-results" data-panel="picker"></div>';
 			if (FLAGS[table] || PROPERTIES[table]) buf += '<div class="dexstatresults dexeffectpanel" data-panel="flags"></div>';
 			buf += '<div class="dexstatresults dexeffectpanel" data-panel="fields">' + this.dexEffectFieldsHTML(data) + '</div>';
-			buf += '<div class="dexstatresults dexeffectpanel" data-panel="attributes"><div class="pad"><p><input type="search" class="textbox dexattrsearch" placeholder="Search attributes" size="30" autocomplete="off" /></p></div>' +
-				'<div class="dexattrlist"></div></div>';
+			buf += this.dexAttributePanelHTML();
 			if (table !== 'Conditions') {
 				buf += '<div class="dexstatresults dexeffectpanel" data-panel="description"><div class="pad dexfieldsection dexeffectfields">' +
 					'<label class="label">Description</label>' + this.dexEffectFieldHTML('desc', 'textarea', null, data) + '</div></div>';
@@ -927,7 +947,7 @@
 			});
 			if (lines.length > 3) lines = lines.slice(0, 2).concat(['<span class="dexattrmore">+' + (lines.length - 2) + ' more</span>']);
 			if (!lines.length) lines = ['<span class="dexattrmore">None</span>'];
-			return '<div class="setrow"><label>All attributes</label><button class="textbox setstats dexmoveattributes" tabindex="-1" name="showDexEffectPanel" value="fields">' +
+			return '<div class="setrow"><label>Attributes</label><button class="textbox setstats dexmoveattributes" tabindex="-1" name="showDexEffectPanel" value="fields">' +
 				'<span class="dexattrlines">' + lines.join('') + '</span></button></div>';
 		},
 		dexEffectSections: function (data) {
@@ -984,13 +1004,11 @@
 				}
 				var removable = editable && self.dexEffectCanEdit(entry[0]) && ALWAYS_SHOWN.indexOf(entry[0]) < 0 && entry[0].slice(0, 10) !== 'condition.';
 				var title = entry[4] || TITLES[table + ':' + entry[0]] || TITLES[entry[0]] || section[0];
-				var remove = index === undefined ? 'removeDexAttribute" value="' + escape(entry[0]) : 'removeDexSecondary" value="' + index;
+				var remove = index === undefined ? ['removeDexAttribute', escape(entry[0])] : ['removeDexSecondary', index];
 				var fieldAt = index === undefined ? field : function (path, control) {
 					return self.dexEffectFieldHTML(path, control, index, data);
 				};
-				boxes += '<div class="dexsentence" data-attribute="' + escape(entry[0]) + '">' + (removable ?
-					'<button class="button dexremoveattr" name="' + remove + '" title="Remove"><i class="fa fa-times"></i></button>' : '') +
-					'<label class="dexsentencehead">' + title + '</label>' + entry[2](fieldAt, data, self) + '</div>';
+				boxes += self.dexSentenceHTML('data-attribute="' + escape(entry[0]) + '"', title, entry[2](fieldAt, data, self), removable && remove);
 			};
 			$.each(this.dexEffectSections(data), function (i, section) {
 				$.each(section[1], function (j, entry) {
@@ -1002,9 +1020,7 @@
 			$.each(later, function (i, pair) {
 				if (pair) box(pair[0], pair[1]);
 			});
-			var buf = '<div class="pad"><div class="dexfieldsection dexeffectfields">' + boxes;
-			if (!editable) return buf + '</div></div>';
-			return buf + '</div><p><button class="button" name="showDexEffectPanel" value="attributes"><i class="fa fa-plus"></i> New attribute</button></p></div>';
+			return this.dexSentencesHTML(boxes, editable && 'name="showDexEffectPanel" value="attributes"');
 		},
 		dexAttributeListHTML: function (query) {
 			var self = this;
@@ -1483,13 +1499,6 @@
 		countDexShortDesc: function (e) {
 			this.$('.dexmonpage .dexdesccount').text(e.currentTarget.value.length + '/' + e.currentTarget.maxLength);
 		},
-		searchDexAttributes: function () {
-			this.$('.dexmonpage .dexattrlist').html(this.dexAttributeListHTML(this.$('.dexmonpage .dexattrsearch').val()));
-		},
-		keyDexAttributeSearch: function (e) {
-			if (e.keyCode === 13) this.$('.dexmonpage .dexattrlist a[data-entry]').first().click();
-			if (e.keyCode === 27) this.showDexEffectPanel('fields', true);
-		},
 		removeDexAttribute: function (path) {
 			delete (this.dexAddedAttributes || {})[path];
 			var fields = {};
@@ -1590,9 +1599,7 @@
 		'input .dexmonpage input[name=effectflags]': 'searchDexEffectFlags',
 		'input .dexmonpage input.dexinline': 'resizeDexInline',
 		'input .dexmonpage .dexshortdesc .dexfield': 'countDexShortDesc',
-		'focus .dexmonpage .dexshortdesc .dexfield': 'focusDexShortDesc',
-		'input .dexmonpage .dexattrsearch': 'searchDexAttributes',
-		'keydown .dexmonpage .dexattrsearch': 'keyDexAttributeSearch'
+		'focus .dexmonpage .dexshortdesc .dexfield': 'focusDexShortDesc'
 	});
 
 })(window.jQuery);

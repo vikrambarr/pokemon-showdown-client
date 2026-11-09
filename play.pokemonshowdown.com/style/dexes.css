@@ -384,6 +384,27 @@
 	position: sticky;
 	left: -1px;
 }
+.dexfamilyhead h3 {
+	margin: 10px 0 0 2px;
+	font-size: 12pt;
+}
+.dexformestrip {
+	margin: 0 0 6px 2px;
+}
+.dexformestrip label {
+	display: block;
+	margin-bottom: 2px;
+	font-size: 9pt;
+	font-weight: bold;
+}
+.dexformestrip .button {
+	margin: 0 3px 3px 0;
+	padding: 0 6px 0 0;
+}
+.dexformestrip .picon {
+	display: inline-block;
+	vertical-align: middle;
+}
 .dextypeedit td,
 .dextypeedit th[data-type] {
 	cursor: pointer;
@@ -463,6 +484,12 @@
 }
 .dexmonchart .setcol-moves .setcell + .setcell label {
 	margin-top: 2px;
+}
+.dexmonchart .setcol-moves .setcell.dexevocell label {
+	margin-top: 1px;
+}
+.dexmonchart .setcol-moves .dexevocell + .setcell.setcell-learnset label {
+	margin-top: 3px;
 }
 .dexmonchart button.learnsetcount {
 	width: 132px;
@@ -991,8 +1018,11 @@
 .dexmonchart .dexabilitybox {
 	width: 228px;
 }
-.dexmonchart .dexabilitybox .dexchip {
+.dexmonchart .dexabilitybox .dexchip[draggable] {
 	cursor: grab;
+}
+.dexmonchart .dexplaceholder {
+	opacity: 0.5;
 }
 .dexmonchart .dexchip small {
 	opacity: 0.6;
