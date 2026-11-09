@@ -82,7 +82,7 @@
 			buf += '<p><label class="label">Name:<br /><input type="text" class="textbox" name="name" value="' + BattleLog.escapeHTML(summary.name) + '" size="24" maxlength="40"' + locked + ' /></label></p>';
 			buf += '<p><label class="checkbox"><input type="checkbox" name="private"' + (summary.visibility === 'private' ? ' checked' : '') + locked + ' /> Private (unlisted)</label></p>';
 			buf += '<p><label class="label">World:<br /><select name="base" class="button"' + locked + '>' + baseOptions(summary) + '</select></label></p>';
-			buf += '<p><label class="label">Description:<br /><textarea class="textbox" name="description" rows="4" maxlength="512"' + (this.room.dexEditable ? '' : ' disabled') + '>' +
+			buf += '<p><label class="label">Description:<br /><textarea class="textbox" name="description" rows="4" maxlength="512">' +
 				BattleLog.escapeHTML(summary.description || '') + '</textarea></label></p></form>';
 			buf += '<p><small>' + summary.counts.map(function (count) {
 				return '<strong>' + count.name + ':</strong> ' + count.total + ' total, ' + count.custom + ' custom, ' + count.modified + ' modified';
@@ -413,35 +413,6 @@
 		focus: function (e) {
 			if (!e) app.send('/crq dexes');
 		},
-		viewDex: function (dexid) {
-			this.leaveDex(null, function () {
-				this.viewDexId = dexid;
-				this.curFolder = dexid;
-				this.update();
-			});
-		},
-		viewedSummary: function () {
-			var self = this;
-			var dexid = this.viewDexId;
-			if (!dexid) return null;
-			var summary = DexViews.list.filter(function (dex) { return dex.id === dexid; })[0];
-			if (summary) return summary;
-			if (this.viewQuery && this.viewQuery.id === dexid) return this.viewQuery;
-			if (!DexViews.list.length || this.viewQuerying === dexid) return null;
-			this.viewQuerying = dexid;
-			DexViews.query(dexid).then(function (data) {
-				if (self.viewDexId !== dexid) return;
-				self.viewQuery = data;
-				self.update();
-			}, function () {
-				if (self.viewDexId !== dexid) return;
-				self.viewDexId = '';
-				if (self.curFolder === dexid) self.curFolder = '';
-				self.update();
-				app.addPopup(Popup, { message: "There's no dex called \"" + dexid + "\"." });
-			});
-			return null;
-		},
 		loadDexStorage: function () {
 			var room = this;
 			if (!app.user.get('registered')) return;
@@ -461,13 +432,11 @@
 			var official = dexes.filter(function (summary) { return summary.official; });
 			var slots = dexes.filter(function (summary) { return !summary.official && toID(summary.owner) === userid; });
 			var shared = dexes.filter(function (summary) { return !summary.official && toID(summary.owner) !== userid; });
-			var viewed = this.viewedSummary();
-			if (viewed && dexes.indexOf(viewed) >= 0) viewed = null;
-			var all = slots.concat(shared, official, viewed ? [viewed] : []);
+			var all = slots.concat(shared, official);
 			var folders = all.map(function (summary) { return summary.id; });
-			if (folders.indexOf(this.curFolder) < 0 && this.curFolder !== this.viewDexId) this.curFolder = folders[0] || '';
+			if (folders.indexOf(this.curFolder) < 0) this.curFolder = folders[0] || '';
 			this.free = Math.max(0, DEX_SLOTS - slots.length);
-			this.updateFolderList(slots, shared, official, viewed);
+			this.updateFolderList(slots, shared, official);
 			var storageKey = JSON.stringify([userid, slots.concat(shared).map(function (summary) { return summary.id; })]);
 			if (storageKey !== this.dexStorageKey) {
 				this.dexStorageKey = storageKey;
@@ -475,7 +444,7 @@
 			}
 			var summary = all[folders.indexOf(this.curFolder)];
 			var key = JSON.stringify([userid, summary, this.free]);
-			this.dexOptions = this.dexOptionsHTML(slots, shared, official, viewed);
+			this.dexOptions = this.dexOptionsHTML(slots, shared, official);
 			this.$('select[name=dexpicker]').html(this.dexOptions);
 			if (key === this.teamListKey) return this.settleDexSave();
 			this.teamListKey = key;
@@ -484,9 +453,8 @@
 		dexPickerHTML: function (heading) {
 			return '<div class="dexpicker">' + heading + '<select name="dexpicker">' + this.dexOptions + '</select></div>';
 		},
-		updateFolderList: function (slots, shared, official, viewed) {
+		updateFolderList: function (slots, shared, official) {
 			var buf = '<div class="folderlist"><div class="folderlistbefore"></div>';
-			if (viewed) buf += '<div class="folder"><h3>Viewing</h3></div>' + this.folderHTML(viewed) + '<div class="foldersep"></div>';
 			buf += '<div class="folder"><h3>Dexes</h3></div>';
 			for (var i = 0; i < slots.length; i++) buf += this.folderHTML(slots[i]);
 			buf += '<div class="folder"><div class="selectFolder" data-value="+"><i class="fa fa-plus"></i><em>(new dex)</em></div></div>';
@@ -498,7 +466,7 @@
 			buf += '<div class="folderlistafter"></div></div>';
 			this.$('.folderpane').html(buf);
 		},
-		dexOptionsHTML: function (slots, shared, official, viewed) {
+		dexOptionsHTML: function (slots, shared, official) {
 			var self = this;
 			var options = function (label, list, extra) {
 				if (!list.length && !extra) return '';
@@ -506,8 +474,8 @@
 					return '<option value="' + BattleLog.escapeHTML(summary.id) + '"' + (self.curFolder === summary.id ? ' selected' : '') + '>' + BattleLog.escapeHTML(summary.name) + '</option>';
 				}).join('') + (extra || '') + '</optgroup>';
 			};
-			return (this.curFolder ? '' : '<option value="" selected disabled>(choose a dex)</option>') + options("Viewing", viewed ? [viewed] : []) +
-				options("Dexes", slots, '<option value="+">(new dex)</option>') + options("Shared with you", shared) + options("Official", official);
+			return (this.curFolder ? '' : '<option value="" selected disabled>(choose a dex)</option>') + options("Dexes", slots, '<option value="+">(new dex)</option>') +
+				options("Shared with you", shared) + options("Official", official);
 		},
 		folderHTML: function (summary) {
 			var cur = this.curFolder === summary.id;
@@ -539,6 +507,10 @@
 				return;
 			}
 			this.saveState = '';
+			var buf = '<button class="button dexmenu" name="openDexSettings" title="Dex settings"><i class="fa fa-ellipsis-h"></i></button>';
+			this.showDex(summary, editable, buf + this.dexPickerHTML('<h2 class="dexheading">' + this.dexHeadingHTML() + '</h2>'));
+		},
+		showDex: function (summary, editable, buf) {
 			this.$el.removeClass('dexsubpage');
 			this.dexid = summary.id;
 			this.dexSummary = summary;
@@ -550,10 +522,8 @@
 			this.dexFormat = '';
 			this.dexFormatId = '';
 			this.dexEditable = editable;
-			var buf = '<button class="button dexmenu" name="openDexSettings" title="' + (editable ? 'Dex settings' : 'Dex info') + '"><i class="fa fa-ellipsis-h"></i></button>';
-			buf += this.dexPickerHTML('<h2 class="dexheading">' + this.dexHeadingHTML() + '</h2>');
-			buf += '<div class="dexpage"><div class="dexbuildertabs"></div><div class="dexbuildersub" style="display:none">' +
-				'<p><button class="button" name="closeDexTab"><i class="fa fa-chevron-left"></i> Dex</button> <strong class="dexsubtitle"></strong></p>' +
+			buf += '<div class="dexpage"><div class="dexbuildertabs"></div><div class="dexbuildersub">' +
+				'<p class="dexsubbar"><button class="button" name="closeDexTab"><i class="fa fa-chevron-left"></i> Dex</button> <strong class="dexsubtitle"></strong></p>' +
 				'<p class="dexpokemonsearch"><input type="search" class="textbox" name="pokemonsearch" placeholder="Search Pok&eacute;mon" size="30" autocomplete="off" />' +
 				' <button class="button" name="newDexPokemon"><i class="fa fa-plus"></i> New Pok&eacute;mon</button>' +
 				'<button class="button" name="newDexEffect"><i class="fa fa-plus"></i> <span></span></button></p>' +
@@ -581,13 +551,15 @@
 		dexKey: function (summary) {
 			return summary.hash + summary.updated + JSON.stringify(summary.formats);
 		},
+		dexTabs: function (summary) {
+			return summary.counts.map(function (count, i) {
+				return [i, TAB_ICONS[count.table], count.name];
+			}).concat([['tiers', 'sort-amount-desc', "Tiers"], ['formats', 'trophy', "Formats"]]);
+		},
 		dexTabsHTML: function (summary) {
-			var buf = summary.counts.map(function (count, i) {
-				return '<button class="button dexbuildertab" name="showDexTab" value="' + i + '"><i class="fa fa-' + TAB_ICONS[count.table] + '"></i>' +
-					count.name + '</button>';
+			return this.dexTabs(summary).map(function (tab) {
+				return '<button class="button dexbuildertab" name="showDexTab" value="' + tab[0] + '"><i class="fa fa-' + tab[1] + '"></i>' + tab[2] + '</button>';
 			}).join('');
-			buf += '<button class="button dexbuildertab" name="showDexTab" value="tiers"><i class="fa fa-sort-amount-desc"></i>Tiers</button>';
-			return buf + '<button class="button dexbuildertab" name="showDexTab" value="formats"><i class="fa fa-trophy"></i>Formats</button>';
 		},
 		renderBuilderDex: function (summary, loadedView) {
 			var sameView = this.dexBaseView === loadedView && this.dexSearch;
@@ -836,8 +808,6 @@
 		showDexTab: function (tab) {
 			var home = tab === '' || tab === null || tab === undefined;
 			this.$el.toggleClass('dexsubpage', !home);
-			this.$('.dexbuildertabs').toggle(home);
-			this.$('.dexbuildersub').toggle(!home);
 			if (home) {
 				this.dexTab = '';
 				this.$('.dexbuildertab').removeClass('cur').blur();
@@ -868,7 +838,7 @@
 			this.$('.dexpage button[name=showDexTab]').removeClass('cur').filter('[value="' + tab + '"]').addClass('cur');
 			if (count && count.table !== 'Pokedex') DexViews.loadEntries(this.dexid);
 			if (this.dexTabSearch && this.dexTabSearch !== this.dexSearch) this.$('input[name=pokemonsearch]').val('');
-			if (kind || conditions) this.$('input[name=pokemonsearch]').attr('placeholder', 'Search ' + BattleLog.unescapeHTML(count.name));
+			if (kind || conditions) this.$('input[name=pokemonsearch]').attr('placeholder', $('<span>').html('Search ' + count.name).text());
 			if (kind && this.dexSearch.engine.typedSearch.searchType !== kind) {
 				this.$('input[name=pokemonsearch]').val('');
 				this.dexSearch.setType(kind, 'gen' + this.dexView.gen);
@@ -1422,7 +1392,6 @@
 			var state = this.saveState === 'saving' ? '<i class="fa fa-refresh"></i> Saving...' :
 				this.saveState === 'failed' ? '<i class="fa fa-exclamation-triangle"></i> Not saved' :
 				this.saveState === 'saved' ? '<i class="fa fa-check"></i> Saved' : '';
-			if (!this.dexEditable) state = '<i class="fa fa-eye"></i> View only';
 			return (summary.official ? OFFICIAL_BADGE : '') + '<i class="fa fa-folder-open"></i> ' + BattleLog.escapeHTML(summary.name) +
 				PICKER_CARET + (state ? ' <small class="dexsavestate">' + state + '</small>' : '');
 		},
@@ -1437,10 +1406,13 @@
 				this.$('select[name=dexpicker]').val(this.curFolder);
 				return;
 			}
-			if (value === this.curFolder) return;
 			this.$('select[name=dexpicker]').val(this.curFolder);
-			this.leaveDex(e.currentTarget, function () {
-				this.curFolder = value;
+			this.openDexFolder(value, e.currentTarget);
+		},
+		openDexFolder: function (dexid, sourceEl) {
+			if (dexid === this.curFolder) return;
+			this.leaveDex(sourceEl, function () {
+				this.curFolder = dexid;
 				this.update();
 			});
 		},
@@ -1635,6 +1607,73 @@
 			this.applyDexDraft();
 			app.send('/crq dexes');
 			if (quit && !errors.length) quit.call(this);
+		}
+	});
+
+	window.DexViewRoom = window.DexBuilderRoom.extend({
+		type: 'dexview',
+		title: 'Dex',
+		isSideRoom: true,
+		minWidth: 320,
+		maxWidth: 1024,
+		initialize: function () {
+			this.$el.addClass('ps-room-light').addClass('scrollable').addClass('dexviewroom');
+			this.$el.html('<div class="teampane"><p><em>Loading...</em></p></div>');
+			this.$('.teampane').on('scroll', this.updateDexScroll.bind(this));
+			this.update();
+		},
+		viewedSummary: function () {
+			var self = this;
+			var dexid = this.id.slice(4);
+			var summary = DexViews.list.filter(function (dex) { return dex.id === dexid; })[0];
+			if (summary) return summary;
+			if (this.viewQuery) return this.viewQuery;
+			if (!DexViews.list.length || this.viewQuerying) return null;
+			this.viewQuerying = true;
+			DexViews.query(dexid).then(function (data) {
+				self.viewQuery = data;
+				self.update();
+			}, function () {
+				app.removeRoom(self.id);
+				app.addPopup(Popup, { message: "There's no dex called \"" + dexid + "\"." });
+			});
+			return null;
+		},
+		update: function () {
+			var summary = this.viewedSummary();
+			if (!summary) return;
+			if (this.title !== summary.name) {
+				this.title = summary.name;
+				app.topbar.updateTabbar();
+			}
+			if (this.dexid !== summary.id) return this.showDex(summary, false, '');
+			if (this.dexKey(summary) !== this.dexKey(this.dexSummary)) return this.loadDex(summary);
+			this.$('.dexheader').html(this.dexHeaderHTML(summary));
+		},
+		dexHeaderHTML: function (summary) {
+			var buf = '<h2>' + (summary.official ? OFFICIAL_BADGE : '') + BattleLog.escapeHTML(summary.name) + '</h2>';
+			if (summary.description) buf += '<p>' + BattleLog.escapeHTML(summary.description).replace(/\n/g, '<br />') + '</p>';
+			buf += '<p><strong>Made by:</strong> ' + BattleLog.escapeHTML(summary.owner);
+			if (summary.editors && summary.editors.length) buf += '<br /><strong>Edited by:</strong> ' + BattleLog.escapeHTML(summary.editors.join(', '));
+			buf += '<br /><strong>World:</strong> ' + BattleLog.escapeHTML(summary.base) + ' (Gen ' + DexViews.genOf(summary.mod) + ')';
+			buf += '<br /><small>' + summary.counts.map(function (count) {
+				return '<strong>' + count.name + ':</strong> ' + count.total + ' total, ' + count.custom + ' custom, ' + count.modified + ' modified';
+			}).join(' &middot; ') + '</small>';
+			return buf + '</p><p><button class="button" name="worldDex"><i class="fa fa-globe"></i> Use as world</button>' +
+				(DexViews.ui.canEdit(summary) ? ' <button class="button" name="editViewedDex"><i class="fa fa-pencil"></i> Edit</button>' : '') + '</p>';
+		},
+		dexTabsHTML: function (summary) {
+			return '<div class="dexheader">' + this.dexHeaderHTML(summary) + '</div><ul class="dexformattabs">' + this.dexTabs(summary).map(function (tab) {
+				return '<li><button class="button" name="showDexTab" value="' + tab[0] + '">' + tab[2] + '</button></li>';
+			}).join('') + '</ul>';
+		},
+		showDexTab: function (tab) {
+			window.DexBuilderRoom.prototype.showDexTab.call(this, tab === '' || tab === null || tab === undefined ? '0' : tab);
+		},
+		editViewedDex: function () {
+			var dexid = this.dexid;
+			app.joinRoom('dexbuilder', window.DexBuilderRoom);
+			app.rooms.dexbuilder.openDexFolder(dexid);
 		}
 	});
 

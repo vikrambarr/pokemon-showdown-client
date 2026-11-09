@@ -446,6 +446,8 @@
 			return '<select class="button' + cls + '">' + optionsHTML([1, 5, 10, 15, 20, 25, 30, 35, 40], value) + '</select>';
 		case 'shortdesc':
 			return '<input type="text" class="textbox' + cls + '" maxlength="' + options + '" value="' + escape(blank(value) ? '' : String(value)) + '" autocomplete="off" />';
+		case 'shortdescbox':
+			return '<textarea class="textbox' + cls + '" maxlength="' + options + '" rows="3">' + escape(blank(value) ? '' : String(value)) + '</textarea>';
 		case 'priority':
 			var priorities = [];
 			for (var priority = 7; priority >= -7; priority--) priorities.push([priority, priorityText(priority)]);
@@ -745,7 +747,10 @@
 			buf += '<div class="setcol setcol-details">';
 			var limit = table === 'Moves' ? 55 : 90;
 			var count = this.dexEffectCanEdit('shortDesc') ? ' (<span class="dexdesccount">' + (data.shortDesc || '').length + '/' + limit + '</span>)' : '';
-			buf += '<div class="setrow"><div class="setcell dexshortdesc"><label>Short description' + count + '</label>' + this.dexEffectFieldHTML('shortDesc', 'shortdesc', limit, data, 'dexfield') + '</div></div>';
+			var desc = table === 'Moves' ? ['shortdesc', 'dexfield'] : ['shortdescbox', 'dexfield dexdescbox'];
+			if (table !== 'Conditions') {
+				buf += '<div class="setrow"><div class="setcell dexshortdesc"><label>Short description' + count + '</label>' + this.dexEffectFieldHTML('shortDesc', desc[0], limit, data, desc[1]) + '</div></div>';
+			}
 			if (table === 'Moves') {
 				buf += '<div class="setrow dexmovenumbers">';
 				for (var n = 0; n < MOVE_NUMBERS.length; n++) {
@@ -781,8 +786,10 @@
 			buf += '<div class="dexstatresults dexeffectpanel" data-panel="fields">' + this.dexEffectFieldsHTML(data) + '</div>';
 			buf += '<div class="dexstatresults dexeffectpanel" data-panel="attributes"><div class="pad"><p><input type="search" class="textbox dexattrsearch" placeholder="Search attributes" size="30" autocomplete="off" /></p></div>' +
 				'<div class="dexattrlist"></div></div>';
-			buf += '<div class="dexstatresults dexeffectpanel" data-panel="description"><div class="pad dexfieldsection dexeffectfields">' +
-				'<label class="label">Description</label>' + this.dexEffectFieldHTML('desc', 'textarea', null, data) + '</div></div>';
+			if (table !== 'Conditions') {
+				buf += '<div class="dexstatresults dexeffectpanel" data-panel="description"><div class="pad dexfieldsection dexeffectfields">' +
+					'<label class="label">Description</label>' + this.dexEffectFieldHTML('desc', 'textarea', null, data) + '</div></div>';
+			}
 			buf += '<div class="dexstatresults dexeffectpanel dexcode" data-panel="code">' + this.dexEffectCodeHTML() + '</div>';
 			this.$('.dexmonpage').html('<div class="teamwrapper">' + buf + '</div>');
 			this.dexPicker = null;
@@ -1419,8 +1426,8 @@
 				return !query || toID(nameOf(id)).indexOf(query) >= 0;
 			});
 			var groups = [
-				[this.dexView.name + " custom conditions", ids.filter(function (id) { return custom.indexOf(id) >= 0; })],
-				[this.dexView.name + " modified conditions", ids.filter(function (id) { return modified.indexOf(id) >= 0; })],
+				["Custom conditions", ids.filter(function (id) { return custom.indexOf(id) >= 0; })],
+				["Modified conditions", ids.filter(function (id) { return modified.indexOf(id) >= 0; })],
 				["Conditions", ids.filter(function (id) { return custom.indexOf(id) < 0 && modified.indexOf(id) < 0; })]
 			];
 			var rows = [];
@@ -1612,8 +1619,8 @@
 		'focus .dexmonpage input[name=effectflags]': 'focusDexEffectFlags',
 		'input .dexmonpage input[name=effectflags]': 'searchDexEffectFlags',
 		'input .dexmonpage input.dexinline': 'resizeDexInline',
-		'input .dexmonpage .dexshortdesc input': 'countDexShortDesc',
-		'focus .dexmonpage .dexshortdesc input': 'focusDexShortDesc',
+		'input .dexmonpage .dexshortdesc .dexfield': 'countDexShortDesc',
+		'focus .dexmonpage .dexshortdesc .dexfield': 'focusDexShortDesc',
 		'input .dexmonpage .dexattrsearch': 'searchDexAttributes',
 		'keydown .dexmonpage .dexattrsearch': 'keyDexAttributeSearch'
 	});
