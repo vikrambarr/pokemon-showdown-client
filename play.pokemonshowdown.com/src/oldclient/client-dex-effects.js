@@ -8,6 +8,7 @@
 	var escape = BattleLog.escapeHTML;
 
 	var KINDS = DexViews.ui.EFFECT_KINDS;
+	var CODE = DexViews.ui.CODE;
 	var NAMES = { Moves: 'Move', Abilities: 'Ability', Items: 'Item', Conditions: 'Condition' };
 	var ICONS = { Abilities: 'star', Conditions: 'cloud' };
 	var CONTROL = ['name', 'inheritsFrom', 'slots', 'replace', 'events', 'spriteFrom'];
@@ -663,6 +664,10 @@
 			var shown = !!this.dexEffectData && this.$('.dexmonpage').is(':visible');
 			keep = keep && this.dexEffect && this.dexEffect.table === table && this.dexEffect.id === id;
 			var effect = this.dexEffect = { table: table, id: id, name: name || id, from: keep ? this.dexEffect.from : from || '' };
+			if (this.dexCodeFor !== table + ':' + id) {
+				this.dexCodeFor = table + ':' + id;
+				this.dexCodePending = {};
+			}
 			this.dexSpecies = null;
 			this.$('.dexsearchpage, .dexpage').hide();
 			this.$('.dexmonpage').show();
@@ -753,8 +758,8 @@
 
 			var buf = '<div class="pad">' + this.dexEffectBackHTML() + '</div>';
 			var start = table === 'Moves' || table === 'Abilities' ? 'list' : 'fields';
-			buf += '<div class="teambar"><button name="showDexEffectPanel" value="' + start + '" class="pokemon">' + escape(info.name) + '</button>';
-			if (info.handlers.length) buf += ' <button name="showDexEffectPanel" value="code" class="pokemon"><i class="fa fa-code"></i> Code</button>';
+			buf += '<div class="teambar"><button name="showDexEffectPanel" value="' + start + '" class="pokemon"><i class="fa fa-pencil"></i> Editor</button>';
+			buf += ' <button name="showDexEffectPanel" value="code" class="pokemon"><i class="fa fa-code"></i> Code</button>';
 			buf += '</div>';
 			buf += '<div class="teamchartbox individual"><ol class="teamchart"><li>';
 			buf += this.dexMenuHTML('copyDexEffect', info.edited && ['deleteDexEffect', info.official ? 'Reset to base' : 'Delete']);
@@ -832,6 +837,7 @@
 			var $page = this.$('.dexmonpage');
 			$page.find('button[name=toggleDexEdits]').toggle(!!original);
 			if (!original) return;
+			this.markDexCodeEdits(this.dexEffectCodeValues(), original);
 			var self = this;
 			var data = this.dexEffectValues();
 			var valueOf = function (object, path) {
@@ -996,6 +1002,7 @@
 				return self.dexEffectFieldHTML(path, control, options, data);
 			};
 			var boxes = '';
+			var groups = SENTENCES[table];
 			var picked = this.dexPickedAttributes || [];
 			var later = [];
 			var box = function (entry, section, index) {
@@ -1008,7 +1015,9 @@
 				var fieldAt = index === undefined ? field : function (path, control) {
 					return self.dexEffectFieldHTML(path, control, index, data);
 				};
-				boxes += self.dexSentenceHTML('data-attribute="' + escape(entry[0]) + '"', title, entry[2](fieldAt, data, self), removable && remove);
+				var group = groups.indexOf(section);
+				boxes += self.dexSentenceHTML('data-attribute="' + escape(entry[0]) + '"', title, entry[2](fieldAt, data, self), removable && remove,
+					groups.length > 1 ? group < 0 ? null : Math.round(group * 280 / (groups.length - 1)) : '@@A@@');
 			};
 			$.each(this.dexEffectSections(data), function (i, section) {
 				$.each(section[1], function (j, entry) {
@@ -1020,6 +1029,9 @@
 			$.each(later, function (i, pair) {
 				if (pair) box(pair[0], pair[1]);
 			});
+			var count = boxes.split('@@A@@').length - 1;
+			var index = 0;
+			boxes = boxes.replace(/@@A@@/g, function () { return String(Math.round(index++ * 280 / Math.max(count - 1, 1))); });
 			return this.dexSentencesHTML(boxes, editable && 'name="showDexEffectPanel" value="attributes"');
 		},
 		dexAttributeListHTML: function (query) {
@@ -1230,17 +1242,117 @@
 			return buf;
 		},
 		dexEffectCodeHTML: function () {
-			var self = this;
+			return '<div class="pad"><div class="setchart dexcodebox">' + this.dexCodeHTML(this.dexEffect.id, this.dexEffectCodeValues(), this.dexEffectCodeNode()) + '</div></div>';
+		},
+		dexEffectCodeValues: function () {
 			var info = this.dexEffectData;
-			var editable = !!this.dexEditable;
-			var buf = '<div class="pad">';
-			var grouping = this.dexEffectSlotGroups();
-			$.each(info.handlers, function (i, handler) {
-				buf += '<h3>' + escape(handler.path) + '</h3>';
-				if (!handler.editable) buf += '<p><small>This code can\'t be changed here.</small></p>';
-				buf += '<pre data-code="' + escape(handler.path) + '">' + self.dexEffectCodeBlockHTML(handler, grouping, editable) + '</pre>';
+			var data = this.dexEffectValues();
+			var values = {};
+			$.each(data, function (key, value) {
+				if ((info.editable ? info.editable.indexOf(key) >= 0 : key !== 'name') && !blank(value)) values[key] = value;
 			});
-			return buf + '</div>';
+			$.each(info.handlers, function (i, handler) {
+				var keys = handler.path.split('.');
+				var object = values;
+				for (var j = 0; j < keys.length - 1; j++) {
+					if (!$.isPlainObject(object[keys[j]])) object[keys[j]] = $.extend(true, {}, getPath(data, keys.slice(0, j + 1).join('.')));
+					object = object[keys[j]];
+				}
+				object[keys[keys.length - 1]] = { handler: handler };
+			});
+			return values;
+		},
+		dexEffectCodeNode: function () {
+			var view = this.dexView;
+			var table = this.dexEffect.table;
+			var conditions = function (kind) {
+				return function () { return selectOptions('condition:' + kind, view) || []; };
+			};
+			var refs = function (refTable) {
+				return function () { return refOptions([refTable], 'id', view) || []; };
+			};
+			var flags = function (flagTable) {
+				return CODE.map(CODE.fixed(1), Object.keys(FLAGS[flagTable]));
+			};
+			var boosts = CODE.map(CODE.whole(-6, 6, 1), Object.keys(BOOSTS));
+			var statuses = STATUSES.map(function (status) { return status[0]; });
+			var secondaryFieldsOf = function () {
+				return {
+					chance: CODE.whole(1, 100, 100), boosts: boosts, status: CODE.choice(statuses), volatileStatus: CODE.choice(conditions('volatileStatus')),
+					sideCondition: CODE.choice(conditions('sideCondition')), pseudoWeather: CODE.choice(conditions('pseudoWeather'))
+				};
+			};
+			var secondary = CODE.obj($.extend(secondaryFieldsOf(), { self: CODE.obj(secondaryFieldsOf(), true) }), true, [], { chance: 100 });
+			var fraction = CODE.tuple([CODE.whole(1, 100, 1), CODE.whole(1, 100, 2)]);
+			var text = { desc: CODE.text(1024), shortDesc: CODE.text(table === 'Moves' ? 55 : 90), countsAs: CODE.choice(refs(table)) };
+			var fields = {
+				Moves: {
+					accuracy: CODE.json(100), basePower: CODE.whole(0, 1000), category: CODE.choice(CATEGORIES), pp: CODE.whole(1, 64, 10),
+					priority: CODE.whole(-7, 7), type: CODE.choice(function () { return selectOptions('type', view); }),
+					target: CODE.choice(MOVE_TARGETS.map(function (target) { return target[0]; })), critRatio: CODE.whole(1, 6, 2), flags: flags('Moves'),
+					drain: fraction, recoil: fraction, heal: fraction, secondary: secondary, secondaries: CODE.list(secondary, 1, 5, true),
+					self: CODE.obj(secondaryFieldsOf(), true), boosts: boosts, selfBoost: CODE.obj({ boosts: boosts }, false, ['boosts']),
+					status: CODE.choice(statuses), volatileStatus: CODE.choice(conditions('volatileStatus')), sideCondition: CODE.choice(conditions('sideCondition')),
+					slotCondition: CODE.choice(conditions('slotCondition')), pseudoWeather: CODE.choice(conditions('pseudoWeather')),
+					weather: CODE.choice(conditions('weather')), terrain: CODE.choice(conditions('terrain')), multihit: CODE.json(2),
+					selfSwitch: CODE.choice([true, 'copyvolatile', 'shedtail']), selfdestruct: CODE.choice(['always', 'ifHit']), ignoreImmunity: CODE.json(true),
+					overrideOffensiveStat: CODE.choice(STATS.slice(1, 6)), overrideDefensiveStat: CODE.choice(STATS.slice(1, 6)),
+					overrideOffensivePokemon: CODE.choice(['target', 'source']), overrideDefensivePokemon: CODE.choice(['target', 'source']),
+					damage: CODE.json('level'), ohko: CODE.json(true),
+					animations: CODE.list(CODE.choice(function () { return animationOptions(); }), 1, 2)
+				},
+				Abilities: { flags: flags('Abilities'), suppressWeather: CODE.bool() },
+				Items: {
+					fling: CODE.obj({ basePower: CODE.whole(0, 250, 10), status: CODE.choice(statuses), volatileStatus: CODE.choice(conditions('volatileStatus')) },
+						true, [], { basePower: 10 }),
+					naturalGift: CODE.obj({ basePower: CODE.whole(0, 250, 80), type: CODE.choice(function () { return selectOptions('type', view); }) },
+						true, [], { basePower: 80, type: 'Normal' }),
+					boosts: boosts, ignoreKlutz: CODE.bool(), spritenum: CODE.whole(0, 2000)
+				},
+				Conditions: { duration: CODE.whole(1, 100, 5), counterMax: CODE.whole(1, 10000, 1), noCopy: CODE.bool(), affectsFainted: CODE.bool() }
+			}[table];
+			$.each(PROPERTIES[table] || {}, function (key) { fields[key] = fields[key] || CODE.bool(); });
+			$.extend(fields, text);
+			var editable = this.dexEffectData.editable;
+			$.each(fields, function (key) {
+				if (editable && editable.indexOf(key) < 0) delete fields[key];
+			});
+			$.each(this.dexEffectCodeValues(), function (key, value) {
+				if (!fields[key]) fields[key] = CODE.of(value);
+			});
+			return CODE.obj(fields, true, { Moves: ['accuracy', 'basePower', 'category', 'flags', 'pp', 'priority', 'target', 'type'], Abilities: ['flags'] }[table] || []);
+		},
+		dexCodeHandlerHTML: function (handler, depth) {
+			var html = this.dexEffectCodeBlockHTML(handler, this.dexEffectSlotGroups(), !!this.dexEditable);
+			return html.replace(/--hue: (\d+)/g, '--hue: @@G$1@@').replace(/\n/g, '\n' + new Array(depth + 1).join('\t'));
+		},
+		saveDexEffectCode: function (key, value) {
+			var data = this.dexEffectValues();
+			var strip = function (item) {
+				if (!$.isPlainObject(item)) return Array.isArray(item) ? item.map(strip) : item;
+				var result = {};
+				$.each(item, function (field, part) {
+					if (!(part && part.handler)) result[field] = strip(part);
+				});
+				return result;
+			};
+			var nulled = function (was, now) {
+				if (!$.isPlainObject(was) || !$.isPlainObject(now)) return now;
+				var result = $.extend({}, now);
+				$.each(was, function (field, part) {
+					result[field] = field in now ? nulled(part, now[field]) : null;
+				});
+				return result;
+			};
+			var clean = value === undefined ? undefined : strip(value);
+			var fields = {};
+			if (key === 'secondary' || key === 'secondaries') {
+				fields = secondaryFields(clean === undefined ? [] : key === 'secondary' ? [clean] : clean, data.secondary);
+			} else {
+				fields[key] = clean === undefined ? null : nulled(data[key], clean);
+			}
+			this.saveDexEffect(fields);
+			this.renderDexEffect();
 		},
 		setupDexMoveLearners: function () {
 			var effect = this.dexEffect;
@@ -1313,7 +1425,6 @@
 			var table = this.dexEffect.table;
 			var start = table === 'Moves' || table === 'Abilities' ? 'list' : 'fields';
 			if (!keep && panel === this.dexPanel && panel !== start && panel !== 'flags') panel = start;
-			if (panel === 'code' && !this.dexEffectData.handlers.length) panel = start;
 			if (panel === 'flags') {
 				this.$('.dexmonpage [data-panel=flags]').html(this.dexFlagListHTML(this.$('.dexmonpage input[name=effectflags]').val()));
 				if (!keep) this.markDexEdits();

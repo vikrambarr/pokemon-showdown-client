@@ -150,7 +150,37 @@
 		ids.forEach(function (id) {
 			if (!placed[id]) visit(id, sections[0].rows);
 		});
+		var stages = {};
+		var stageOf = function (id, depth) {
+			if (stages[id] === undefined) {
+				var from = parents[id] || bases[id];
+				stages[id] = from && depth < 20 ? stageOf(from, depth + 1) + (parents[id] ? 1 : 0) : 0;
+			}
+			return stages[id];
+		};
+		var last = Math.max.apply(null, ids.map(function (id) { return stageOf(id, 0); }));
+		sections.forEach(function (section) {
+			section.rows.forEach(function (row) {
+				if (!row.species || !last) return;
+				row.stage = stageOf(row.species.id, 0) + 1;
+				row.hue = Math.round((row.stage - 1) * 280 / last);
+			});
+		});
 		return sections.filter(function (section) { return section.rows.length; });
+	}
+
+	function stageHue(view, species) {
+		var hue;
+		dexFamily(view, species).forEach(function (section) {
+			section.rows.forEach(function (row) {
+				if (row.species && row.species.id === species.id) hue = row.hue;
+			});
+		});
+		return stageAttrs(hue);
+	}
+
+	function stageAttrs(hue) {
+		return hue === undefined ? '' : ' class="dexstaged" style="--hue: ' + hue + '"';
 	}
 
 	var COLORS = ['Black', 'Blue', 'Brown', 'Gray', 'Green', 'Pink', 'Purple', 'Red', 'White', 'Yellow'];
@@ -184,8 +214,8 @@
 		if (key === 'gender') {
 			var ratio = species.genderRatio;
 			var male = ratio ? ratio.M * 100 : 50;
-			if (!editable) return value ? { M: "always male", F: "always female", N: "genderless" }[value] : male + '% male';
-			return '<select class="button" name="gender">' + options([['', "male or female"], ['M', "always male"], ['F', "always female"], ['N', "genderless"]]) + '</select>' +
+			if (!editable) return value ? { M: "always male", F: "always female", N: "nonbinary" }[value] : male + '% male';
+			return '<select class="button" name="gender">' + options([['', "male or female"], ['M', "always male"], ['F', "always female"], ['N', "nonbinary"]]) + '</select>' +
 				(value ? '' : ', <input type="number" class="textbox" name="male" value="' + male + '" min="0" max="100" step="12.5" />% male');
 		}
 		if (key === 'evoType') {
@@ -202,8 +232,156 @@
 		return input('text', key === 'eggGroups' || key === 'tags' ? 24 : 16);
 	}
 
+	var learnsetsLoading = null;
+
+	function loadLearnsets() {
+		if (window.BattleLearnsets) return Promise.resolve();
+		if (!learnsetsLoading) {
+			learnsetsLoading = new Promise(function (resolve, reject) {
+				var script = document.createElement('script');
+				script.src = Dex.resourcePrefix + 'data/learnsets.js';
+				script.onload = resolve;
+				script.onerror = function () {
+					learnsetsLoading = null;
+					reject(new Error("Learnsets couldn't be loaded."));
+				};
+				document.body.appendChild(script);
+			});
+		}
+		return learnsetsLoading;
+	}
+
 	function hasStandardSprites(id) {
 		return !!(window.BattlePokedex && BattlePokedex[id]) && !DexViews.custom.Pokedex[id];
+	}
+
+	var CODE = {
+		whole: function (min, max, def) {
+			return { kind: 'int', min: min, max: max, def: def !== undefined ? def : Math.max(min, Math.min(0, max)) };
+		},
+		num: function (min, max, def) {
+			return { kind: 'num', min: min, max: max, def: def !== undefined ? def : min };
+		},
+		text: function (max, def) {
+			return { kind: 'text', max: max, def: def };
+		},
+		json: function (def) {
+			return { kind: 'json', def: def };
+		},
+		bool: function (def) {
+			return { kind: 'select', options: [true, false], def: def !== undefined ? def : true };
+		},
+		choice: function (options, def) {
+			return { kind: 'select', options: options, def: def };
+		},
+		fixed: function (def) {
+			return { kind: 'fixed', def: def };
+		},
+		list: function (item, min, max, multiline) {
+			return { kind: 'list', item: item, min: min, max: max, multiline: multiline };
+		},
+		tuple: function (items) {
+			return { kind: 'tuple', items: items };
+		},
+		map: function (value, keys, required) {
+			return { kind: 'map', value: value, keys: keys, required: required || [] };
+		},
+		obj: function (fields, optional, required, defs) {
+			return { kind: 'obj', fields: fields, optional: !!optional, required: required || [], defs: defs || {} };
+		},
+		of: function (value) {
+			if (typeof value === 'number') return CODE.num(-1000000, 1000000, value);
+			if (typeof value === 'boolean') return CODE.bool(value);
+			if (typeof value === 'string') return CODE.text(1024, value);
+			if ($.isPlainObject(value) && !value.handler) {
+				var fields = {};
+				for (var key in value) fields[key] = CODE.of(value[key]);
+				return CODE.obj(fields, false, Object.keys(fields));
+			}
+			return CODE.json(value);
+		}
+	};
+
+	function codeOptions(node) {
+		var options = typeof node.options === 'function' ? node.options() : node.options;
+		return (options || []).filter(function (option) { return !(option && option.group); }).map(function (option) {
+			return Array.isArray(option) ? option : [option, option];
+		});
+	}
+
+	function codeDefault(node) {
+		if (node.def !== undefined) return $.extend(true, {}, { value: node.def }).value;
+		if (node.kind === 'select') return (codeOptions(node)[0] || [''])[0];
+		if (node.kind === 'list') {
+			var item = node.min ? codeDefault(node.item) : undefined;
+			return item === undefined ? [] : [item];
+		}
+		if (node.kind === 'tuple') return node.items.map(codeDefault);
+		if (node.kind === 'map') return {};
+		if (node.kind === 'obj') {
+			var value = {};
+			$.each(node.required, function (i, key) { value[key] = codeDefault(node.fields[key]); });
+			return $.extend(value, node.defs);
+		}
+		return undefined;
+	}
+
+	function codeChild(node, key, value) {
+		if (!node) return CODE.of(value);
+		if (node.kind === 'list') return node.item;
+		if (node.kind === 'tuple') return node.items[key];
+		if (node.kind === 'map') return node.value;
+		if (node.kind === 'obj') return node.fields[key] || CODE.of(value);
+		return CODE.of(value);
+	}
+
+	function codeKey(key) {
+		return /^([A-Za-z_$][\w$]*|\d+)$/.test(key) ? key : JSON.stringify(key);
+	}
+
+	function codeLiteral(value) {
+		return BattleLog.escapeHTML(JSON.stringify(value) || 'undefined');
+	}
+
+	function codeLines(html) {
+		return html.split('\n').map(function (line) {
+			var depth = /^\t*/.exec(line)[0].length;
+			return '<span class="dexcodeline" style="padding-left: ' + (depth + 1) * 4 + 'ch">' + (line.slice(depth) || ' ') + '</span>';
+		}).join('');
+	}
+
+	function codeWidth(text) {
+		return Math.min(String(text).length + 2, 72);
+	}
+
+	function codeLeafHTML(path, value, node, editable, hue) {
+		var escape = BattleLog.escapeHTML;
+		var attrs = ' data-codepath="' + escape(path) + '" data-kind="' + node.kind + '"';
+		var color = '--hue: ' + hue;
+		if (node.kind === 'fixed') return '<span class="dexcodeleaf"' + attrs + '>' + codeLiteral(value) + '</span>';
+		if (!editable) return '<span class="dexcodeleaf"' + attrs + '><mark class="dexmark" style="' + color + '">' + codeLiteral(value) + '</mark></span>';
+		var inner;
+		if (node.kind === 'int' || node.kind === 'num') {
+			var shown = typeof value === 'number' ? String(value) : '';
+			inner = '<input type="number" class="dexinline dexmark" value="' + shown + '" min="' + node.min + '" max="' + node.max + '" step="' + (node.kind === 'int' ? 1 : 'any') +
+				'" style="width: ' + (codeWidth(shown) + 2) + 'ch; ' + color + '" />';
+		} else if (node.kind === 'select') {
+			var options = codeOptions(node);
+			var current = JSON.stringify(value);
+			if (value !== undefined && !options.some(function (option) { return JSON.stringify(option[0]) === current; })) options = [[value, value]].concat(options);
+			inner = '<select class="dexinline dexmark" style="width: ' + (codeWidth(current || '') + 2) + 'ch; ' + color + '">' + options.map(function (option) {
+				var literal = JSON.stringify(option[0]);
+				return '<option value="' + escape(literal) + '"' + (literal === current ? ' selected' : '') + '>' + escape(literal) + '</option>';
+			}).join('') + '</select>';
+		} else if (node.kind === 'json') {
+			var json = value === undefined ? '' : JSON.stringify(value);
+			inner = '<input type="text" class="dexinline dexmark" value="' + escape(json) + '" style="width: ' + codeWidth(json) + 'ch; ' + color + '" autocomplete="off" />';
+		} else {
+			var text = value === undefined || value === null ? '' : String(value);
+			inner = '"<input type="text" class="dexinline dexmark" value="' + escape(text).replace(/\n/g, '&#10;') + '"' + (node.max ? ' maxlength="' + node.max + '"' : '') +
+				' style="width: ' + codeWidth(text) + 'ch; ' + color + '" autocomplete="off" />"';
+		}
+		return '<span class="dexcodeleaf"' + attrs + '>' + inner + '</span>';
 	}
 
 	var DexCopyPopup = Popup.extend({
@@ -272,6 +450,7 @@
 
 	DexViews.ui.abilitySlotsOf = abilitySlotsOf;
 	DexViews.ui.DexCopyPopup = DexCopyPopup;
+	DexViews.ui.CODE = CODE;
 
 	_.extend(window.DexBuilderRoom.prototype, {
 		openDexFamily: function (name) {
@@ -281,6 +460,7 @@
 			if (this.$('.dexpage').is(':visible')) this.dexScrollTop = this.dexScroller().scrollTop();
 			this.dexFamilyOf = species.name;
 			this.dexSpecies = null;
+			this.$('.dexmonpage').removeClass('dexcodetab');
 			this.dexEffect = null;
 			this.dexPicker = null;
 			this.dexListSearch = null;
@@ -291,9 +471,17 @@
 			var room = this;
 			var editable = this.dexEditable;
 			var entries = DexViews.entries[view.dexid];
-			var buf = '<div class="pad"><button name="closeDexPokemon" class="button"><i class="fa fa-chevron-left"></i> Pok&eacute;mon</button></div>';
+			var family = dexFamily(view, species);
+			var key = [];
+			$.each(family, function (i, section) {
+				$.each(section.rows, function (j, row) {
+					if (row.stage) key[row.stage - 1] = '<span class="dexstagekey" style="--hue: ' + row.hue + '">' + row.stage + '</span>';
+				});
+			});
+			var buf = '<div class="pad"><button name="closeDexPokemon" class="button"><i class="fa fa-chevron-left"></i> Pok&eacute;mon</button>' +
+				(key.length ? '<span class="dexstagekeys">' + key.join('') + '</span>' : '') + '</div>';
 			buf += '<div class="teamchartbox dexfamily"><ol class="teamchart">';
-			$.each(dexFamily(view, species), function (i, section) {
+			$.each(family, function (i, section) {
 				if (section.title) buf += '<li class="dexfamilyhead"><h3>' + section.title + '</h3></li>';
 				$.each(section.rows, function (j, row) {
 					if (row.strip) {
@@ -307,12 +495,15 @@
 					var id = row.species.id;
 					var custom = DexViews.custom.Pokedex[id];
 					var edited = custom || !entries || entries.originals.hasOwnProperty(id);
-					buf += '<li data-species="' + BattleLog.escapeHTML(row.species.name) + '"><div class="setmenu"><button name="copyDexPokemon" value="' + BattleLog.escapeHTML(row.species.name) + '"><i class="fa fa-clone"></i>Copy</button>';
+					buf += '<li data-species="' + BattleLog.escapeHTML(row.species.name) + '"' + stageAttrs(row.hue) + '><div class="setmenu"><button name="copyDexPokemon" value="' + BattleLog.escapeHTML(row.species.name) + '"><i class="fa fa-clone"></i>Copy</button>';
 					if (editable && edited) buf += ' <button name="deleteDexPokemon" value="' + BattleLog.escapeHTML(row.species.name) + '"><i class="fa fa-trash"></i>' + (custom ? 'Delete' : 'Reset to base') + '</button>';
 					buf += '</div>' + room.dexSpeciesRowHTML(row.species, editable) + '</li>';
+					if (editable && !inBattle(row.species)) {
+						var value = ' value="' + BattleLog.escapeHTML(row.species.name) + '" class="button"';
+						buf += '<li class="dexaddrow"><button name="addDexEvo"' + value + '><i class="fa fa-plus"></i> Add evo</button> <button name="addDexPrevo"' + value + '><i class="fa fa-plus"></i> Add prevo</button> <button name="addDexForme"' + value + '><i class="fa fa-plus"></i> Add forme</button></li>';
+					}
 				});
 			});
-			if (editable) buf += '<li><button name="newDexRelative" class="button big"><i class="fa fa-plus"></i> Add Pok&eacute;mon</button></li>';
 			buf += '</ol></div>';
 			this.$('.dexmonpage').html('<div class="teamwrapper">' + buf + '</div>');
 			if (entries) {
@@ -336,39 +527,401 @@
 			if (button) return this.leaveDex(button, function () { this.backDexFamily(); });
 			this.openDexFamily(this.dexSpecies.name);
 		},
-		newDexRelative: function (value, button) {
+		addDexEvo: function (value, button) {
+			this.addDexRelative('evo', value, button);
+		},
+		addDexPrevo: function (value, button) {
+			this.addDexRelative('prevo', value, button);
+		},
+		addDexForme: function (value, button) {
+			this.addDexRelative('forme', value, button);
+		},
+		addDexRelative: function (relation, value, button) {
 			var room = this;
 			var view = this.dexView;
-			var options = '';
-			this.$('.dexfamily li[data-species]').each(function () {
-				var relative = view.dex.species.get(this.dataset.species);
-				if (inBattle(relative)) return;
-				var name = BattleLog.escapeHTML(relative.name);
-				options += '<option value="evo|' + name + '">Evolution of ' + name + '</option>';
-				if (relative.baseSpecies === relative.name) options += '<option value="forme|' + name + '">Forme of ' + name + '</option>';
-			});
+			var species = view.dex.species.get(value);
+			var prevo = species.prevo && view.species[toID(species.prevo)] ? view.dex.species.get(species.prevo) : null;
+			var relationText = { evo: "Evolves from ", prevo: "Evolves into ", forme: "Forme of " }[relation] + BattleLog.escapeHTML(species.name);
+			if (relation === 'prevo' && prevo) relationText = "Evolves from " + BattleLog.escapeHTML(prevo.name) + " into " + BattleLog.escapeHTML(species.name);
 			app.addPopup(DexViews.ui.DexNamePopup, {
-				fields: '<p><label class="label">Relation:<br /><select name="relation" class="button">' + options + '</select></label></p>',
+				value: relation === 'forme' ? species.name + '-' : '',
+				fields: '<p>' + relationText + '</p>',
 				sourceEl: button,
-				callback: function (name, data) {
-					var relation = data.relation.split('|');
-					var parent = view.dex.species.get(relation[1]);
+				callback: function (name) {
 					if (view.species[toID(name)]) return app.addPopup(Popup, { message: name + " is already in this dex." });
-					if (relation[0] === 'forme' && name.indexOf(parent.name + '-') !== 0) {
-						return app.addPopup(Popup, { message: "A forme's name is its base species, a dash, then the forme, like \"" + parent.name + "-Delta\"." });
+					if (relation === 'forme' && name.indexOf(species.name + '-') !== 0) {
+						return app.addPopup(Popup, { message: "A forme's name is its base species, a dash, then the forme, like \"" + species.name + "-Delta\"." });
 					}
 					var fields = { name: name };
-					if (DexViews.custom.Pokedex[parent.id]) {
-						$.each(['types', 'abilities', 'baseStats', 'eggGroups', 'weightkg'], function (i, key) { fields[key] = parent[key]; });
+					if (DexViews.custom.Pokedex[species.id]) {
+						$.each(['types', 'abilities', 'baseStats', 'eggGroups', 'weightkg'], function (i, key) { fields[key] = species[key]; });
 					} else {
-						fields.inheritsFrom = parent.name;
+						fields.inheritsFrom = species.name;
 					}
-					fields[relation[0] === 'evo' ? 'prevo' : 'baseSpecies'] = parent.name;
+					if (relation === 'evo') fields.prevo = species.name;
+					if (relation === 'forme') fields.baseSpecies = species.name;
+					if (relation === 'prevo') {
+						fields.evos = [species.name];
+						if (prevo) fields.prevo = prevo.name;
+					}
 					room.pendingSpecies = name;
 					room.editDex({ pokemon: fields });
-					if (relation[0] === 'evo') room.editDex({ pokemon: { name: parent.name, evos: (parent.evos || []).concat([name]) } });
+					if (relation === 'evo') room.editDex({ pokemon: { name: species.name, evos: (species.evos || []).concat([name]) } });
+					if (relation !== 'prevo') return;
+					room.editDex({ pokemon: { name: species.name, prevo: name } });
+					if (prevo) {
+						room.editDex({ pokemon: { name: prevo.name, evos: prevo.evos.map(function (evo) { return toID(evo) === species.id ? name : evo; }) } });
+					}
 				}
 			});
+		},
+		dexCodeHTML: function (name, value, node) {
+			var html = codeKey(toID(name)) + ': ' + this.dexCodeValueHTML('', value, node, 0) + ',';
+			var order = [];
+			var groups = {};
+			var count = 0;
+			html.replace(/@@(L|G\d+)@@/g, function (token, id) {
+				if (id === 'L') {
+					order.push(count++);
+				} else {
+					if (!(id in groups)) groups[id] = count++;
+					order.push(groups[id]);
+				}
+				return token;
+			});
+			var i = 0;
+			return '<pre class="dexcodetext">' + codeLines(html.replace(/@@(L|G\d+)@@/g, function () {
+				return String(Math.round(order[i++] * 280 / Math.max(count - 1, 1)));
+			})) + '</pre>';
+		},
+		dexCodeValueHTML: function (path, value, node, depth) {
+			var room = this;
+			var escape = BattleLog.escapeHTML;
+			var editable = this.dexCodeCanEdit(path);
+			var pad = new Array(depth + 1).join('\t');
+			var childPath = function (key) { return path === '' ? String(key) : path + '.' + key; };
+			var remove = function (key) {
+				return ' <button class="dexcodex" name="removeDexCode" value="' + escape(childPath(key)) + '" title="Remove">&times;</button>';
+			};
+			var pending = this.dexCodePending || {};
+			if (value && value.handler) return this.dexCodeHandlerHTML(value.handler, depth);
+			if (node.kind === 'list' || node.kind === 'tuple') {
+				var items = (value || []).map(function (item, i) {
+					var html = room.dexCodeValueHTML(childPath(i), item, codeChild(node, i, item), depth + 1);
+					return html + (editable && node.kind === 'list' && value.length > node.min ? remove(i) : '');
+				});
+				if (pending[childPath(items.length)]) items.push(codeLeafHTML(childPath(items.length), undefined, node.item, true, '@@L@@'));
+				if (editable && node.kind === 'list' && items.length < node.max) {
+					items.push('<button class="dexcodeplus" name="addDexCode" value="' + escape(path) + '" title="Add">+</button>');
+				}
+				if (node.multiline && items.length) return '[\n' + items.map(function (item) { return pad + '\t' + item; }).join(',\n') + ',\n' + pad + ']';
+				return '[' + items.join(', ') + ']';
+			}
+			if (node.kind === 'map' || node.kind === 'obj') {
+				value = value || {};
+				var keys = Object.keys(value).filter(function (key) {
+					return value[key] && value[key].handler || node.kind === 'map' || node.fields[key] || node.generic;
+				});
+				$.each(pending, function (full) {
+					var split = full.lastIndexOf('.');
+					var key = full.slice(split + 1);
+					if ((split < 0 ? '' : full.slice(0, split)) === path && keys.indexOf(key) < 0 && node.kind === 'obj' && node.fields[key]) keys.push(key);
+				});
+				var multiline = depth === 0 || node.multiline || keys.some(function (key) { return value[key] && value[key].handler; });
+				var lines = keys.map(function (key) {
+					var item = value[key];
+					if (item && item.handler) return room.dexCodeHandlerHTML(item.handler, depth + 1);
+					var removable = editable && (node.kind === 'map' || node.optional) && node.required.indexOf(key) < 0;
+					return codeKey(key) + ': ' + room.dexCodeValueHTML(childPath(key), item, codeChild(node, key, item), depth + 1) + (removable ? remove(key) : '');
+				});
+				var free = !editable ? [] : node.kind === 'map' ? codeOptions({ options: node.keys }).filter(function (option) { return !(option[0] in value); }) :
+					node.optional ? Object.keys(node.fields).filter(function (key) { return keys.indexOf(key) < 0 && room.dexCodeCanEdit(childPath(key)); }).map(function (key) { return [key, key]; }) : [];
+				if (free.length) {
+					lines.push('<select class="dexinline dexcodeaddkey" data-codepath="' + escape(path) + '" style="width: 4ch"><option value="">+</option>' + free.map(function (option) {
+						return '<option value="' + escape(String(option[0])) + '">' + escape(String(option[1])) + '</option>';
+					}).join('') + '</select>');
+				}
+				if (!lines.length) return '{}';
+				if (multiline) return '{\n' + lines.map(function (line) { return pad + '\t' + line; }).join(',\n') + ',\n' + pad + '}';
+				return '{' + lines.join(', ') + '}';
+			}
+			return codeLeafHTML(path, value, node, editable, '@@L@@');
+		},
+		dexCodeNodeAt: function (path) {
+			var keys = path.split('.');
+			var values = this.dexCodeValues();
+			var value = values[keys[0]];
+			var node = this.dexCodeTopNode(keys[0], value);
+			for (var i = 1; i < keys.length; i++) {
+				node = codeChild(node, keys[i], value && value[keys[i]]);
+				value = value && value[keys[i]];
+			}
+			return node;
+		},
+		dexCodeEdit: function (path, change) {
+			var keys = path.split('.');
+			var root = {};
+			root[keys[0]] = $.extend(true, {}, { value: this.dexCodeValues()[keys[0]] }).value;
+			var parent = root;
+			for (var i = 0; i < keys.length - 1; i++) {
+				if (parent[keys[i]] === undefined) parent[keys[i]] = /^\d+$/.test(keys[i + 1]) ? [] : {};
+				parent = parent[keys[i]];
+			}
+			change(parent, keys[keys.length - 1]);
+			this.dexCodePending = {};
+			this.dexCodeSave(keys[0], root[keys[0]]);
+		},
+		changeDexCode: function (e) {
+			var $leaf = $(e.currentTarget).closest('[data-codepath]');
+			var kind = $leaf.attr('data-kind');
+			var raw = e.currentTarget.value;
+			var value = raw;
+			if (kind === 'int' || kind === 'num') {
+				if (!$.trim(raw) || isNaN(Number(raw))) return;
+				value = Number(raw);
+			} else if (kind === 'select') {
+				value = JSON.parse(raw);
+			} else if (kind === 'json') {
+				try {
+					value = JSON.parse(raw);
+				} catch (err) {}
+			} else if (!$.trim(raw)) {
+				return;
+			}
+			this.dexCodeEdit($leaf.attr('data-codepath'), function (parent, key) { parent[key] = value; });
+		},
+		removeDexCode: function (path) {
+			this.dexCodeEdit(path, function (parent, key) {
+				if (Array.isArray(parent)) parent.splice(Number(key), 1);
+				else delete parent[key];
+			});
+		},
+		addDexCode: function (path) {
+			var node = this.dexCodeNodeAt(path);
+			var item = codeDefault(node.item);
+			var list = this.dexCodeValues();
+			$.each(path.split('.'), function (i, key) { list = list && list[key]; });
+			if (node.item.kind === 'select') {
+				var unused = codeOptions(node.item).filter(function (option) {
+					return !(list || []).some(function (entry) { return JSON.stringify(entry) === JSON.stringify(option[0]); });
+				})[0];
+				if (unused) item = unused[0];
+			}
+			if (item === undefined) {
+				this.dexCodePending = {};
+				this.dexCodePending[path + '.' + this.dexCodeLength(path)] = true;
+				return this.refreshDexCode();
+			}
+			this.dexCodeEdit(path, function (parent, key) { parent[key] = (parent[key] || []).concat([item]); });
+		},
+		dexCodeLength: function (path) {
+			var value = this.dexCodeValues();
+			$.each(path.split('.'), function (i, key) { value = value && value[key]; });
+			return value ? value.length : 0;
+		},
+		addDexCodeKey: function (e) {
+			var key = e.currentTarget.value;
+			var path = e.currentTarget.dataset.codepath;
+			if (!key) return;
+			var full = path ? path + '.' + key : key;
+			var node = this.dexCodeNodeAt(full);
+			var value = codeDefault(node);
+			if (value === undefined || node.kind === 'list' && node.min && !value.length) {
+				this.dexCodePending = {};
+				this.dexCodePending[full] = true;
+				if (node.kind === 'list') this.dexCodePending[full + '.0'] = true;
+				return this.refreshDexCode();
+			}
+			if (!path) {
+				this.dexCodePending = {};
+				return this.dexCodeSave(key, value);
+			}
+			this.dexCodeEdit(path, function (parent, last) {
+				parent[last] = parent[last] || {};
+				parent[last][key] = value;
+			});
+		},
+		dexCodeValues: function () {
+			return this.dexEffect ? this.dexEffectCodeValues() : this.dexSpeciesCodeValues(this.dexSpecies);
+		},
+		dexCodeTopNode: function (key, value) {
+			return codeChild(this.dexEffect ? this.dexEffectCodeNode() : this.dexSpeciesCodeNode(), key, value);
+		},
+		dexCodeCanEdit: function (path) {
+			if (!this.dexEditable) return false;
+			return this.dexEffect ? path === '' || this.dexEffectCanEdit(path.split('.')[0]) : true;
+		},
+		dexCodeSave: function (key, value) {
+			if (this.dexEffect) return this.saveDexEffectCode(key, value);
+			var fields = {};
+			fields[key] = value === undefined ? null : value;
+			if (key === 'learnset') {
+				var old = this.dexSpeciesLearnset(this.dexSpecies);
+				var changes = fields.learnset = {};
+				$.each(old, function (move) {
+					if (!value || !(move in value)) changes[move] = null;
+				});
+				$.each(value || {}, function (move, sources) {
+					if (JSON.stringify(sources) !== JSON.stringify(old[move])) changes[move] = sources;
+				});
+			}
+			this.saveDexPokemon(fields);
+			this.refreshDexCode();
+		},
+		markDexCodeEdits: function (now, was) {
+			this.$('.dexmonpage .dexcodebox [data-codepath]').each(function () {
+				var path = this.dataset.codepath.split('.');
+				var get = function (object) {
+					for (var i = 0; i < path.length && object !== undefined && object !== null; i++) object = object[path[i]];
+					return object;
+				};
+				if (DexViews.ui.changedValue(get(now), get(was))) $(this).addClass('dexedited');
+			});
+		},
+		dexSpeciesCodeValues: function (species) {
+			var value = {};
+			var put = function (key, item) {
+				if (item === undefined || item === null || item === '' || item === 0 || Array.isArray(item) && !item.length) return;
+				value[key] = $.extend(true, {}, { item: item }).item;
+			};
+			put('types', species.types);
+			put('gender', species.gender);
+			if (!species.gender) put('genderRatio', species.genderRatio);
+			put('baseStats', species.baseStats);
+			put('abilities', species.abilities);
+			put('heightm', species.heightm);
+			put('weightkg', species.weightkg);
+			put('color', species.color);
+			put('prevo', species.prevo);
+			put('evos', species.evos);
+			put('evoType', species.evoType);
+			put('evoLevel', species.evoLevel);
+			put('evoItem', species.evoItem);
+			put('evoMove', species.evoMove);
+			put('evoCondition', species.evoCondition);
+			put('eggGroups', species.eggGroups);
+			put('tags', species.tags);
+			if (DexViews.custom.Pokedex[species.id] && species.forme) {
+				put('baseSpecies', species.baseSpecies);
+				put('forme', species.forme);
+			}
+			put('cosmeticFormes', species.cosmeticFormes);
+			if (species.requiredItems && species.requiredItems.length === 1) put('requiredItem', species.requiredItems[0]);
+			put('battleOnly', species.battleOnly);
+			if (species.changesFrom !== species.baseSpecies && species.changesFrom !== species.name) put('changesFrom', species.changesFrom);
+			value.learnset = this.dexSpeciesLearnset(species);
+			return value;
+		},
+		dexSpeciesLearnset: function (species) {
+			var view = this.dexView;
+			var learnset = DexViews.learnsetOf(view, species.id) || {};
+			var all = window.BattleLearnsets || {};
+			var base = all[species.id] || all[toID(species.changesFrom || species.baseSpecies)] || {};
+			var result = {};
+			Object.keys(learnset).sort().forEach(function (id) {
+				if (!learnset[id]) return;
+				result[id] = (Array.isArray(learnset[id]) ? learnset[id] : base.learnset && base.learnset[id] || [view.gen + 'M']).slice();
+			});
+			return result;
+		},
+		dexSpeciesCodeNode: function () {
+			var room = this;
+			var view = this.dexView;
+			var text = CODE.text;
+			var types = function () {
+				return view.dex.types.names().filter(function (name) { return view.dex.types.get(name).exists !== false; });
+			};
+			var names = function (table, standard, store) {
+				return function () {
+					var ids = Object.keys($.extend({}, standard, view[store]));
+					return ids.map(function (id) {
+						var entry = view.dex[table].get(id);
+						return entry.exists && !(table === 'species' && room.dexSpecies && entry.id === room.dexSpecies.id) ? entry.name : '';
+					}).filter(Boolean).sort();
+				};
+			};
+			var abilities = names('abilities', window.BattleAbilities, 'Abilities');
+			var species = CODE.choice(names('species', window.BattlePokedex, 'Pokedex'));
+			var items = CODE.choice(names('items', window.BattleItems, 'Items'));
+			var moves = CODE.choice(names('moves', window.BattleMovedex, 'Moves'));
+			var stats = {};
+			$.each(BattleStatNames, function (stat) { stats[stat] = CODE.whole(1, 255, 50); });
+			var fields = {
+				types: CODE.list(CODE.choice(types, 'Normal'), 1, 2),
+				gender: CODE.choice(['M', 'F', 'N']),
+				genderRatio: CODE.obj({ M: CODE.num(0, 1, 0.5), F: CODE.num(0, 1, 0.5) }, false, ['M', 'F']),
+				baseStats: CODE.obj(stats, false, Object.keys(stats)),
+				abilities: CODE.map(CODE.choice(abilities), ['0', '1', 'H', 'S'], ['0']),
+				heightm: CODE.num(0.01, 200, 1),
+				weightkg: CODE.num(0, 10000, 10),
+				color: CODE.choice(COLORS),
+				prevo: species,
+				evos: CODE.list(species, 1, 32),
+				evoType: CODE.choice(EVO_TYPES.map(function (type) { return type[0]; }).filter(Boolean)),
+				evoLevel: CODE.whole(1, 100, 1),
+				evoItem: items,
+				evoMove: moves,
+				evoCondition: text(128),
+				eggGroups: CODE.list(text(20, 'Undiscovered'), 0, 8),
+				tags: CODE.list(text(40), 1, 8),
+				cosmeticFormes: CODE.list(text(40), 1, 32),
+				requiredItem: items,
+				requiredAbility: CODE.choice(abilities),
+				requiredMove: moves,
+				battleOnly: CODE.json(),
+				changesFrom: species,
+				maxHP: CODE.whole(1, 999, 1),
+				learnset: $.extend(CODE.map($.extend(CODE.list(text(12), 1, 30), { def: [view.gen + 'M'] }), function () {
+					var learned = room.dexSpecies ? room.dexSpeciesLearnset(room.dexSpecies) : {};
+					return Object.keys($.extend({}, window.BattleMovedex, view.Moves)).filter(function (id) {
+						var move = view.dex.moves.get(id);
+						return move.exists && !move.isZ && !move.isMax && !learned[id];
+					}).sort();
+				}), { multiline: true })
+			};
+			if (this.dexSpecies && DexViews.custom.Pokedex[this.dexSpecies.id]) {
+				fields.baseSpecies = species;
+				fields.forme = text(30);
+			}
+			return CODE.obj(fields, true, ['types', 'baseStats', 'abilities', 'eggGroups', 'weightkg']);
+		},
+		dexSpritesCodeHTML: function (species) {
+			var room = this;
+			var view = this.dexView;
+			var sprites = view.sprites[species.id] || {};
+			return '<div class="setchart dexcodebox dexspritebox">' + SPRITE_CELLS.map(function (cell) {
+				var image = sprites[cell[0]] && view.images[sprites[cell[0]]];
+				var html = image ? '<img src="' + Dex.resourcePrefix + 'sprites/custom/' + BattleLog.escapeHTML(image.file) + '" alt=""' + (image.pixelated ? ' class="pixelated"' : '') + ' />' :
+					(room.dexStandardSprite(cell[0]) || { html: '<em>No sprite</em>' }).html;
+				return '<button class="dexspritecell" name="showDexSprite" value="' + cell[0] + '"><span class="dexspriteimg">' + html + '</span><small>' + cell[2] + '</small></button>';
+			}).join('') + '</div>';
+		},
+		dexSpeciesCodeHTML: function (species) {
+			var values = this.dexSpeciesCodeValues(species);
+			var node = this.dexSpeciesCodeNode();
+			node.fields = $.extend({}, node.fields);
+			delete node.fields.learnset;
+			delete values.learnset;
+			return this.dexCodeHTML(species.id, values, node);
+		},
+		dexLearnsetCodeHTML: function (species) {
+			var learnset = this.dexSpeciesLearnset(species);
+			var moves = Object.keys(learnset);
+			var shown = {};
+			$.each(this.dexCodeFullLearnset ? moves : moves.slice(0, 12), function (i, id) { shown[id] = learnset[id]; });
+			var more = moves.length > 12 ? '<p><button class="dexcodeplus" name="toggleDexCodeLearnset">' +
+				(this.dexCodeFullLearnset ? 'Show fewer' : '&hellip; ' + (moves.length - 12) + ' more') + '</button></p>' : '';
+			var node = this.dexSpeciesCodeNode();
+			return '<div class="setchart dexcodebox">' + this.dexCodeHTML(species.id, { learnset: shown }, CODE.obj({ learnset: node.fields.learnset }, false, ['learnset'])) + more + '</div>';
+		},
+		toggleDexCodeLearnset: function () {
+			this.dexCodeFullLearnset = !this.dexCodeFullLearnset;
+			this.refreshDexCode();
+		},
+		refreshDexCode: function () {
+			var top = this.$('.dexmonpage [data-panel=code]').scrollTop();
+			this.refreshDexPage();
+			this.$('.dexmonpage [data-panel=code]').scrollTop(top);
 		},
 		openDexPokemon: function (name, picked) {
 			var view = DexViews.current = this.dexView;
@@ -387,9 +940,15 @@
 			var editable = this.dexEditable;
 			var buf = '<div class="pad">';
 			buf += '<button name="backDexFamily" class="button"><i class="fa fa-chevron-left"></i> Family</button></div>';
-			buf += '<div class="teambar"><button disabled class="pokemon"><span class="picon" style="' + Dex.getPokemonIcon(species.name) + '"></span>' + BattleLog.escapeHTML(species.name) + '</button></div>';
+			buf += '<div class="teambar"><button name="showDexMonPanel" value="list" class="pokemon"><i class="fa fa-pencil"></i> Editor</button>' +
+				' <button name="showDexMonPanel" value="code" class="pokemon"><i class="fa fa-code"></i> Code</button></div>';
+			if (this.dexCodeFor !== 'Pokedex:' + species.id) {
+				this.dexCodeFor = 'Pokedex:' + species.id;
+				this.dexCodePending = {};
+				this.dexCodeFullLearnset = false;
+			}
 
-			buf += '<div class="teamchartbox individual"><ol class="teamchart"><li>';
+			buf += '<div class="teamchartbox individual"><ol class="teamchart"><li' + stageHue(view, species) + '>';
 			buf += this.dexPokemonMenuHTML();
 			buf += this.dexSpeciesRowHTML(species, editable);
 			buf += '</li></ol></div>';
@@ -398,6 +957,9 @@
 			buf += '<div class="dexstatresults" data-panel="stats" style="display:none">' + this.dexStatsHTML(species, species.bst) + '</div>';
 			buf += '<div class="dexstatresults dexeffectpanel" data-panel="details" style="display:none">' + this.dexDetailsHTML() + '</div>';
 			if (editable) buf += this.dexAttributePanelHTML();
+			buf += '<div class="dexstatresults dexeffectpanel dexcode" data-panel="code" style="display:none"><div class="pad">' + this.dexSpritesCodeHTML(species) +
+				'<div class="setchart dexcodebox">' + this.dexSpeciesCodeHTML(species) + '</div>' +
+				this.dexLearnsetCodeHTML(species) + '</div></div>';
 			this.dexSpeciesBST = species.bst;
 			this.$('.dexmonpage').html('<div class="teamwrapper">' + buf + '</div>');
 
@@ -575,6 +1137,7 @@
 			var species = this.dexView.dex.species.get(this.dexSpecies.id);
 			var was = base.species;
 			var changed = DexViews.ui.changedValue;
+			this.markDexCodeEdits(this.dexSpeciesCodeValues(species), this.dexSpeciesCodeValues(was));
 			var mark = function ($el, edited) {
 				if (edited) $el.addClass('dexedited');
 			};
@@ -670,7 +1233,7 @@
 			this.dexSpecies = null;
 			this.dexFamilyOf = null;
 			this.dexEffect = null;
-			this.$('.dexmonpage').hide().empty();
+			this.$('.dexmonpage').removeClass('dexcodetab').hide().empty();
 			this.$('.dexpage').show();
 			if (this.dexSearch && this.dexSearchView !== this.dexView) this.setupDexSearch(this.dexView);
 			this.dexScroller().scrollTop(this.dexScrollTop || 0);
@@ -686,15 +1249,17 @@
 			var boxes = DETAILS.filter(function (detail) { return room.dexDetailShown(detail[0]); }).map(function (detail) {
 				var removable = editable && ALWAYS_DETAILS.indexOf(detail[0]) < 0;
 				var parts = detail[2].split('___');
-				return room.dexSentenceHTML('data-detail="' + detail[0] + '"', detail[1], parts[0] + detailHTML(species, detail[0], editable) + parts[1],
-					removable && ['removeDexDetail', detail[0]]);
-			}).join('');
+				var value = detailHTML(species, detail[0], editable);
+				return ['data-detail="' + detail[0] + '"', detail[1], parts[0] + (editable ? value : '<span class="dexvalue">' + value + '</span>') + parts[1], removable && ['removeDexDetail', detail[0]]];
+			});
 			var data = this.dexView.Pokedex[species.id] || {};
 			var origin = this.dexView.origins[species.id];
 			$.each([["Origin", origin], ["Category", data.category && 'The ' + data.category + ' Pok\u00e9mon'], ["Dex entry", data.dexEntry]], function (i, info) {
-				if (info[1]) boxes += room.dexSentenceHTML('', info[0], BattleLog.escapeHTML(info[1]));
+				if (info[1]) boxes.push(['', info[0], BattleLog.escapeHTML(info[1])]);
 			});
-			return this.dexSentencesHTML(boxes, editable && 'name="showDexDetailList"');
+			return this.dexSentencesHTML(boxes.map(function (box, i) {
+				return room.dexSentenceHTML(box[0], box[1], box[2], box[3], Math.round(i * 280 / Math.max(boxes.length - 1, 1)));
+			}).join(''), editable && 'name="showDexDetailList"');
 		},
 		dexDetailShown: function (key) {
 			return ALWAYS_DETAILS.indexOf(key) >= 0 || !!(this.dexAddedDetails || {})[key] || detailValue(this.dexSpecies, key) !== '';
@@ -709,8 +1274,9 @@
 			});
 			return DexViews.ui.chartHTML([['', rows]], "No more attributes to add.");
 		},
-		dexSentenceHTML: function (attrs, title, body, remove) {
-			return '<div class="dexsentence"' + (attrs ? ' ' + attrs : '') + '>' +
+		dexSentenceHTML: function (attrs, title, body, remove, hue) {
+			var hued = hue !== undefined && hue !== null;
+			return '<div class="dexsentence' + (hued ? ' dexhued" style="--hue: ' + hue : '') + '"' + (attrs ? ' ' + attrs : '') + '>' +
 				(remove ? '<button class="button dexremoveattr" name="' + remove[0] + '" value="' + remove[1] + '" title="Remove"><i class="fa fa-times"></i></button>' : '') +
 				'<label class="dexsentencehead">' + title + '</label>' + body + '</div>';
 		},
@@ -746,6 +1312,17 @@
 			this.showDexPanel(panel);
 			this.$('.dexmonpage .setstats').toggleClass('cur', panel === 'stats');
 			this.$('.dexmonpage .setdetails').toggleClass('cur', panel === 'details');
+			this.$('.dexmonpage').toggleClass('dexcodetab', panel === 'code');
+			this.$('.dexmonpage .teambar button').each(function () {
+				this.disabled = (this.value === 'code') === (panel === 'code');
+			});
+			var room = this;
+			var species = this.dexSpecies;
+			if (panel === 'code' && !window.BattleLearnsets) {
+				loadLearnsets().then(function () {
+					if (room.dexSpecies === species && room.dexPanel === 'code') room.refreshDexCode();
+				}, function () {});
+			}
 		},
 		showDexDetails: function (value, button) {
 			this.openDexFamilyRow(button);
@@ -1117,6 +1694,8 @@
 	});
 
 	_.extend(window.DexBuilderRoom.prototype.events, {
+		'change .dexmonpage .dexcodebox .dexcodeleaf input, .dexmonpage .dexcodebox .dexcodeleaf select': 'changeDexCode',
+		'change .dexmonpage .dexcodebox select.dexcodeaddkey': 'addDexCodeKey',
 		'input .dexmonpage .dexattrsearch': 'searchDexAttributes',
 		'keydown .dexmonpage .dexattrsearch': 'keyDexAttributeSearch',
 		'focus .dexmonpage input[name=namesearch]': 'focusDexNameSearch',

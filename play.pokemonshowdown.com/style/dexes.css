@@ -384,6 +384,39 @@
 	position: sticky;
 	left: -1px;
 }
+.dexfamily .teamchart {
+	margin-top: -2px;
+}
+.dexfamily li.dexaddrow {
+	padding: 5px 0 6px;
+}
+.dexstaged .setchart,
+.dexstaged .setchart-nickname {
+	background-color: hsl(var(--hue), 45%, 90%);
+}
+.dark .dexstaged .setchart,
+.dark .dexstaged .setchart-nickname {
+	background-color: hsl(var(--hue), 25%, 20%);
+}
+.dexstagekeys {
+	float: right;
+	margin: 3px 2px 0 0;
+}
+.dexstagekey {
+	display: inline-block;
+	width: 18px;
+	margin-left: 4px;
+	border: 1px solid #999999;
+	border-radius: 4px;
+	background: hsl(var(--hue), 45%, 90%);
+	text-align: center;
+	font-size: 9pt;
+	font-weight: bold;
+	line-height: 16px;
+}
+.dark .dexstagekey {
+	background: hsl(var(--hue), 25%, 20%);
+}
 .dexfamilyhead h3 {
 	margin: 10px 0 0 2px;
 	font-size: 12pt;
@@ -458,18 +491,26 @@
 	height: 32px;
 	object-fit: cover;
 }
-.dexcodetab .setchart {
+.dexcodetab .teamchartbox .setchart,
+.dexcodetab .teamchartbox .setchart-nickname {
 	display: none;
 }
 .dexcodetab .dexstatresults {
-	top: 70px;
+	top: 69px;
 }
-.dexcode h3 {
-	margin: 12px 0 4px 0;
-	font-size: 10pt;
+.dexcode > .pad {
+	padding: 0 0 8px 7px;
+}
+.dexcodebox.setchart {
+	width: 617px;
+	height: auto;
+	padding: 6px;
+}
+.dexcode > .pad > .dexcodebox:first-child {
+	margin-top: 0;
 }
 .dexcode pre {
-	margin: 0 0 6px 0;
+	margin: 0;
 	padding: 6px 8px;
 	font-size: 8pt;
 	tab-size: 4;
@@ -481,6 +522,63 @@
 .dark .dexcode pre {
 	border-color: #555555;
 	background: #222222;
+}
+.dexcodeline {
+	display: block;
+	text-indent: -4ch;
+}
+.dexcodebox p {
+	margin: 4px 0 0 0;
+}
+.dexspritebox {
+	display: flex;
+	justify-content: space-around;
+	padding: 4px 0;
+}
+.dexspritecell {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: flex-end;
+	width: 118px;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	cursor: pointer;
+}
+.dexspriteimg {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100px;
+}
+.dexspriteimg img {
+	max-width: 100px;
+	max-height: 100px;
+	width: auto;
+	height: auto;
+}
+.dexspritecell small {
+	font-weight: bold;
+	color: #555555;
+}
+.dark .dexspritecell small {
+	color: #AAAAAA;
+}
+.dexcodex,
+.dexcodeplus {
+	padding: 0 2px;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	opacity: 0.5;
+	cursor: pointer;
+}
+.dexcodex:hover,
+.dexcodeplus:hover {
+	opacity: 1;
 }
 .dexmonchart .setcol-moves .setcell + .setcell label {
 	margin-top: 2px;
@@ -1106,6 +1204,23 @@
 [data-panel=details] .dexfieldsection {
 	width: 631px;
 }
+.dexsentence.dexhued {
+	background: hsl(var(--hue), 45%, 90%);
+}
+.dark .dexsentence.dexhued {
+	background: hsl(var(--hue), 25%, 20%);
+}
+.dexsentence.dexhued .dexvalue,
+.dexsentence.dexhued input:not([type=checkbox]),
+.dexsentence.dexhued select {
+	background: hsl(var(--hue), 90%, 72%);
+}
+.dark .dexsentence.dexhued .dexvalue,
+.dark .dexsentence.dexhued input:not([type=checkbox]),
+.dark .dexsentence.dexhued select {
+	background: hsl(var(--hue), 65%, 38%);
+	color: #FFFFFF;
+}
 .dexsentence {
 	box-sizing: border-box;
 	margin: 6px 0;
@@ -1183,6 +1298,7 @@
 	color: #FFFFFF;
 }
 .dexcode pre .dexinline {
+	display: inline-block;
 	font: inherit;
 	color: inherit;
 	margin: 0;
@@ -1205,6 +1321,12 @@
 }
 .dark .dexcode pre .dexevent {
 	background: #444444;
+}
+.dexcode pre .dexcodeaddkey {
+	background: rgba(255, 255, 255, 0.75);
+}
+.dark .dexcode pre .dexcodeaddkey {
+	background: rgba(0, 0, 0, 0.3);
 }
 .dexcode pre .dexinline:focus {
 	outline: 1px solid #6688AA;
@@ -1253,4 +1375,7 @@
 }
 .dexshowedits .dexcode pre .dexedited {
 	box-shadow: 0 0 0 2px #E2B53A;
+}
+.dexshowedits .dexcode pre .dexcodeleaf.dexedited {
+	background: none;
 }
