@@ -257,7 +257,7 @@
 						continue;
 					}
 					var fields = $.extend({}, entries[id]);
-					$.each(['name', 'inheritsFrom', 'slots', 'replace', 'events', 'spriteFrom'], function (i, key) { delete fields[key]; });
+					$.each(['name', 'inheritsFrom', 'slots', 'events', 'spriteFrom'], function (i, key) { delete fields[key]; });
 					var data = view[table][id] || window[GLOBALS[table][0]][id] || {};
 					draft[table][id] = mergeEffect($.extend(true, {}, data), fields);
 				}
@@ -490,7 +490,7 @@
 			var found = spriteImage(view, species, isFront, shiny, gender, Dex.afdMode || options && options.afd);
 			if (!found) return spriteData;
 			var size = fit(found.image, 96, 96);
-			spriteData.url = imageURL(found.image) + (!found.image.flip !== !found.flip ? '#flip' : '');
+			spriteData.url = imageURL(found.image) + (found.flip ? '#flip' : '');
 			spriteData.w = size[0];
 			spriteData.h = size[1];
 			spriteData.y = found.image.y || 0;
