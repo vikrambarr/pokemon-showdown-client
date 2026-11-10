@@ -48,8 +48,10 @@
 		type: 'semimodal',
 		initialize: function (data) {
 			this.callback = data.callback;
-			this.$el.html('<form class="dexcreate"><p><label class="label">Name:<br /><input type="text" class="textbox autofocus" name="name" maxlength="40" /></label></p>' + (data.fields || '') +
+			this.$el.html('<form class="dexcreate"><p><label class="label">Name:<br /><input type="text" class="textbox autofocus" name="name" maxlength="40" value="' + BattleLog.escapeHTML(data.value || '') + '" /></label></p>' + (data.fields || '') +
 				'<p class="buttonbar"><button type="submit" class="button"><strong>Create</strong></button> <button type="button" name="close" class="button">Cancel</button></p></form>');
+			var input = this.$('input[name=name]')[0];
+			if (data.value) setTimeout(function () { input.setSelectionRange(input.value.length, input.value.length); });
 		},
 		submit: function (data) {
 			var name = $.trim(data.name);
@@ -230,7 +232,7 @@
 	}
 
 	function shrinkSprite(file, kind) {
-		var box = kind.slice(0, 4) === 'icon' ? { max: 64, width: 40, height: 30 } : { max: 192, width: 96, height: 96 };
+		var box = kind === 'type' ? { max: 64, width: 32, height: 14 } : kind.slice(0, 4) === 'icon' ? { max: 64, width: 40, height: 30 } : { max: 192, width: 96, height: 96 };
 		return new Promise(function (resolve) {
 			var image = new Image();
 			var url = URL.createObjectURL(file);
@@ -251,6 +253,28 @@
 				canvas.toBlob(function (blob) { resolve(blob || file); }, 'image/png');
 			};
 			image.src = url;
+		});
+	}
+
+	function uploadSprite(room, name, kind, file) {
+		room.setSaveState('saving');
+		(room.dexSummary.official ? Promise.resolve(file) : shrinkSprite(file, kind)).then(function (shrunk) {
+			file = shrunk;
+			return DexViews.ui.request('dexupload', room.dexid + ', ' + name + ', ' + kind);
+		}).then(function (data) {
+			return new Promise(function (resolve) {
+				$.ajax({ url: data.url, method: 'POST', data: file, processData: false, contentType: file.type, dataType: 'json' }).done(resolve).fail(function (xhr) {
+					resolve(xhr.responseJSON || { error: "The upload didn't work." });
+				});
+			});
+		}).then(function (result) {
+			room.setSaveState(result.error ? 'failed' : 'saved');
+			if (result.error) app.addPopup(Popup, { message: result.error });
+			room.dexStorageKey = null;
+			app.send('/crq dexes');
+		}, function (err) {
+			room.setSaveState('failed');
+			app.addPopup(Popup, { message: err.message });
 		});
 	}
 
@@ -288,29 +312,8 @@
 		submit: function () {
 			var file = this.$('input[name=file]')[0].files[0];
 			if (!file) return;
-			var room = this.room;
-			var name = room.dexSpecies.name;
-			var kind = this.kind;
 			this.close();
-			room.setSaveState('saving');
-			(room.dexSummary.official ? Promise.resolve(file) : shrinkSprite(file, kind)).then(function (shrunk) {
-				file = shrunk;
-				return DexViews.ui.request('dexupload', room.dexid + ', ' + name + ', ' + kind);
-			}).then(function (data) {
-				return new Promise(function (resolve) {
-					$.ajax({ url: data.url, method: 'POST', data: file, processData: false, contentType: file.type, dataType: 'json' }).done(resolve).fail(function (xhr) {
-						resolve(xhr.responseJSON || { error: "The upload didn't work." });
-					});
-				});
-			}).then(function (result) {
-				room.setSaveState(result.error ? 'failed' : 'saved');
-				if (result.error) app.addPopup(Popup, { message: result.error });
-				room.dexStorageKey = null;
-				app.send('/crq dexes');
-			}, function (err) {
-				room.setSaveState('failed');
-				app.addPopup(Popup, { message: err.message });
-			});
+			uploadSprite(this.room, this.room.dexSpecies.name, this.kind, file);
 		},
 		clearSprite: function () {
 			this.close();
@@ -357,7 +360,9 @@
 		events: {
 			'input input[name^=colorslider]': 'slideColor',
 			'input input[name^=color-]': 'typeColor',
-			'input input[name=label]': 'previewType'
+			'input input[name=label]': 'previewType',
+			'change input[name=iconmode]': 'switchIcon',
+			'change input[name=file]': 'previewType'
 		},
 		initialize: function (data) {
 			this.room = data.room;
@@ -366,10 +371,17 @@
 			var id = toID(data.name);
 			var entries = DexViews.entries[room.dexid];
 			this.own = entries && entries.types[id];
-			this.styled = !window.BattleTypeChart[id];
+			this.vanilla = !!window.BattleTypeChart[id];
+			this.removed = !!(room.dexView.TypeChart[id] && room.dexView.TypeChart[id].isNonstandard);
 			var buf = '<form class="dextypeform"><p><span class="dextypepreview">' + Dex.getTypeIcon(data.name) + '</span> <strong>' + BattleLog.escapeHTML(data.name) + '</strong></p>';
-			if (this.styled) {
+			if (this.removed) {
+				buf += '<p><small>Removed from this dex.</small></p>';
+			} else {
 				var style = this.style = DexViews.typeStyle(id, room.dexView.TypeChart[id] || {});
+				var image = this.image = DexViews.typeSprite(room.dexView, id);
+				buf += '<p><label class="checkbox"><input type="radio" name="iconmode" value="drawn"' + (image ? '' : ' checked') + ' /> Drawn</label> ' +
+					'<label class="checkbox"><input type="radio" name="iconmode" value="sprite"' + (image ? ' checked' : '') + ' /> Sprite</label></p>';
+				buf += '<div class="dextypedrawn"' + (image ? ' style="display:none"' : '') + '>';
 				buf += '<p><label class="label">Label:<br /><input type="text" name="label" class="textbox" maxlength="6" size="8" value="' + BattleLog.escapeHTML(style.label) + '" autocomplete="off" /></label></p>';
 				var rows = { label: '', value: '', slider: '' };
 				$.each(COLOR_CHANNELS, function (i, channel) {
@@ -379,10 +391,25 @@
 					rows.slider += '<div><input type="range" name="colorslider-' + channel[0] + '" value="' + value + '" min="0" max="255" class="evslider" style="--fill:' + channel[2] + '" /></div>';
 				});
 				buf += '<div class="statform dextypecolor"><div class="col labelcol">' + rows.label + '</div><div class="col evcol">' + rows.value + '</div>' +
-					'<div class="col evslidercol">' + rows.slider + '</div><div style="clear:both"></div></div>';
+					'<div class="col evslidercol">' + rows.slider + '</div><div style="clear:both"></div></div></div>';
+				buf += '<div class="dextypesprite"' + (image ? '' : ' style="display:none"') + '>';
+				if (image) {
+					buf += '<p><img src="' + DexViews.imageURL(image) + '" width="' + image.width * 2 + '" height="' + image.height * 2 + '" alt="" class="pixelated" /></p>' +
+						'<p><small>' + image.width + '&times;' + image.height + (image.artist ? ', by ' + BattleLog.escapeHTML(image.artist) : '') + '</small></p>';
+				}
+				buf += '<p><input type="file" name="file" accept="image/png,image/gif" /></p>';
+				buf += '<p><small>' + (room.dexSummary.official ? 'Official dex: any size' : 'Best at 32&times;14. Bigger than 64&times;64 is shrunk to 32&times;14') + '. Pixel art only.</small></p>';
+				if (!room.dexSummary.official && room.dexStorage) buf += '<p><small>' + storageHTML(room.dexStorage) + '</small></p>';
+				buf += '</div>';
 			}
-			buf += '<p class="buttonbar">' + (this.styled ? '<button type="submit" class="button"><strong>Done</strong></button> ' : '');
-			if (this.own) buf += '<button type="button" name="deleteType" class="button">' + (this.own === 'custom' ? 'Delete' : 'Reset to base') + '</button> ';
+			buf += '<p class="buttonbar">';
+			if (this.removed) {
+				buf += '<button type="button" name="restoreType" class="button"><strong>Restore</strong></button> ';
+			} else {
+				buf += '<button type="submit" class="button"><strong>Done</strong></button> ';
+				buf += '<button type="button" name="deleteType" class="button">Delete</button> ';
+			}
+			if (this.own && this.vanilla) buf += '<button type="button" name="resetType" class="button">Reset to base</button> ';
 			this.$el.html(buf + '<button type="button" name="close" class="button">Cancel</button></p></form>');
 		},
 		colorValue: function () {
@@ -401,39 +428,75 @@
 			$slider.val(Math.min(255, Math.max(0, Number(e.currentTarget.value) || 0)));
 			this.slideColor({ currentTarget: $slider[0] });
 		},
+		iconMode: function () {
+			return this.$('input[name=iconmode]:checked').val();
+		},
+		switchIcon: function () {
+			var sprite = this.iconMode() === 'sprite';
+			this.$('.dextypedrawn').toggle(!sprite);
+			this.$('.dextypesprite').toggle(sprite);
+			this.previewType();
+		},
 		previewType: function () {
+			var file = this.$('input[name=file]')[0].files[0];
+			if (this.objectURL) URL.revokeObjectURL(this.objectURL);
+			this.objectURL = null;
+			if (this.iconMode() === 'sprite') {
+				if (file) this.objectURL = URL.createObjectURL(file);
+				var src = this.objectURL || this.image && DexViews.imageURL(this.image);
+				this.$('.dextypepreview').html(src ? '<img src="' + BattleLog.escapeHTML(src) + '" alt="" class="pixelated" style="max-width:32px;max-height:14px" />' : '<em>No sprite</em>');
+				return;
+			}
 			var label = $.trim(this.$('input[name=label]').val()).toUpperCase() || this.style.label;
-			this.$('.dextypepreview img').attr('src', DexViews.typeIconURL({ label: label, color: this.colorValue() }));
+			this.$('.dextypepreview').html('<img src="' + DexViews.typeIconURL({ label: label, color: this.colorValue() }) + '" alt="" width="32" height="14" class="pixelated" />');
 		},
 		submit: function () {
 			var room = this.room;
 			var style = this.style;
 			var fields = { name: this.name };
+			var file = this.$('input[name=file]')[0].files[0];
+			var sprite = this.iconMode() === 'sprite';
 			var label = $.trim(this.$('input[name=label]').val()).toUpperCase();
 			var color = this.colorValue();
-			if (label && label !== style.label) fields.label = label;
-			if (color !== style.color) fields.color = color;
+			if (!sprite && label && label !== style.label) fields.label = label;
+			if (!sprite && color !== style.color) fields.color = color;
 			this.close();
+			if (sprite && file) uploadSprite(room, this.name, 'type', file);
+			if (!sprite && this.image) {
+				room.dexStorageKey = null;
+				room.editDex({ sprite: { name: this.name, kind: 'type', image: null } });
+			}
 			if (!fields.label && !fields.color) return;
 			room.draftDex('effects', 'TypeChart:' + toID(this.name), fields);
 			room.$('.dextabempty').html(room.renderDexTypes());
 		},
+		close: function () {
+			if (this.objectURL) URL.revokeObjectURL(this.objectURL);
+			Popup.prototype.close.apply(this, arguments);
+		},
 		deleteType: function () {
+			var name = BattleLog.escapeHTML(this.name);
+			this.confirmType(this.vanilla ? 'Remove the ' + name + ' type from this dex? Its matchups become neutral, and Pok&eacute;mon and moves that have it keep it.' :
+				'Delete the ' + name + ' type from this dex?', "Delete", this.vanilla ? { type: { name: this.name, removed: true } } : { deletetype: this.name });
+		},
+		restoreType: function () {
+			this.confirmType(null, null, { type: { name: this.name, removed: null } });
+		},
+		resetType: function () {
+			this.confirmType('Reset ' + BattleLog.escapeHTML(this.name) + ' to its base matchups and look? Every edit to it in this dex is removed.',
+				"Reset to base", { deletetype: this.name });
+		},
+		confirmType: function (message, button, edit) {
 			var room = this.room;
-			var name = this.name;
-			var custom = this.own === 'custom';
-			var message = custom ? 'Delete the ' + BattleLog.escapeHTML(name) + ' type from this dex?' :
-				'Reset ' + BattleLog.escapeHTML(name) + ' to its base matchups? Every edit to it in this dex is removed.';
+			var key = 'TypeChart:' + toID(this.name);
+			var save = function () {
+				if (room.dexDraft) delete room.dexDraft.effects[key];
+				room.applyDexDraft();
+				room.editDex(edit);
+			};
 			this.close();
-			app.addPopup(DexConfirmPopup, {
-				message: message,
-				button: custom ? "Delete" : "Reset to base",
-				callback: function () {
-					if (room.dexDraft) delete room.dexDraft.effects['TypeChart:' + toID(name)];
-					room.applyDexDraft();
-					room.editDex({ deletetype: name });
-				}
-			});
+			if (!message) return save();
+			app.addPopup(DexConfirmPopup, { message: message, button: button, callback: save });
 		}
 	});
 
@@ -473,7 +536,8 @@
 			'change select[name=tierstyle]': 'changeTierStyle',
 			'click .dextierpage a[data-entry]': 'clickDexTierEntry',
 			'click .dextypeedit td[data-defender]': 'cycleDexTypeMatchup',
-			'click .dextypeedit th[data-type]': 'openDexType'
+			'click .dextypeedit th[data-type]': 'openDexType',
+			'click .dexremovedtypes button[data-type]': 'openDexType'
 		},
 		initialize: function () {
 			this.$el.addClass('ps-room-light').addClass('scrollable');
@@ -942,10 +1006,8 @@
 			var buf = editable ? '<p><button class="button" name="newDexEffect"><i class="fa fa-plus"></i> New type</button>' + this.dexSaveHTML('button dexsave') + '</p>' : '';
 			buf += '<p><small>Rows are the attacking type, columns are the defending type.' + (editable ? ' Click a matchup to change it.' : '') + '</small></p>';
 			buf += '<div class="ladder dextypechart' + (editable ? ' dextypeedit' : '') + '"><table><tr><th></th>';
-			var entries = DexViews.entries[this.dexid];
 			var typeHeader = function (name) {
-				var clickable = editable && (!window.BattleTypeChart[toID(name)] || entries && entries.types[toID(name)]);
-				return '<th title="' + BattleLog.escapeHTML(name) + '"' + (clickable ? ' data-type="' + BattleLog.escapeHTML(name) + '"' : '') + '>' + Dex.getTypeIcon(name) + '</th>';
+				return '<th title="' + BattleLog.escapeHTML(name) + '"' + (editable ? ' data-type="' + BattleLog.escapeHTML(name) + '"' : '') + '>' + Dex.getTypeIcon(name) + '</th>';
 			};
 			for (var i = 0; i < names.length; i++) buf += typeHeader(names[i]);
 			buf += '</tr>';
@@ -958,7 +1020,15 @@
 				}
 				buf += '</tr>';
 			}
-			return buf + '</table></div>';
+			buf += '</table></div>';
+			var removed = Object.keys(this.dexView.TypeChart).filter(function (id) { return dex.types.get(id).isNonstandard; });
+			if (!removed.length) return buf;
+			buf += '<p class="dexremovedtypes"><small>Removed types:</small> ';
+			for (var i = 0; i < removed.length; i++) {
+				var name = dex.types.get(removed[i]).name;
+				buf += editable ? '<button class="button" data-type="' + BattleLog.escapeHTML(name) + '" title="Restore ' + BattleLog.escapeHTML(name) + '">' + Dex.getTypeIcon(name) + '</button> ' : Dex.getTypeIcon(name) + ' ';
+			}
+			return buf + '</p>';
 		},
 		openDexType: function (e) {
 			e.stopPropagation();

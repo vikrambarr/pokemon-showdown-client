@@ -28,6 +28,14 @@
 			'fire', 'water', 'grass', 'electric', 'psychic', 'ice', 'dragon', 'dark', 'fairy', 'stellar'
 		];
 
+		var TYPE_COLORS = {
+			normal: '#ada594', fighting: '#a55239', flying: '#9cadf7', poison: '#b55aa5', ground: '#d6b55a', rock: '#bda55a',
+			bug: '#adbd21', ghost: '#6363b5', steel: '#adadc6', fire: '#f75231', water: '#399cff', grass: '#7bce52',
+			electric: '#ffc631', psychic: '#ff73a5', ice: '#5acee7', dragon: '#7b63e7', dark: '#735a4a', fairy: '#ff65d5', stellar: '#3f00ff'
+		};
+
+		var TYPE_LABELS = { fighting: 'FIGHT', electric: 'ELECTR', psychic: 'PSYCHC', stellar: 'STELLR' };
+
 		var TYPE_GLYPHS = {
 			'-': '....|....|....|WWWs|ssss|....|....|....',
 			'0': '.WWs.|WssWs|Ws.Ws|WsWWs|WWsWs|WssWs|sWWss|.sss.',
@@ -77,6 +85,7 @@
 			custom: { Pokedex: {}, Moves: {}, Items: {}, Abilities: {} },
 			sprites: {},
 			itemSprites: {},
+			typeSprites: {},
 			types: {},
 			current: null,
 			query: null,
@@ -87,6 +96,8 @@
 			tierData: tierData,
 			typeStyle: typeStyle,
 			typeIconURL: typeIconURL,
+			typeSprite: function (view, id) { return view.images[view.typeSprites[id]] || null; },
+			imageURL: imageURL,
 			indexSearch: indexSearch
 		};
 		var unindexed = [];
@@ -144,7 +155,7 @@
 		}
 
 		function merge(view, source, attributes) {
-			var tables = ['Pokedex', 'Moves', 'Abilities', 'Items', 'TypeChart', 'FormatsData', 'images', 'itemSprites'];
+			var tables = ['Pokedex', 'Moves', 'Abilities', 'Items', 'TypeChart', 'FormatsData', 'images', 'itemSprites', 'typeSprites'];
 			for (var i = 0; i < tables.length; i++) {
 				var table = source[tables[i]];
 				for (var id in table) {
@@ -188,7 +199,7 @@
 				hash: layer.hash, dexid: layer.dexid, name: layer.name, mod: layer.mod, gen: gen,
 				modid: 'gen' + gen + 'dex' + layer.hash, species: {},
 				Pokedex: {}, Learnsets: {}, FormatsData: {}, Moves: {}, Abilities: {}, Items: {}, TypeChart: {},
-				sprites: {}, itemSprites: {}, images: {}, origins: {}
+				sprites: {}, itemSprites: {}, typeSprites: {}, images: {}, origins: {}
 			};
 			for (var i = parents.length - 1; i >= 0; i--) merge(view, parents[i], true);
 			for (var j = parents.length - 1; j >= 0; j--) $.extend(view.origins, parents[j].origins);
@@ -256,6 +267,7 @@
 				var learnset = fields.learnset;
 				delete fields.learnset;
 				delete fields.name;
+				if ('requiredItem' in fields) fields.requiredItems = fields.requiredItem ? [fields.requiredItem] : null;
 				if (!$.isEmptyObject(fields)) draft.Pokedex[id] = $.extend({}, view.Pokedex[id] || view.dex.species.get(id), fields);
 				if (!learnset) continue;
 				var moves = $.extend({}, DexViews.learnsetOf(view, id));
@@ -333,9 +345,9 @@
 				var names = typeNames().slice();
 				for (var id in view.TypeChart) {
 					var typeName = dex.types.get(id).name;
-					if (!names.includes(typeName)) names.push(typeName);
+					if (!names.includes(typeName) && TYPES.indexOf(id) < 0) names.push(typeName);
 				}
-				return names;
+				return names.filter(function (name) { return !dex.types.get(name).isNonstandard; });
 			};
 
 			var getText = dex.text.get;
@@ -371,6 +383,9 @@
 			for (var id in view.itemSprites) {
 				if (view.images[view.itemSprites[id]]) DexViews.itemSprites[id] = view.images[view.itemSprites[id]];
 			}
+			for (var id in view.typeSprites) {
+				if (TYPES.indexOf(id) < 0 && view.images[view.typeSprites[id]]) DexViews.typeSprites[id] = view.images[view.typeSprites[id]];
+			}
 			for (var id in view.TypeChart) {
 				if (TYPES.indexOf(id) >= 0) continue;
 				if (!DexViews.types[id]) added.push([id, 'type']);
@@ -384,8 +399,8 @@
 			var name = id.charAt(0).toUpperCase() + id.slice(1);
 			return {
 				name: name,
-				label: entry.label || name.toUpperCase().replace(/[^A-Z0-9?-]/g, '').slice(0, 6),
-				color: entry.color || '#9a9aa8'
+				label: entry.label || TYPE_LABELS[id] || name.toUpperCase().replace(/[^A-Z0-9?-]/g, '').slice(0, 6),
+				color: entry.color || TYPE_COLORS[id] || '#9a9aa8'
 			};
 		}
 
@@ -579,7 +594,13 @@
 		Dex.getTypeIcon = function (type, b) {
 			var id = toID(type);
 			var view = DexViews.current;
-			var custom = TYPES.indexOf(id) < 0 && (view && view.TypeChart[id] ? typeStyle(id, view.TypeChart[id]) : DexViews.types[id]);
+			var image = view && view.images[view.typeSprites[id]] || TYPES.indexOf(id) < 0 && DexViews.typeSprites[id];
+			if (image) {
+				var size = fit(image, 32, 14);
+				return '<img src="' + imageURL(image) + '" alt="' + BattleLog.escapeHTML(Dex.types.get(type).name || id) + '" width="' + size[0] + '" height="' + size[1] + '" class="pixelated' + (b ? ' b' : '') + '" />';
+			}
+			var entry = view && view.TypeChart[id];
+			var custom = entry && (TYPES.indexOf(id) < 0 || entry.color || entry.label) ? typeStyle(id, entry) : TYPES.indexOf(id) < 0 && DexViews.types[id];
 			if (!custom) return getTypeIcon.apply(this, arguments);
 			return '<img src="' + typeIconURL(custom) + '" alt="' + BattleLog.escapeHTML(custom.name) + '" height="14" width="32" class="pixelated' + (b ? ' b' : '') + '" />';
 		};
