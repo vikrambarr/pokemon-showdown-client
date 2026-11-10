@@ -905,18 +905,8 @@
 			return this.dexCodeHTML(species.id, values, node);
 		},
 		dexLearnsetCodeHTML: function (species) {
-			var learnset = this.dexSpeciesLearnset(species);
-			var moves = Object.keys(learnset);
-			var shown = {};
-			$.each(this.dexCodeFullLearnset ? moves : moves.slice(0, 12), function (i, id) { shown[id] = learnset[id]; });
-			var more = moves.length > 12 ? '<p><button class="dexcodeplus" name="toggleDexCodeLearnset">' +
-				(this.dexCodeFullLearnset ? 'Show fewer' : '&hellip; ' + (moves.length - 12) + ' more') + '</button></p>' : '';
 			var node = this.dexSpeciesCodeNode();
-			return '<div class="setchart dexcodebox">' + this.dexCodeHTML(species.id, { learnset: shown }, CODE.obj({ learnset: node.fields.learnset }, false, ['learnset'])) + more + '</div>';
-		},
-		toggleDexCodeLearnset: function () {
-			this.dexCodeFullLearnset = !this.dexCodeFullLearnset;
-			this.refreshDexCode();
+			return '<div class="setchart dexcodebox">' + this.dexCodeHTML(species.id, { learnset: this.dexSpeciesLearnset(species) }, CODE.obj({ learnset: node.fields.learnset }, false, ['learnset'])) + '</div>';
 		},
 		refreshDexCode: function () {
 			var top = this.$('.dexmonpage [data-panel=code]').scrollTop();
@@ -945,7 +935,6 @@
 			if (this.dexCodeFor !== 'Pokedex:' + species.id) {
 				this.dexCodeFor = 'Pokedex:' + species.id;
 				this.dexCodePending = {};
-				this.dexCodeFullLearnset = false;
 			}
 
 			buf += '<div class="teamchartbox individual"><ol class="teamchart"><li' + stageHue(view, species) + '>';
