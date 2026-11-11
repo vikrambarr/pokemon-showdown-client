@@ -512,8 +512,12 @@
 				}
 			}
 			var view = pokemon instanceof Pokemon ? viewOf(pokemon.side.battle.dex) : DexViews.current;
-			var sprites = spritesOf(view, id) || spritesOf(null, id);
-			var image = sprites && (pokemon.gender === 'F' && sprites['icon-f'] || sprites.icon);
+			var ids = window.BattlePokedex && BattlePokedex[id] && !DexViews.custom.Pokedex[id] ? [id] : [id, toID((view ? view.dex : Dex).species.get(id).baseSpecies)];
+			var image = null;
+			for (var i = 0; i < ids.length && !image; i++) {
+				var sprites = spritesOf(view, ids[i]) || spritesOf(null, ids[i]);
+				image = sprites && (pokemon.gender === 'F' && sprites['icon-f'] || sprites.icon);
+			}
 			if (!image) return icon;
 			var size = fit(image, 40, 30);
 			var end = icon.indexOf(';');
