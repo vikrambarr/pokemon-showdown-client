@@ -58,10 +58,16 @@
 
 	var missingEntries = {};
 
+	function toSet(ids) {
+		var set = {};
+		for (var i = 0; i < ids.length; i++) set[ids[i]] = 1;
+		return set;
+	}
+
 	function loadEntries(dexid) {
 		if (DexViews.entries[dexid] || !dexid || missingEntries[dexid]) return;
 		request('dexentries', dexid).then(function (data) {
-			var entries = { custom: data.custom, modified: data.modified, names: data.names, choices: data.choices, species: data.Pokedex, originals: data.originals || {}, conditions: data.conditions || {}, types: data.types || {} };
+			var entries = { custom: data.custom, modified: data.modified, names: data.names, choices: data.choices, species: data.Pokedex, world: toSet(data.world || []), needed: toSet(data.needed || []), own: data.own, originals: data.originals || {}, conditions: data.conditions || {}, types: data.types || {} };
 			$.each(['Moves', 'Abilities', 'Items', 'Conditions'], function (i, table) {
 				var ids = entries[table] = {};
 				for (var j = 0; j < data[table].length; j++) ids[data[table][j]] = 1;
@@ -73,7 +79,8 @@
 			$.each(dexRooms(), function (j, room) {
 				if (room.dexid !== dexid && !(room.dexView && room.dexView.dexid === dexid)) return;
 				var typedSearch = room.dexSearch && room.dexSearch.engine.typedSearch;
-				if (typedSearch && typedSearch.searchType !== 'pokemon') room.dexSearch.setType(typedSearch.searchType, 'gen' + room.dexView.gen);
+				if (typedSearch && (typedSearch.searchType !== 'pokemon' || room.dexScope === 'out')) room.dexSearch.setType(typedSearch.searchType, 'gen' + room.dexView.gen);
+				if (room.dexSelect) room.activeDexSelect().render();
 				if (room.dexFormatSearch && room.dexFormatKind) room.showDexFormatList(room.dexFormatKind);
 				if (room.dexSpecies) room.updateDexLearnsetCount(true);
 				if (room.dexSummary && room.dexSummary.counts[room.dexTab] && ['Conditions', 'TypeChart'].includes(room.dexSummary.counts[room.dexTab].table)) room.showDexTab(room.dexTab);
@@ -325,7 +332,7 @@
 			app.addPopup(Popup, { htmlMessage: data.error ? BattleLog.escapeHTML(data.error) : BattleLog.sanitizeHTML(data.html) });
 			app.send('/crq dexes');
 		});
-		$.each(['dex', 'dexentries', 'dexeffect', 'dexformat', 'dexupload', 'dexstorage'], function (i, cmd) {
+		$.each(['dex', 'dexentries', 'dexeffect', 'dexformat', 'dexupload', 'dexstorage', 'dexsource'], function (i, cmd) {
 			app.on('response:' + cmd, function (data) {
 				answer(cmd, data);
 			});
@@ -403,8 +410,9 @@
 			var view = this.typedSearch && this.typedSearch.dexView;
 			if (!this.results) return changed;
 			if (view && !DexViews.entries[view.dexid]) loadEntries(view.dexid);
+			var filter = this.typedSearch && this.typedSearch.dexFilter;
 			this.results = this.results.filter(function (row) {
-				return shownInDex(view, row);
+				return filter ? filter(row) : shownInDex(view, row);
 			}).filter(function (row, index, rows) {
 				return row[0] !== 'header' || (rows[index + 1] && rows[index + 1][0] !== 'header');
 			});
@@ -440,7 +448,9 @@
 			var view = search.dexView;
 			var moves = {};
 			var learnsetid = firstLearnsetid(view, search, speciesid);
-			while (learnsetid) {
+			var seen = {};
+			while (learnsetid && !seen[learnsetid]) {
+				seen[learnsetid] = 1;
 				var learnset = learnsetOf(view, learnsetid);
 				for (var moveid in learnset) moves[moveid] = 1;
 				learnsetid = search.nextLearnsetid(learnsetid, speciesid, true);
@@ -502,7 +512,7 @@
 			if (!this.dexView) return getPokemonResults.apply(this, arguments);
 			var self = this;
 			var tiers = {};
-			for (var id in this.dexView.species) {
+			for (var id in this.dexPool || this.dexView.species) {
 				var species = this.dex.species.get(id);
 				if (!species.exists) continue;
 				var tier = this.getTier(species) || 'Illegal';
@@ -649,13 +659,14 @@
 			if (!table) return;
 			typedSearch.getBaseResults = function () {
 				var shown = DexViews.entries[dexid];
+				var pool = this.dexPool;
 				var seen = {};
 				var results = dropEmptyHeaders(this.getDefaultResults().filter(function (row) {
 					if (row[0] !== searchType) return true;
 					seen[row[1]] = 1;
-					return !!shown && !!shown[table][row[1]];
+					return pool ? !!pool[row[1]] : !!shown && !!shown[table][row[1]];
 				}));
-				var others = Object.keys(shown ? shown[table] : {}).filter(function (id) { return !seen[id]; }).sort();
+				var others = Object.keys(pool || (shown ? shown[table] : {})).filter(function (id) { return !seen[id]; }).sort();
 				if (!others.length) return results;
 				return results.concat([['header', "Other " + table.toLowerCase()]], others.map(function (id) {
 					return [searchType, id];
@@ -663,6 +674,155 @@
 			};
 		};
 	}
+
+	var selections = [];
+
+	function selectable(search, options) {
+		var sel = { on: false, picked: {}, base: {}, anchor: '', pressed: false, timer: null };
+		var copy = function (picked) {
+			return $.extend({}, picked);
+		};
+		var rows = function () {
+			var type = options.type();
+			return (search.resultSet || []).filter(function (row) {
+				return row[0] === type && options.canSelect(toID(row[1]));
+			}).map(function (row) { return toID(row[1]); });
+		};
+		var refresh = function () {
+			var type = options.type();
+			$(options.$bar()).closest('p').toggleClass('dexselectmode', sel.on);
+			$(search.el).toggleClass('dexselecting', sel.on).find('a[data-entry]').each(function () {
+				var entry = this.dataset.entry.split('|');
+				$(this).toggleClass('cur', sel.on && entry[0] === type && !!sel.picked[toID(entry[1])]);
+			});
+			render();
+		};
+		var render = function () {
+			var $bar = options.$bar();
+			$bar.off('click.dexselect').on('click.dexselect', 'button[data-select], button[data-select-action]', function (e) {
+				e.preventDefault();
+				e.stopPropagation();
+				var command = this.dataset.select;
+				if (command === 'start') return sel.start();
+				if (command === 'stop') return sel.stop();
+				if (command === 'all') return sel.all();
+				var action = options.actions()[this.dataset.selectAction];
+				var ids = Object.keys(sel.picked).filter(action.applies);
+				if (ids.length) action.run(ids, this, sel.stop);
+			});
+			if (!options.enabled()) return $bar.empty();
+			if (!sel.on) {
+				return $bar.html('<button class="button" data-select="start"><i class="fa fa-check-square-o"></i> Select</button>');
+			}
+			var ids = Object.keys(sel.picked);
+			var buf = '<button class="button" data-select="stop" title="Cancel"><i class="fa fa-times"></i></button> <strong>' + ids.length + ' selected</strong>';
+			$.each(options.actions(), function (i, action) {
+				var count = ids.filter(action.applies).length;
+				if (!count) return;
+				buf += ' <button class="button" data-select-action="' + i + '"><i class="fa fa-' + action.icon + '"></i> <strong>' + action.label + '</strong>' +
+					(count !== ids.length ? ' (' + count + ')' : '') + '</button>';
+			});
+			$bar.html(buf + ' <button class="button" data-select="all" title="Select all"><i class="fa fa-check-square"></i> All</button>');
+		};
+		var toggle = function (id) {
+			if (sel.picked[id]) delete sel.picked[id];
+			else sel.picked[id] = 1;
+			sel.anchor = id;
+			sel.base = copy(sel.picked);
+		};
+		var range = function (id, add) {
+			if (add) sel.base = copy(sel.picked);
+			var list = rows();
+			var from = list.indexOf(sel.anchor);
+			var to = list.indexOf(id);
+			if (from < 0) from = to;
+			sel.picked = copy(sel.base);
+			for (var i = Math.min(from, to); i <= Math.max(from, to); i++) sel.picked[list[i]] = 1;
+		};
+		var pick = function (target, shift, add) {
+			var entry = target.dataset.entry.split('|');
+			if (entry[0] !== options.type()) return false;
+			var id = toID(entry[1]);
+			if (!sel.on) {
+				if (!(add || shift) || !options.enabled()) return false;
+				sel.start();
+			}
+			if (!options.canSelect(id)) return true;
+			if (shift && sel.anchor) range(id, add);
+			else toggle(id);
+			refresh();
+			return true;
+		};
+		sel.start = function () {
+			sel.on = true;
+			sel.picked = {};
+			sel.base = {};
+			sel.anchor = '';
+			if (selections.indexOf(sel) < 0) selections.push(sel);
+			refresh();
+		};
+		sel.stop = function () {
+			sel.on = false;
+			sel.picked = {};
+			refresh();
+		};
+		sel.render = refresh;
+		sel.visible = function () {
+			return $(search.el).is(':visible');
+		};
+		sel.all = function () {
+			$.each(rows(), function (i, id) { sel.picked[id] = 1; });
+			sel.base = copy(sel.picked);
+			refresh();
+		};
+		sel.click = function (e) {
+			if (sel.pressed) {
+				sel.pressed = false;
+				return true;
+			}
+			if (!sel.on && !e.ctrlKey && !e.metaKey && !e.shiftKey) return false;
+			return pick(e.currentTarget, e.shiftKey, e.ctrlKey || e.metaKey);
+		};
+		var renderRow = search.renderRow;
+		search.renderRow = function (id, type, matchStart, matchLength, errorMessage, attrs) {
+			if (sel.on && type === options.type() && sel.picked[toID(id)]) attrs = attrs ? attrs.replace('class="', 'class="cur ') : ' class="cur"';
+			return renderRow.call(this, id, type, matchStart, matchLength, errorMessage, attrs);
+		};
+		var clear = function () {
+			clearTimeout(sel.timer);
+			sel.timer = null;
+		};
+		$(search.el).addClass('dexselectable').on('pointerdown', 'a[data-entry]', function (e) {
+			var event = e.originalEvent;
+			sel.pressed = false;
+			if (event.pointerType === 'mouse' || !options.enabled()) return;
+			var target = this;
+			sel.point = [event.clientX, event.clientY];
+			clear();
+			sel.timer = setTimeout(function () {
+				sel.timer = null;
+				sel.pressed = pick(target, sel.on, true);
+			}, 500);
+		}).on('pointermove', function (e) {
+			var event = e.originalEvent;
+			if (sel.timer && Math.abs(event.clientX - sel.point[0]) + Math.abs(event.clientY - sel.point[1]) > 10) clear();
+		}).on('pointerup pointercancel', clear).on('contextmenu', 'a[data-entry]', function (e) {
+			if (sel.pressed || sel.timer) e.preventDefault();
+		});
+		return sel;
+	}
+
+	window.addEventListener('keydown', function (e) {
+		var sel = selections.filter(function (each) { return each.on && each.visible(); })[0];
+		if (!sel || app.popups.length) return;
+		if (e.keyCode === 27) {
+			sel.stop();
+			e.preventDefault();
+		} else if (e.keyCode === 65 && (e.ctrlKey || e.metaKey) && !$(e.target).is('input, textarea, select')) {
+			sel.all();
+			e.preventDefault();
+		}
+	}, true);
 
 	function chartHTML(groups, empty) {
 		var buf = '';
@@ -850,7 +1010,7 @@
 
 	DexViews.ui = {
 		request: request, compareFormats: compareFormats, openDexPage: openDexPage, DexConfirmPopup: DexConfirmPopup,
-		HIDE_BUTTON: HIDE_BUTTON, OFFICIAL_BADGE: OFFICIAL_BADGE, canEdit: canEdit, viewSearch: viewSearch, panelSearch: panelSearch, rowClasses: rowClasses,
+		HIDE_BUTTON: HIDE_BUTTON, OFFICIAL_BADGE: OFFICIAL_BADGE, canEdit: canEdit, viewSearch: viewSearch, panelSearch: panelSearch, rowClasses: rowClasses, selectable: selectable,
 		EFFECT_KINDS: EFFECT_KINDS, ENTRY_TABLES: ENTRY_TABLES, GETTERS: GETTERS, dexEntryResults: dexEntryResults, chartHTML: chartHTML, chartRowHTML: chartRowHTML, sentenceRowHTML: sentenceRowHTML,
 		dropEmptyHeaders: dropEmptyHeaders, shownInDex: shownInDex, learnRows: learnRows, showSaveProblems: showSaveProblems, setTierStyle: setTierStyle, tierHeader: tierHeader, changedValue: changedValue
 	};

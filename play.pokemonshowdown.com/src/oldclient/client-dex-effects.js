@@ -2,7 +2,6 @@
 
 	var DexViews = window.DexViews;
 	var request = DexViews.ui.request;
-	var DexConfirmPopup = DexViews.ui.DexConfirmPopup;
 	var viewSearch = DexViews.ui.viewSearch;
 	var mergeEffect = DexViews.mergeEffect;
 	var escape = BattleLog.escapeHTML;
@@ -762,7 +761,7 @@
 			buf += ' <button name="showDexEffectPanel" value="code" class="pokemon"><i class="fa fa-code"></i> Code</button>';
 			buf += '</div>';
 			buf += '<div class="teamchartbox individual"><ol class="teamchart"><li>';
-			buf += this.dexMenuHTML('copyDexEffect', info.edited && ['deleteDexEffect', info.official ? 'Reset to base' : 'Delete']);
+			buf += this.dexMenuHTML('copyDexEffect', null, '', this.dexEffectMembershipHTML(info));
 			buf += '<div class="setchart dexmonchart dexeffectchart">';
 
 			buf += '<div class="setcol setcol-icon"><div class="setcell-sprite dexmoveicons">' + this.dexEffectIconHTML(data) + '</div>';
@@ -1518,10 +1517,11 @@
 				var kind = kinds.indexOf((entries.conditions[id] || [''])[0]);
 				return kind < 0 ? kinds.length : kind;
 			};
+			var needed = this.dexScope !== 'out';
 			var ids = Object.keys(entries.Conditions).sort(function (a, b) {
 				return rank(a) - rank(b) || nameOf(a).localeCompare(nameOf(b));
 			}).filter(function (id) {
-				return !query || toID(nameOf(id)).indexOf(query) >= 0;
+				return !!entries.needed[id] === needed && (!query || toID(nameOf(id)).indexOf(query) >= 0);
 			});
 			var groups = [
 				["Custom conditions", ids.filter(function (id) { return custom.indexOf(id) >= 0; })],
@@ -1657,25 +1657,29 @@
 			if (focused) this.$('.dexmonpage input[name=effectflags]').val(query).focus();
 			this.markDexEdits();
 		},
+		dexEffectMembershipHTML: function (info) {
+			var table = this.dexEffect.table;
+			var entries = DexViews.entries[this.dexid];
+			if (table !== 'Conditions' && entries && !entries[table][this.dexEffect.id]) {
+				return ' <button name="addDexEffect"><i class="fa fa-plus-circle"></i>Add to dex</button>';
+			}
+			var buf = table !== 'Conditions' || !info.official ? ' <button name="deleteDexEffect"><i class="fa fa-trash"></i>Delete</button>' : '';
+			return buf + (info.official && info.edited ? ' <button name="resetDexEffect"><i class="fa fa-undo"></i>Reset to base</button>' : '');
+		},
+		addDexEffect: function () {
+			var edit = {};
+			edit['add' + KINDS[this.dexEffect.table]] = { names: [this.dexEffectData.name] };
+			this.editDex(edit);
+		},
 		deleteDexEffect: function (value, button) {
 			var self = this;
-			var effect = this.dexEffect;
-			var info = this.dexEffectData;
-			var message = info.official ? 'Reset ' + escape(info.name) + ' to its base data? Every edit to it in this dex is removed.' :
-				'Delete ' + escape(info.name) + ' from this dex?';
-			app.addPopup(DexConfirmPopup, {
-				message: message,
-				button: info.official ? "Reset to base" : "Delete",
-				sourceEl: button,
-				callback: function () {
-					if (self.dexDraft) delete self.dexDraft.effects[effect.table + ':' + effect.id];
-					self.applyDexDraft();
-					var edit = {};
-					edit['delete' + KINDS[effect.table]] = info.name;
-					self.editDex(edit);
-					if (!info.official) self.closeDexEffect();
-				}
+			var official = this.dexEffectData.official;
+			this.deleteDexEntries(this.dexEffect.table, [this.dexEffect.id], false, button, function () {
+				if (!official) self.closeDexEffect();
 			});
+		},
+		resetDexEffect: function (value, button) {
+			this.deleteDexEntries(this.dexEffect.table, [this.dexEffect.id], true, button);
 		},
 		newDexEffect: function (value, button) {
 			var count = this.dexSummary.counts[this.dexTab];

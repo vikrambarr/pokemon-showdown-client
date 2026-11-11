@@ -2,7 +2,6 @@
 
 	var DexViews = window.DexViews;
 	var viewSearch = DexViews.ui.viewSearch;
-	var DexConfirmPopup = DexViews.ui.DexConfirmPopup;
 
 	function editableDexes() {
 		return DexViews.list.filter(function (summary) {
@@ -57,9 +56,9 @@
 
 	function evoParent(view, species) {
 		var prevo = toID(species.prevo);
-		if (prevo && view.species[prevo]) return prevo;
+		if (prevo && prevo !== species.id && view.species[prevo]) return prevo;
 		var parents = (linksOf(view)[species.id] || []).filter(function (id) {
-			return (view.dex.species.get(id).evos || []).indexOf(species.name) >= 0;
+			return id !== species.id && (view.dex.species.get(id).evos || []).indexOf(species.name) >= 0;
 		});
 		return parents[0] || '';
 	}
@@ -252,7 +251,7 @@
 	}
 
 	function hasStandardSprites(id) {
-		return !!(window.BattlePokedex && BattlePokedex[id]) && !DexViews.custom.Pokedex[id];
+		return !!(window.BattlePokedex && BattlePokedex[id] && BattlePokedex[id].exists !== false) && !DexViews.custom.Pokedex[id];
 	}
 
 	var CODE = {
@@ -492,11 +491,8 @@
 						buf += '</li>';
 						return;
 					}
-					var id = row.species.id;
-					var custom = DexViews.custom.Pokedex[id];
-					var edited = custom || !entries || entries.originals.hasOwnProperty(id);
 					buf += '<li data-species="' + BattleLog.escapeHTML(row.species.name) + '"' + stageAttrs(row.hue) + '><div class="setmenu"><button name="copyDexPokemon" value="' + BattleLog.escapeHTML(row.species.name) + '"><i class="fa fa-clone"></i>Copy</button>';
-					if (editable && edited) buf += ' <button name="deleteDexPokemon" value="' + BattleLog.escapeHTML(row.species.name) + '"><i class="fa fa-trash"></i>' + (custom ? 'Delete' : 'Reset to base') + '</button>';
+					if (editable) buf += room.dexMembershipHTML(row.species);
 					buf += '</div>' + room.dexSpeciesRowHTML(row.species, editable) + '</li>';
 					if (editable && !inBattle(row.species)) {
 						var value = ' value="' + BattleLog.escapeHTML(row.species.name) + '" class="button"';
@@ -1025,7 +1021,7 @@
 				var value = species.baseStats[stat];
 				var width = Math.min(value * 75 / 255, 75);
 				var color = Math.min(Math.floor(value * 180 / 255), 360);
-				buf += '<span class="statrow"><label>' + BattleStatNames[stat] + '</label> <span class="statgraph"><span style="width:' + width + 'px;background:hsl(' + color + ',40%,75%);"></span></span> <em>' + value + '</em></span>';
+				buf += '<span class="statrow" data-stat="' + stat + '"><label>' + BattleStatNames[stat] + '</label> <span class="statgraph"><span style="width:' + width + 'px;background:hsl(' + color + ',40%,75%);"></span></span> <em>' + value + '</em></span>';
 			}
 			buf += '</button></div></div>';
 			return buf + '</div>';
@@ -1069,20 +1065,23 @@
 			var query = $.trim(this.$('.dexmonpage input[name=listsearch]').val() || '');
 			if (query) search.find(query);
 		},
-		dexMenuHTML: function (copy, remove, removeValue) {
+		dexMenuHTML: function (copy, remove, removeValue, extra) {
 			var buf = '<div class="setmenu">' + (this.dexEditable ? this.dexSaveHTML('dexsave') : '') + this.dexEditsHTML() +
-				' <button name="' + copy + '"><i class="fa fa-clone"></i>Copy</button>';
+				' <button name="' + copy + '"><i class="fa fa-clone"></i>Copy</button>' + (this.dexEditable && extra || '');
 			if (this.dexEditable && remove) {
 				buf += ' <button name="' + remove[0] + '"' + (removeValue ? ' value="' + BattleLog.escapeHTML(removeValue) + '"' : '') + '><i class="fa fa-trash"></i>' + remove[1] + '</button>';
 			}
 			return buf + '</div>';
 		},
 		dexPokemonMenuHTML: function () {
-			var species = this.dexSpecies;
+			return this.dexMenuHTML('copyDexPokemon', null, '', this.dexMembershipHTML(this.dexSpecies));
+		},
+		dexMembershipHTML: function (species) {
+			var value = ' value="' + BattleLog.escapeHTML(species.name) + '"';
+			if (!this.dexView.species[species.id]) return ' <button name="addDexPokemon"' + value + '><i class="fa fa-plus-circle"></i>Add to dex</button>';
 			var entries = DexViews.entries[this.dexView.dexid];
-			var custom = DexViews.custom.Pokedex[species.id];
-			var edited = custom || !entries || entries.originals.hasOwnProperty(species.id);
-			return this.dexMenuHTML('copyDexPokemon', edited && ['deleteDexPokemon', custom ? 'Delete' : 'Reset to base'], species.name);
+			return ' <button name="deleteDexPokemon"' + value + '><i class="fa fa-trash"></i>Delete</button>' +
+				(entries && entries.originals[species.id] ? ' <button name="resetDexPokemon"' + value + '><i class="fa fa-undo"></i>Reset to base</button>' : '');
 		},
 		dexEditsHTML: function () {
 			var on = !!Storage.prefs('dexshowedits');
@@ -1584,6 +1583,9 @@
 			var color = Math.min(Math.floor(value * 180 / 255), 360);
 			e.currentTarget.style.setProperty('--fill', 'hsl(' + color + ',85%,45%)');
 			e.currentTarget.style.setProperty('--pct', (value * 100 / 255) + '%');
+			var $row = this.$('.dexmonpage .setstats .statrow[data-stat=' + stat + ']');
+			$row.find('.statgraph span').css({ width: Math.min(value * 75 / 255, 75) + 'px', background: 'hsl(' + color + ',40%,75%)' });
+			$row.find('em').text(value);
 			this.$('.dexmonpage input[name=stat-' + stat + ']').val(value);
 			this.$('.dexmonpage .dexmin-' + stat).text(stat === 'hp' ? 2 * value + 110 : Math.floor((2 * value + 5) * 0.9));
 			this.$('.dexmonpage .dexmax-' + stat).text(stat === 'hp' ? 2 * value + 204 : Math.floor((2 * value + 99) * 1.1));
@@ -1658,27 +1660,25 @@
 			app.addPopup(DexViews.ui.DexNamePopup, {
 				sourceEl: button,
 				callback: function (name) {
-					if (room.dexView.species[toID(name)]) return room.openDexPokemon(name);
+					var id = toID(name);
+					if (room.dexView.species[id]) return room.openDexPokemon(name);
 					room.pendingSpecies = name;
-					room.editDex({ pokemon: { name: name } });
+					if (room.dexView.dex.species.get(id).exists && !DexViews.custom.Pokedex[id]) return room.addDexPokemon(name);
+					room.editDex({ pokemon: {
+						name: name, types: ['Normal'], abilities: { 0: 'No Ability' }, baseStats: { hp: 50, atk: 50, def: 50, spa: 50, spd: 50, spe: 50 },
+						eggGroups: ['Undiscovered'], weightkg: 10
+					} });
 				}
 			});
 		},
+		addDexPokemon: function (name) {
+			this.editDex({ addpokemon: { names: [name] } });
+		},
 		deleteDexPokemon: function (name, button) {
-			var self = this;
-			var custom = DexViews.custom.Pokedex[toID(name)];
-			var message = custom ? 'Delete ' + BattleLog.escapeHTML(name) + ' from this dex?' :
-				'Reset ' + BattleLog.escapeHTML(name) + ' to its base data? Every edit to it in this dex is removed.';
-			app.addPopup(DexConfirmPopup, {
-				message: message,
-				button: custom ? "Delete" : "Reset to base",
-				sourceEl: button,
-				callback: function () {
-					if (self.dexDraft) delete self.dexDraft.pokemon[toID(name)];
-					self.applyDexDraft();
-					self.editDex({ deletepokemon: name });
-				}
-			});
+			this.confirmDeletePokemon([toID(name)], button);
+		},
+		resetDexPokemon: function (name, button) {
+			this.deleteDexEntries('Pokedex', [toID(name)], true, button);
 		}
 	});
 

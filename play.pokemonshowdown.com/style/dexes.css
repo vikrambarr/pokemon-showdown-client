@@ -1048,8 +1048,42 @@
 	overflow: visible;
 	background: none;
 }
-.dextierlist .result a {
+.dexselectable .result a {
 	user-select: none;
+	-webkit-touch-callout: none;
+}
+.dexselectable .result a.cur,
+.dexselectable .result a.cur:hover {
+	border-color: #555555;
+	background: #F8F8F8;
+}
+.dark .dexselectable .result a.cur,
+.dark .dexselectable .result a.cur:hover {
+	border-color: #BBBBBB;
+	background: rgba(100, 100, 100, 0.4);
+}
+.dexselectmode > :not(.dexselectslot) {
+	display: none !important;
+}
+@media (max-width: 600px) {
+	.dexselectmode {
+		position: fixed;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		z-index: 20;
+		margin: 0;
+		padding: 8px;
+		background: #F2F2F2;
+		border-top: 1px solid #AAAAAA;
+	}
+	.dark .dexselectmode {
+		background: #333333;
+		border-top-color: #555555;
+	}
+	.dexselecting {
+		padding-bottom: 50px;
+	}
 }
 .dextierbuttons {
 	display: grid;

@@ -204,7 +204,7 @@
 			for (var i = parents.length - 1; i >= 0; i--) merge(view, parents[i], true);
 			for (var j = parents.length - 1; j >= 0; j--) $.extend(view.origins, parents[j].origins);
 			for (var id in layer.Pokedex) {
-				var standard = window.BattlePokedex && BattlePokedex[id] && !DexViews.custom.Pokedex[id];
+				var standard = window.BattlePokedex && BattlePokedex[id] && BattlePokedex[id].exists !== false && !DexViews.custom.Pokedex[id];
 				if (layer.origins && layer.origins[id]) view.origins[id] = layer.origins[id];
 				else if (!view.origins[id] && !standard) view.origins[id] = layer.name;
 			}
@@ -365,8 +365,8 @@
 			$.each(GLOBALS, function (table, info) {
 				var data = window[info[0]] || (window[info[0]] = {});
 				for (var id in view[table]) {
-					if (data[id] && !DexViews.custom[table][id]) continue;
-					if (!data[id]) added.push([id, info[1]]);
+					if (data[id] && data[id].exists !== false && !DexViews.custom[table][id]) continue;
+					if (!data[id] || data[id].exists === false) added.push([id, info[1]]);
 					var entry = $.extend({}, view[table][id]);
 					if (table === 'Pokedex') entry.tier = tierData(view, { id: id, baseSpecies: entry.baseSpecies || '' }).tier || entry.tier;
 					data[id] = entry;
