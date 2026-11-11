@@ -356,7 +356,8 @@
 			var summary = format && formatDex(format);
 			var view = summary && DexViews.views[summary.hash];
 			if (!view) return getTypedSearch.apply(this, arguments);
-			var search = getTypedSearch.call(this, searchType, 'gen' + view.gen + format.slice(summary.id.length), speciesOrSet);
+			var suffix = format.startsWith(summary.id) ? format.slice(summary.id.length) : 'ou';
+			var search = getTypedSearch.call(this, searchType, 'gen' + view.gen + suffix, speciesOrSet);
 			if (!search) return search;
 			search.dex = view.dex;
 			search.dexView = view;
@@ -712,7 +713,7 @@
 			});
 			if (!options.enabled()) return $bar.empty();
 			if (!sel.on) {
-				return $bar.html('<button class="button" data-select="start"><i class="fa fa-check-square-o"></i> Select</button>');
+				return $bar.html('<button class="button" data-select="start"><i class="fa fa-check-square-o"></i> Multi-select</button>');
 			}
 			var ids = Object.keys(sel.picked);
 			var buf = '<button class="button" data-select="stop" title="Cancel"><i class="fa fa-times"></i></button> <strong>' + ids.length + ' selected</strong>';
