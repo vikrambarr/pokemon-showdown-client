@@ -301,7 +301,9 @@
 	$(function () {
 		app.on('response:dexes', function (list) {
 			if (!list) return;
-			DexViews.list = list;
+			var previous = {};
+			$.each(DexViews.list, function (i, summary) { previous[summary.id] = summary; });
+			DexViews.list = list.map(function (summary) { return summary.hash ? summary : previous[summary.id]; });
 			addFormats();
 			var teambuilder = app.rooms.teambuilder;
 			if (fixTeamFormats() && teambuilder && teambuilder.curTeam) {
@@ -332,7 +334,7 @@
 			app.addPopup(Popup, { htmlMessage: data.error ? BattleLog.escapeHTML(data.error) : BattleLog.sanitizeHTML(data.html) });
 			app.send('/crq dexes');
 		});
-		$.each(['dex', 'dexentries', 'dexeffect', 'dexformat', 'dexupload', 'dexstorage', 'dexsource'], function (i, cmd) {
+		$.each(['dex', 'dexentries', 'dexeffect', 'dexformat', 'dexrules', 'dexupload', 'dexstorage', 'dexsource'], function (i, cmd) {
 			app.on('response:' + cmd, function (data) {
 				answer(cmd, data);
 			});
