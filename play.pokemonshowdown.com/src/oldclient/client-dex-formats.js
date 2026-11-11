@@ -22,6 +22,19 @@
 
 	window.DexViews.ui.DexFormatPopup = DexFormatPopup;
 
+	var formatRules = {};
+
+	function requestFormat(target) {
+		var formatid = target.split(',')[0];
+		if (!formatRules[formatid]) {
+			formatRules[formatid] = request('dexrules', formatid);
+			formatRules[formatid].then(null, function () { delete formatRules[formatid]; });
+		}
+		return Promise.all([request('dexformat', target), formatRules[formatid]]).then(function (results) {
+			return $.extend({}, results[0], { rulesets: results[1].rulesets, tags: results[1].tags });
+		});
+	}
+
 	var FORMAT_PICKERS = [['pokemon', 'Pok&eacute;mon', 'Pok\u00E9mon'], ['move', 'Moves', 'moves'], ['ability', 'Abilities', 'abilities'], ['item', 'Items', 'items']];
 	var FORMAT_TABS = [['rule', 'Rulesets'], ['banlist', 'Banlist']];
 	var FORMAT_BAN_TABS = [['ban', 'Tags'], ['pokemon', 'Pok&eacute;mon'], ['item', 'Items'], ['move', 'Moves'], ['ability', 'Abilities']];
@@ -43,7 +56,7 @@
 			this.dexFormatSearch = null;
 			this.$('.dexformatpage').html('<div class="pad"><p><em style="font-size:20pt">Loading...</em></p></div>');
 			var room = this;
-			request('dexformat', this.dexFormatTarget(formatid)).then(function (details) {
+			requestFormat(this.dexFormatTarget(formatid)).then(function (details) {
 				room.renderDexFormat(details);
 			}, function () {
 				if (room.dexFormatId === formatid) room.renderDexFormat(null);
@@ -260,7 +273,7 @@
 			}
 			var self = this;
 			var formatid = this.dexFormat;
-			DexViews.ui.request('dexformat', this.dexFormatTarget(formatid)).then(function (details) {
+			requestFormat(this.dexFormatTarget(formatid)).then(function (details) {
 				if (self.dexFormat === formatid && self.dexTab === 'formats') self.showDexFormatDetails(details);
 			});
 		},
@@ -283,7 +296,7 @@
 			if (tweak) tweak(local);
 			this.showDexFormatDetails(local);
 			var target = this.dexFormatTarget(formatid);
-			DexViews.ui.request('dexformat', target).then(function (preview) {
+			requestFormat(target).then(function (preview) {
 				if (room.dexFormatTarget(formatid) === target && room.dexFormat === formatid) room.showDexFormatDetails(preview);
 			}, function (err) {
 				if (room.dexFormatTarget(formatid) !== target) return;
