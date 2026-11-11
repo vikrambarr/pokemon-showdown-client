@@ -675,8 +675,8 @@
 			buf += '<div class="dexpage"><div class="dexbuildertabs"></div><div class="dexbuildersub">' +
 				'<p class="dexsubbar"><button class="button" name="closeDexTab"><i class="fa fa-chevron-left"></i> Dex</button> <strong class="dexsubtitle"></strong></p>' +
 				'<ul class="dexformattabs dexscope"></ul><p class="dexpokemonsearch"><input type="search" class="textbox" name="pokemonsearch" placeholder="Search Pok&eacute;mon" size="30" autocomplete="off" />' +
-				' <button class="button" name="newDexPokemon"><i class="fa fa-plus"></i> Create</button>' +
-				'<button class="button" name="newDexEffect"><i class="fa fa-plus"></i> Create</button> <span class="dexsourcepick"></span> <span class="dexselectbar dexselectslot"></span></p>' +
+				' <button class="button" name="newDexPokemon" style="display:none"><i class="fa fa-plus"></i> Create</button>' +
+				'<button class="button" name="newDexEffect" style="display:none"><i class="fa fa-plus"></i> Create</button> <span class="dexsourcepick"></span> <span class="dexselectbar dexselectslot"></span></p>' +
 				'<div class="dextabempty"></div><div class="dexpokemon"></div><div class="dexformatpage"></div><div class="dextierpage" style="display:none"></div></div></div>' +
 				'<div class="dexmonpage" style="display:none"></div>';
 			this.$('.teampane').html(buf);
@@ -968,7 +968,7 @@
 			this.$('.dexsubtitle').text(this.$('.dexbuildertab[value="' + this.dexTab + '"]').contents().filter(function () { return this.nodeType === 3; }).text());
 			var table = this.dexSummary.counts[this.dexTab] && this.dexSummary.counts[this.dexTab].table;
 			this.$('button[name=newDexPokemon]').toggle(this.dexEditable && table === 'Pokedex' && this.dexScope !== 'out');
-			this.$('button[name=newDexEffect]').toggle(this.dexEditable && !!EFFECT_KINDS[table]).attr('title', 'Create a new ' + EFFECT_KINDS[table]);
+			this.$('button[name=newDexEffect]').toggle(this.dexEditable && !!EFFECT_KINDS[table] && this.dexScope !== 'out').attr('title', 'Create a new ' + EFFECT_KINDS[table]);
 			var scopeTabs = this.dexScopeHTML(this.dexKind());
 			this.$('.dexscope').html(scopeTabs).toggle(!!scopeTabs);
 			this.$('.dexsourcepick').html(this.dexSourceHTML(kind));
@@ -1191,23 +1191,10 @@
 			var view = this.dexScope === 'out' && SOURCED[kind] && this.dexSourceView(kind);
 			return (view || this.dexView).gen;
 		},
-		dexScopeCounts: function (kind) {
-			var entries = DexViews.entries[this.dexid];
-			if (kind === 'condition') {
-				if (!entries) return [null, null];
-				var needed = Object.keys(entries.needed).length;
-				return [needed, Object.keys(entries.Conditions).length - needed];
-			}
-			var typedSearch = this.dexSearch.engine.typedSearch;
-			var pool = this.dexScope === 'out' && typedSearch && typedSearch.dexPool;
-			return [this.dexSummary.counts[this.dexTab].total, pool && this.dexSourceView(kind) ? Object.keys(pool).length : null];
-		},
 		dexScopeHTML: function (kind) {
 			if (!SOURCED[kind] && kind !== 'condition') return '';
-			var counts = this.dexScopeCounts(kind);
-			return ['in', 'out'].map(function (scope, i) {
-				return '<li><button class="button' + (scope === this.dexScope ? ' cur' : '') + '" name="setDexScope" value="' + scope + '">' + (scope === 'in' ? "This dex" : "Other dexes") +
-					(counts[i] === null ? '' : ' <small>' + counts[i] + '</small>') + '</button></li>';
+			return ['in', 'out'].map(function (scope) {
+				return '<li><button class="button' + (scope === this.dexScope ? ' cur' : '') + '" name="setDexScope" value="' + scope + '">' + (scope === 'in' ? "This dex" : "Other dexes") + '</button></li>';
 			}, this).join('');
 		},
 		dexSourceHTML: function (kind) {
