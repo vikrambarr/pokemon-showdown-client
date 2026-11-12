@@ -201,7 +201,7 @@
 		Conditions: []
 	};
 	var TITLES = {
-		countsAs: "Counts as", ignoreImmunity: "Type immunities",
+		ignoreImmunity: "Type immunities",
 		damage: "Fixed damage", ohko: "One-hit KO", 'multihit multiaccuracy': "Hits", 'critRatio willCrit': "Critical hits",
 		status: "Status", volatileStatus: "Target's volatile status", 'Moves:boosts': "Target's stat changes", forceSwitch: "Forced switch",
 		'self.boosts': "User's stat changes", 'selfBoost.boosts': "User's stat changes", 'self.volatileStatus': "User's volatile status",
@@ -212,7 +212,6 @@
 		'Items:boosts': "Holder's stat changes", spriteFrom: "Icon", spritenum: "Icon number"
 	};
 	TITLES[DAMAGE_STATS] = "Damage";
-	var ALWAYS_SHOWN = ['countsAs'];
 	var CRIT_CHOICES = [['1', "normal"], ['2', "high"], ['3', "very high"], ['4', "maximum"], ['always', "100% (always crits)"]];
 	var BOOST_CHOICES = [6, 5, 4, 3, 2, 1, 0, -1, -2, -3, -4, -5, -6].map(function (amount) { return [amount, amount ? priorityText(amount) : '']; });
 	var GETTERS = DexViews.ui.GETTERS;
@@ -841,7 +840,6 @@
 			var data = this.dexEffectValues();
 			var valueOf = function (object, path) {
 				if (path === 'secondaries') return secondaryList(object);
-				if (path === 'countsAs') return !!object.countsAs;
 				if (path.indexOf(' ') >= 0) return path.split(' ').map(function (each) { return getPath(object, each); });
 				return getPath(object, path);
 			};
@@ -940,7 +938,7 @@
 			var lines = [];
 			$.each(this.dexEffectSections(data), function (i, section) {
 				$.each(section[1], function (j, entry) {
-					if (ALWAYS_SHOWN.indexOf(entry[0]) >= 0 || entry[0].slice(0, 10) === 'condition.' || !self.dexAttributeShown(entry, data)) return;
+					if (entry[0].slice(0, 10) === 'condition.' || !self.dexAttributeShown(entry, data)) return;
 					var title = entry[4] || TITLES[table + ':' + entry[0]] || TITLES[entry[0]] || section[0];
 					var summaries = entry[0] === 'secondaries' ? secondaryList(data).map(secondaryText) : [attributeSummary(entry, data)];
 					$.each(summaries, function (k, text) {
@@ -958,17 +956,6 @@
 		dexEffectSections: function (data) {
 			var table = this.dexEffect.table;
 			var sections = SENTENCES[table].slice();
-			var info = this.dexEffectData;
-			if (info.base && info.base !== info.id) {
-				var original = valueText('select', info.base, 'ref:' + table);
-				var counts = "Wherever the battle engine or another effect checks for " + original + ", this copy counts too. Both can be active at once.";
-				if (!data.countsAs && info.lost && (info.lost.engine.length || info.lost.references.length)) {
-					counts += " Without it, this copy misses how the engine treats " + original + " and " + info.lost.references.length + " effects that check for it by name.";
-				}
-				sections.splice(1, 0, ["Counts as", [['countsAs', "", function (field) {
-					return '<label class="checkbox">' + field('countsAs', 'bool') + ' Counts as ' + original + '</label><p><small>' + counts + '</small></p>';
-				}]]]);
-			}
 			if (table === 'Moves' && $.isPlainObject(data.condition)) {
 				var leaves = [];
 				var collect = function (object, prefix) {
@@ -986,7 +973,7 @@
 			return sections;
 		},
 		dexAttributeShown: function (entry, data) {
-			if (ALWAYS_SHOWN.indexOf(entry[0]) >= 0 || entry[0].slice(0, 10) === 'condition.' || (this.dexAddedAttributes || {})[entry[0]]) return true;
+			if (entry[0].slice(0, 10) === 'condition.' || (this.dexAddedAttributes || {})[entry[0]]) return true;
 			if (entry[0] === 'secondaries') return !!(data.secondaries || data.secondary);
 			return entry[0].split(' ').some(function (path) {
 				var value = getPath(data, path);
@@ -1008,7 +995,7 @@
 				if (entry[0] === 'secondaries' && index === undefined) {
 					return $.each(secondaryList(data), function (i) { box(entry, section, i); });
 				}
-				var removable = editable && self.dexEffectCanEdit(entry[0]) && ALWAYS_SHOWN.indexOf(entry[0]) < 0 && entry[0].slice(0, 10) !== 'condition.';
+				var removable = editable && self.dexEffectCanEdit(entry[0]) && entry[0].slice(0, 10) !== 'condition.';
 				var title = entry[4] || TITLES[table + ':' + entry[0]] || TITLES[entry[0]] || section[0];
 				var remove = index === undefined ? ['removeDexAttribute', escape(entry[0])] : ['removeDexSecondary', index];
 				var fieldAt = index === undefined ? field : function (path, control) {
@@ -1267,9 +1254,6 @@
 			var conditions = function (kind) {
 				return function () { return selectOptions('condition:' + kind, view) || []; };
 			};
-			var refs = function (refTable) {
-				return function () { return refOptions([refTable], 'id', view) || []; };
-			};
 			var flags = function (flagTable) {
 				return CODE.map(CODE.fixed(1), Object.keys(FLAGS[flagTable]));
 			};
@@ -1283,7 +1267,7 @@
 			};
 			var secondary = CODE.obj($.extend(secondaryFieldsOf(), { self: CODE.obj(secondaryFieldsOf(), true) }), true, [], { chance: 100 });
 			var fraction = CODE.tuple([CODE.whole(1, 100, 1), CODE.whole(1, 100, 2)]);
-			var text = { desc: CODE.text(1024), shortDesc: CODE.text(table === 'Moves' ? 55 : 90), countsAs: CODE.choice(refs(table)) };
+			var text = { desc: CODE.text(1024), shortDesc: CODE.text(table === 'Moves' ? 55 : 90) };
 			var fields = {
 				Moves: {
 					accuracy: CODE.json(100), basePower: CODE.whole(0, 1000), category: CODE.choice(CATEGORIES), pp: CODE.whole(1, 64, 10),

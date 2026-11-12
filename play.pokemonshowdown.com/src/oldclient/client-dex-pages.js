@@ -440,7 +440,6 @@
 				var entries = DexViews.entries[room.dexid];
 				if (entries && entries[table][toID(name)]) return room.openDexEffect(table, toID(name));
 				room.pendingEffect = [table, toID(name)];
-				fields.countsAs = true;
 			}
 			edit[this.kind] = fields;
 			room.editDex(edit);
