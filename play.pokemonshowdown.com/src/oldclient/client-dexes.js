@@ -179,18 +179,6 @@
 		}, function () {});
 	}
 
-	function fixTeamFormats() {
-		var fixed = false;
-		$.each(Storage.teams || [], function (i, team) {
-			var summary = team.format.startsWith('gen6') && DexViews.formats[team.format.slice(4)];
-			if (!summary) return;
-			team.format = team.format.slice(4);
-			team.gen = summary.gen;
-			fixed = true;
-		});
-		return fixed;
-	}
-
 	function useTeamDex(room) {
 		var team = room.curTeam;
 		var summary = team && formatDex(team.format);
@@ -221,7 +209,6 @@
 		},
 		edit: function (i) {
 			if (i && i.currentTarget) i = $(i.currentTarget).data('value');
-			fixTeamFormats();
 			var team = Storage.teams[+i];
 			var summary = team && formatDex(team.format);
 			if (summary && !loadedDex(summary) && !DexViews.failed[summary.hash]) {
@@ -280,7 +267,6 @@
 			$header.remove();
 		},
 		update: function () {
-			fixTeamFormats();
 			update.apply(this, arguments);
 			if (this.curTeam || !Storage.teams) return;
 			var self = this;
@@ -305,13 +291,7 @@
 			$.each(DexViews.list, function (i, summary) { previous[summary.id] = summary; });
 			DexViews.list = list.map(function (summary) { return summary.hash ? summary : previous[summary.id]; });
 			addFormats();
-			var teambuilder = app.rooms.teambuilder;
-			if (fixTeamFormats() && teambuilder && teambuilder.curTeam) {
-				useTeamDex(teambuilder);
-				teambuilder.update();
-			} else if (teambuilder) {
-				teambuilder.updateFolderList();
-			}
+			if (app.rooms.teambuilder) app.rooms.teambuilder.updateFolderList();
 			if (app.rooms.rooms) app.rooms.rooms.updateDexSearch();
 			$.each(dexRooms(), function (i, room) {
 				room.update();

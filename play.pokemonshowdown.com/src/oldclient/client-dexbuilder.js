@@ -15,13 +15,11 @@
 		return summary.parents.length ? summary.parents.join('+') : summary.mod;
 	}
 
-	function baseOptions(summary) {
-		var current = summary ? baseValue(summary) : 'gen9';
-		var found = false;
-		var option = function (value, label) {
-			if (value === current) found = true;
-			return '<option value="' + BattleLog.escapeHTML(value) + '"' + (value === current ? ' selected' : '') + '>' + BattleLog.escapeHTML(label) + '</option>';
-		};
+	function optionHTML(value, label, current) {
+		return '<option value="' + BattleLog.escapeHTML(value) + '"' + (value === current ? ' selected' : '') + '>' + BattleLog.escapeHTML(label) + '</option>';
+	}
+
+	function worldOptions(current, exceptid, unofficial) {
 		var group = function (label, list) {
 			if (!list.length) return '';
 			return '<optgroup label="' + label + '">' + list.map(function (dex) {
@@ -29,17 +27,20 @@
 			}).sort(function (a, b) {
 				return a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' });
 			}).map(function (dex) {
-				return option(dex.id, dex.label);
+				return optionHTML(dex.id, dex.label, current);
 			}).join('') + '</optgroup>';
 		};
-		var others = DexViews.list.filter(function (dex) { return !summary || dex.id !== summary.id; });
+		var others = DexViews.list.filter(function (dex) { return dex.id !== exceptid; });
 		var buf = '<optgroup label="Games">';
-		for (var gen = 9; gen >= 1; gen--) buf += option('gen' + gen, 'Gen ' + gen);
-		buf += '</optgroup>';
-		buf += group("Official dexes", others.filter(function (dex) { return dex.official; }));
-		buf += group("Dexes", others.filter(function (dex) { return !dex.official; }));
-		if (!found) buf = option(current, summary.base) + buf;
-		return buf;
+		for (var gen = 9; gen >= 1; gen--) buf += optionHTML('gen' + gen, 'Gen ' + gen, current);
+		buf += '</optgroup>' + group("Official dexes", others.filter(function (dex) { return dex.official; }));
+		return buf + (unofficial ? group("Dexes", others.filter(function (dex) { return !dex.official; })) : '');
+	}
+
+	function baseOptions(summary) {
+		var current = summary ? baseValue(summary) : 'gen9';
+		var buf = worldOptions(current, summary && summary.id, true);
+		return buf.indexOf(' selected>') < 0 ? optionHTML(current, summary.base, current) + buf : buf;
 	}
 
 	var DexNamePopup = Popup.extend({
@@ -363,14 +364,8 @@
 		}
 	});
 
-	var COLOR_CHANNELS = [['r', 'Red', '#FF0000'], ['g', 'Green', '#00FF00'], ['b', 'Blue', '#0000FF']];
-
 	var DexTypePopup = Popup.extend({
 		events: {
-			'input input[name^=colorslider]': 'slideColor',
-			'input input[name^=color-]': 'typeColor',
-			'input input[name=label]': 'previewType',
-			'change input[name=iconmode]': 'switchIcon',
 			'change input[name=file]': 'previewType'
 		},
 		initialize: function (data) {
@@ -386,22 +381,7 @@
 			if (this.removed) {
 				buf += '<p><small>Removed from this dex.</small></p>';
 			} else {
-				var style = this.style = DexViews.typeStyle(id, room.dexView.TypeChart[id] || {});
 				var image = this.image = DexViews.typeSprite(room.dexView, id);
-				buf += '<p><label class="checkbox"><input type="radio" name="iconmode" value="drawn"' + (image ? '' : ' checked') + ' /> Drawn</label> ' +
-					'<label class="checkbox"><input type="radio" name="iconmode" value="sprite"' + (image ? ' checked' : '') + ' /> Sprite</label></p>';
-				buf += '<div class="dextypedrawn"' + (image ? ' style="display:none"' : '') + '>';
-				buf += '<p><label class="label">Label:<br /><input type="text" name="label" class="textbox" maxlength="6" size="8" value="' + BattleLog.escapeHTML(style.label) + '" autocomplete="off" /></label></p>';
-				var rows = { label: '', value: '', slider: '' };
-				$.each(COLOR_CHANNELS, function (i, channel) {
-					var value = parseInt(style.color.slice(1 + 2 * i, 3 + 2 * i), 16);
-					rows.label += '<div><label>' + channel[1] + '</label></div>';
-					rows.value += '<div><input type="number" name="color-' + channel[0] + '" value="' + value + '" min="0" max="255" class="textbox inputform numform" /></div>';
-					rows.slider += '<div><input type="range" name="colorslider-' + channel[0] + '" value="' + value + '" min="0" max="255" class="evslider" style="--fill:' + channel[2] + '" /></div>';
-				});
-				buf += '<div class="statform dextypecolor"><div class="col labelcol">' + rows.label + '</div><div class="col evcol">' + rows.value + '</div>' +
-					'<div class="col evslidercol">' + rows.slider + '</div><div style="clear:both"></div></div></div>';
-				buf += '<div class="dextypesprite"' + (image ? '' : ' style="display:none"') + '>';
 				if (image) {
 					buf += '<p><img src="' + DexViews.imageURL(image) + '" width="' + image.width * 2 + '" height="' + image.height * 2 + '" alt="" class="pixelated" /></p>' +
 						'<p><small>' + image.width + '&times;' + image.height + (image.artist ? ', by ' + BattleLog.escapeHTML(image.artist) : '') + '</small></p>';
@@ -409,74 +389,33 @@
 				buf += '<p><input type="file" name="file" accept="image/png,image/gif" /></p>';
 				buf += '<p><small>' + (room.dexSummary.official ? 'Official dex: any size' : 'Best at 32&times;14. Bigger than 64&times;64 is shrunk to 32&times;14') + '. Pixel art only.</small></p>';
 				buf += storageHTML(room);
-				buf += '</div>';
 			}
 			buf += '<p class="buttonbar">';
 			if (this.removed) {
 				buf += '<button type="button" name="restoreType" class="button"><strong>Restore</strong></button> ';
 			} else {
 				buf += '<button type="submit" class="button"><strong>Done</strong></button> ';
+				if (this.image) buf += '<button type="button" name="clearSprite" class="button">Remove sprite</button> ';
 				buf += '<button type="button" name="deleteType" class="button">Delete</button> ';
 			}
 			if (this.own && this.vanilla) buf += '<button type="button" name="resetType" class="button">Reset to base</button> ';
 			this.$el.html(buf + '<button type="button" name="close" class="button">Cancel</button></p></form>');
 		},
-		colorValue: function () {
-			var self = this;
-			return '#' + COLOR_CHANNELS.map(function (channel) {
-				var value = Math.min(255, Math.max(0, Number(self.$('input[name=color-' + channel[0] + ']').val()) || 0));
-				return (value < 16 ? '0' : '') + value.toString(16);
-			}).join('');
-		},
-		slideColor: function (e) {
-			this.$('input[name=color-' + e.currentTarget.name.slice(12) + ']').val(e.currentTarget.value);
-			this.previewType();
-		},
-		typeColor: function (e) {
-			var $slider = this.$('input[name=colorslider-' + e.currentTarget.name.slice(6) + ']');
-			$slider.val(Math.min(255, Math.max(0, Number(e.currentTarget.value) || 0)));
-			this.slideColor({ currentTarget: $slider[0] });
-		},
-		iconMode: function () {
-			return this.$('input[name=iconmode]:checked').val();
-		},
-		switchIcon: function () {
-			var sprite = this.iconMode() === 'sprite';
-			this.$('.dextypedrawn').toggle(!sprite);
-			this.$('.dextypesprite').toggle(sprite);
-			this.previewType();
-		},
 		previewType: function () {
 			var file = this.$('input[name=file]')[0].files[0];
 			if (this.objectURL) URL.revokeObjectURL(this.objectURL);
-			this.objectURL = null;
-			if (this.iconMode() === 'sprite') {
-				if (file) this.objectURL = URL.createObjectURL(file);
-				var src = this.objectURL || this.image && DexViews.imageURL(this.image);
-				this.$('.dextypepreview').html(src ? '<img src="' + BattleLog.escapeHTML(src) + '" alt="" class="pixelated" style="max-width:32px;max-height:14px" />' : '<em>No sprite</em>');
-				return;
-			}
-			var label = $.trim(this.$('input[name=label]').val()).toUpperCase() || this.style.label;
-			this.$('.dextypepreview').html('<img src="' + DexViews.typeIconURL({ label: label, color: this.colorValue() }) + '" alt="" width="32" height="14" class="pixelated" />');
+			this.objectURL = file ? URL.createObjectURL(file) : null;
+			var src = this.objectURL || this.image && DexViews.imageURL(this.image);
+			this.$('.dextypepreview').html(src ? '<img src="' + BattleLog.escapeHTML(src) + '" alt="" class="pixelated" style="max-width:32px;max-height:14px" />' : Dex.getTypeIcon(this.name));
 		},
 		submit: function () {
-			var room = this.room;
-			var style = this.style;
-			var fields = { name: this.name };
 			var file = this.$('input[name=file]')[0].files[0];
-			var sprite = this.iconMode() === 'sprite';
-			var label = $.trim(this.$('input[name=label]').val()).toUpperCase();
-			var color = this.colorValue();
-			if (!sprite && label && label !== style.label) fields.label = label;
-			if (!sprite && color !== style.color) fields.color = color;
 			this.close();
-			if (sprite && file) uploadSprite(room, this.name, 'type', file);
-			if (!sprite && this.image) {
-				room.editDex({ sprite: { name: this.name, kind: 'type', image: null } });
-			}
-			if (!fields.label && !fields.color) return;
-			room.draftDex('effects', 'TypeChart:' + toID(this.name), fields);
-			room.$('.dextabempty').html(room.renderDexTypes());
+			if (file) uploadSprite(this.room, this.name, 'type', file);
+		},
+		clearSprite: function () {
+			this.close();
+			this.room.editDex({ sprite: { name: this.name, kind: 'type', image: null } });
 		},
 		close: function () {
 			if (this.objectURL) URL.revokeObjectURL(this.objectURL);
@@ -1145,7 +1084,7 @@
 				var own = entries.originals;
 				return [
 					{ label: "Delete", icon: 'trash', applies: function () { return true; }, run: function (ids, button, done) {
-						room.confirmDeletePokemon(ids, button, done);
+						room.deleteDexEntries('Pokedex', ids, false, button, done);
 					} },
 					{ label: "Reset", icon: 'undo', applies: function (id) { return !!own[id]; }, run: function (ids, button, done) {
 						room.deleteDexEntries('Pokedex', ids, true, button, done);
@@ -1195,17 +1134,8 @@
 		dexSourceHTML: function (kind) {
 			if (!SOURCED[kind] || this.dexScope !== 'out') return '';
 			var current = this.dexSource || '';
-			var option = function (value, label) {
-				return '<option value="' + BattleLog.escapeHTML(value) + '"' + (value === current ? ' selected' : '') + '>' + BattleLog.escapeHTML(label) + '</option>';
-			};
-			var gens = '';
-			for (var gen = 9; gen >= 1; gen--) gens += option('gen' + gen, "Gen " + gen);
-			var dexid = this.dexid;
-			var official = DexViews.list.filter(function (summary) { return summary.official && summary.id !== dexid; }).sort(function (a, b) {
-				return a.name.localeCompare(b.name);
-			}).map(function (summary) { return option(summary.id, '[Gen ' + DexViews.genOf(summary.mod) + '] ' + summary.name); }).join('');
-			return '<label>from <select name="dexsource" class="button">' + option('', "This dex's world") +
-				'<optgroup label="Main games">' + gens + '</optgroup><optgroup label="Official dexes">' + official + '</optgroup></select></label>';
+			return '<label>from <select name="dexsource" class="button">' + optionHTML('', "This dex's world", current) + worldOptions(current, this.dexid) + '</select></label>';
+
 		},
 		changeDexSource: function (e) {
 			this.dexSource = e.currentTarget.value;
@@ -1290,58 +1220,43 @@
 			if (table === 'Conditions') return this.dexConditionInfo(id).name;
 			return this.dexView.dex[DexViews.ui.GETTERS[table]].get(id).name || id;
 		},
-		confirmDeletePokemon: function (ids, button, done) {
-			var room = this;
-			var view = this.dexView;
-			var gone = [];
-			$.each(ids, function (i, id) {
-				$.each(speciesIds(view, id), function (j, formeid) {
-					var name = view.dex.species.get(formeid).name;
-					if (view.species[formeid] && gone.indexOf(name) < 0) gone.push(name);
-				});
-			});
-			if (!gone.length) return;
-			var one = gone.length === 1;
-			app.addPopup(DexConfirmPopup, {
-				message: 'Delete ' + namesHTML(gone, 'Pok&eacute;mon') + ' from this dex?<br /><small>' + (one ?
-					'Teams using it stop being legal, dexes set in this one lose it too, and its edits are lost.' :
-					'Teams using them stop being legal, dexes set in this one lose them too, and their edits are lost.') + '</small>',
-				button: "Delete",
-				sourceEl: button,
-				callback: function () {
-					var layer = room.dexDraft && room.dexDraft.pokemon;
-					$.each(ids, function (i, id) {
-						if (layer) delete layer[id];
-					});
-					room.applyDexDraft();
-					room.editDex({ deletepokemon: ids.map(function (id) { return view.dex.species.get(id).name; }) });
-					if (done) done();
-					if (room.dexSpecies || room.dexFamilyOf) room.closeDexPokemon();
-				}
-			});
-		},
 		deleteDexEntries: function (table, ids, reset, button, done) {
 			var room = this;
+			var view = this.dexView;
+			var pokemon = table === 'Pokedex';
+			var whole = pokemon && !reset;
 			var names = ids.map(function (id) { return room.dexEntryName(table, id); });
-			var noun = table === 'Pokedex' ? 'Pok&eacute;mon' : table.toLowerCase();
-			var one = names.length === 1;
-			var warning = one ? 'Teams using it stop being legal, and its edits are lost.' : 'Teams using them stop being legal, and their edits are lost.';
-			var message = reset ? 'Reset ' + namesHTML(names, noun) + ' to ' + (one ? 'its' : 'their') + ' base data? Every edit to ' + (one ? 'it' : 'them') + ' in this dex is removed.' :
-				'Delete ' + namesHTML(names, noun) + ' from this dex?<br /><small>' + warning + '</small>';
+			var shown = whole ? [] : names;
+			$.each(whole ? ids : [], function (i, id) {
+				$.each(speciesIds(view, id), function (j, formeid) {
+					var name = view.dex.species.get(formeid).name;
+					if (view.species[formeid] && shown.indexOf(name) < 0) shown.push(name);
+				});
+			});
+			if (!shown.length) return;
+			var noun = pokemon ? 'Pok&eacute;mon' : table.toLowerCase();
+			var one = shown.length === 1;
+			var warning = 'Teams using ' + (one ? 'it' : 'them') + ' stop being legal, ' + (pokemon ? 'dexes set in this one lose ' + (one ? 'it' : 'them') + ' too, ' : '') +
+				'and ' + (one ? 'its' : 'their') + ' edits are lost.';
+			var message = reset ? 'Reset ' + namesHTML(shown, noun) + ' to ' + (one ? 'its' : 'their') + ' base data? Every edit to ' + (one ? 'it' : 'them') + ' in this dex is removed.' :
+				'Delete ' + namesHTML(shown, noun) + ' from this dex?<br /><small>' + warning + '</small>';
 			app.addPopup(DexConfirmPopup, {
 				message: message,
 				button: reset ? "Reset to base" : "Delete",
 				sourceEl: button,
 				callback: function () {
-					var layer = room.dexDraft && room.dexDraft[table === 'Pokedex' ? 'pokemon' : 'effects'];
+					var layer = room.dexDraft && room.dexDraft[pokemon ? 'pokemon' : 'effects'];
 					$.each(ids, function (i, id) {
-						if (layer) delete layer[table === 'Pokedex' ? id : table + ':' + id];
+						if (layer) delete layer[pokemon ? id : table + ':' + id];
+						if (whole) return;
 						var edit = {};
-						edit[(reset ? 'reset' : 'delete') + (table === 'Pokedex' ? 'pokemon' : EFFECT_KINDS[table])] = names[i];
+						edit[(reset ? 'reset' : 'delete') + (pokemon ? 'pokemon' : EFFECT_KINDS[table])] = names[i];
 						room.editDex(edit, names[i]);
 					});
+					if (whole) room.editDex({ deletepokemon: names });
 					room.applyDexDraft();
 					if (done) done();
+					if (whole && (room.dexSpecies || room.dexFamilyOf)) room.closeDexPokemon();
 				}
 			});
 		},
@@ -1475,18 +1390,6 @@
 			var draft = this.dexDraft;
 			if (!draft || this.dexSaving) return false;
 			var room = this;
-			var problems = [];
-			$.each(draft.pokemon, function (id, fields) {
-				if (fields.abilities && $.isEmptyObject(fields.abilities)) problems.push(fields.name + ": A Pok\u00e9mon needs at least one ability.");
-			});
-			if (problems.length) {
-				app.addPopup(Popup, {
-					message: (problems.length === 1 ? "Your changes weren't saved for the following reason:" : "Your changes weren't saved for the following reasons:") +
-						"\n\n- " + problems.join('\n- '),
-					sourceEl: null
-				});
-				return false;
-			}
 			this.dexSaving = draft;
 			this.dexDraft = null;
 			$.each(draft.pokemon, function (id, fields) {

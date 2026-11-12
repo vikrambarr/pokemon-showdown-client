@@ -28,55 +28,6 @@
 			'fire', 'water', 'grass', 'electric', 'psychic', 'ice', 'dragon', 'dark', 'fairy', 'stellar'
 		];
 
-		var TYPE_COLORS = {
-			normal: '#ada594', fighting: '#a55239', flying: '#9cadf7', poison: '#b55aa5', ground: '#d6b55a', rock: '#bda55a',
-			bug: '#adbd21', ghost: '#6363b5', steel: '#adadc6', fire: '#f75231', water: '#399cff', grass: '#7bce52',
-			electric: '#ffc631', psychic: '#ff73a5', ice: '#5acee7', dragon: '#7b63e7', dark: '#735a4a', fairy: '#ff65d5', stellar: '#3f00ff'
-		};
-
-		var TYPE_LABELS = { fighting: 'FIGHT', electric: 'ELECTR', psychic: 'PSYCHC', stellar: 'STELLR' };
-
-		var TYPE_GLYPHS = {
-			'-': '....|....|....|WWWs|ssss|....|....|....',
-			'0': '.WWs.|WssWs|Ws.Ws|WsWWs|WWsWs|WssWs|sWWss|.sss.',
-			'1': '.Ws.|WWs.|sWs.|.Ws.|.Ws.|.Ws.|WWWs|ssss',
-			'2': '.WWs.|WssWs|ss.Ws|..Wss|.Wss.|Wss..|WWWWs|sssss',
-			'3': 'WWWs.|sssWs|...Ws|.WWss|.ssWs|...Ws|WWWss|ssss.',
-			'4': 'Ws.Ws|Ws.Ws|Ws.Ws|WWWWs|sssWs|...Ws|...Ws|...ss',
-			'5': 'WWWWs|Wssss|Ws...|WWWs.|sssWs|...Ws|WWWss|ssss.',
-			'6': '.WWs.|Wsss.|Ws...|WWWs.|WssWs|Ws.Ws|sWWss|.sss.',
-			'7': 'WWWWs|sssWs|...Ws|..Wss|..Ws.|.Wss.|.Ws..|.ss..',
-			'8': '.WWs.|WssWs|Ws.Ws|sWWss|WssWs|Ws.Ws|sWWss|.sss.',
-			'9': '.WWs.|WssWs|Ws.Ws|sWWWs|.ssWs|...Ws|.WWss|.sss.',
-			'?': '.WWs.|WssWs|ss.Ws|..Wss|.Wss.|.ss..|.Ws..|.ss..',
-			A: '.WWs.|WssWs|Ws.Ws|Ws.Ws|WWWWs|WssWs|Ws.Ws|ss.ss',
-			B: 'WWWs.|WssWs|Ws.Ws|WWWss|WssWs|Ws.Ws|WWWss|ssss.',
-			C: '.WWs.|WssWs|Ws.ss|Ws...|Ws...|Ws.Ws|sWWss|.sss.',
-			D: 'WWWs.|WssWs|Ws.Ws|Ws.Ws|Ws.Ws|Ws.Ws|WWWss|ssss.',
-			E: 'WWWWs|Wssss|Ws...|WWWs.|Wsss.|Ws...|WWWWs|sssss',
-			F: 'WWWWs|Wssss|Ws...|WWWs.|Wsss.|Ws...|Ws...|ss...',
-			G: '.WWs.|WssWs|Ws.ss|WsWWs|WssWs|Ws.Ws|sWWss|.sss.',
-			H: 'Ws.Ws|Ws.Ws|Ws.Ws|WWWWs|WssWs|Ws.Ws|Ws.Ws|ss.ss',
-			I: 'WWWs|sWss|.Ws.|.Ws.|.Ws.|.Ws.|WWWs|ssss',
-			J: '...Ws|...Ws|...Ws|...Ws|Ws.Ws|Ws.Ws|sWWss|.sss.',
-			K: 'Ws.Ws|WsWs.|WWs..|Ws...|WWs..|WsWs.|WssWs|ss.ss',
-			L: 'Ws...|Ws...|Ws...|Ws...|Ws...|Ws...|WWWWs|sssss',
-			M: 'Ws..Ws|WWsWWs|WWWWWs|WsWsWs|Wss.Ws|Ws..Ws|Ws..Ws|ss..ss',
-			N: 'Ws.Ws|WWsWs|WWsWs|WWWWs|WsWWs|WsWWs|WssWs|ss.ss',
-			O: '.WWs.|WssWs|Ws.Ws|Ws.Ws|Ws.Ws|Ws.Ws|sWWss|.sss.',
-			P: 'WWWs.|WssWs|Ws.Ws|WWWss|Wsss.|Ws...|Ws...|ss...',
-			Q: '.WWs.|WssWs|Ws.Ws|Ws.Ws|Ws.Ws|WsWss|sWsWs|.ssss',
-			R: 'WWWs.|WssWs|Ws.Ws|WWWs.|WsWs.|WssWs|Ws.Ws|ss.ss',
-			S: '.WWs.|WssWs|Ws.ss|sWWs.|.ssWs|Ws.Ws|sWWss|.sss.',
-			T: 'WWWs|sWss|.Ws.|.Ws.|.Ws.|.Ws.|.Ws.|.ss.',
-			U: 'Ws.Ws|Ws.Ws|Ws.Ws|Ws.Ws|Ws.Ws|Ws.Ws|sWWss|.sss.',
-			V: 'Ws..Ws|Ws..Ws|Ws..Ws|sWsWss|.WsWs.|.sWss.|..Ws..|..ss..',
-			W: 'Ws..Ws|Ws..Ws|Ws..Ws|Ws..Ws|WsWsWs|WWsWWs|Ws.sWs|s...ss',
-			X: 'Ws..Ws|Ws..Ws|sWsWss|.sWss.|.WsWs.|WsssWs|Ws..Ws|ss..ss',
-			Y: 'Ws..Ws|Ws..Ws|sWsWs.|.sWs..|..Ws..|..Ws..|..Ws..|..ss..',
-			Z: 'WWWWs|sssWs|..Wss|..Ws.|.Wss.|Wss..|WWWWs|sssss'
-		};
-
 		var DexViews = window.DexViews = {
 			layers: {},
 			loading: {},
@@ -94,8 +45,6 @@
 			draft: draftView,
 			mergeEffect: mergeEffect,
 			tierData: tierData,
-			typeStyle: typeStyle,
-			typeIconURL: typeIconURL,
 			typeSprite: function (view, id) { return view.images[view.typeSprites[id]] || null; },
 			imageURL: imageURL,
 			indexSearch: indexSearch
@@ -235,8 +184,6 @@
 		function draftType(view, id, fields) {
 			var data = $.extend({}, view.TypeChart[id], { damageTaken: $.extend({}, view.dex.types.get(id).damageTaken) });
 			for (var source in fields.damageTaken) data.damageTaken[source] = TYPE_CODES[fields.damageTaken[source]];
-			if (fields.color) data.color = fields.color;
-			if (fields.label) data.label = fields.label;
 			return data;
 		}
 
@@ -387,21 +334,12 @@
 				if (TYPES.indexOf(id) < 0 && view.images[view.typeSprites[id]]) DexViews.typeSprites[id] = view.images[view.typeSprites[id]];
 			}
 			for (var id in view.TypeChart) {
-				if (TYPES.indexOf(id) >= 0) continue;
-				if (!DexViews.types[id]) added.push([id, 'type']);
-				DexViews.types[id] = typeStyle(id, view.TypeChart[id]);
+				if (TYPES.indexOf(id) >= 0 || DexViews.types[id]) continue;
+				DexViews.types[id] = true;
+				added.push([id, 'type']);
 			}
 			unindexed = unindexed.concat(added);
 			indexSearch();
-		}
-
-		function typeStyle(id, entry) {
-			var name = id.charAt(0).toUpperCase() + id.slice(1);
-			return {
-				name: name,
-				label: entry.label || TYPE_LABELS[id] || name.toUpperCase().replace(/[^A-Z0-9?-]/g, '').slice(0, 6),
-				color: entry.color || TYPE_COLORS[id] || '#9a9aa8'
-			};
 		}
 
 		function indexSearch() {
@@ -558,42 +496,6 @@
 				(image.pixelated ? ';image-rendering:pixelated' : '');
 		};
 
-		var typeIcons = {};
-		function typeIconURL(type) {
-			var key = type.label + type.color;
-			if (typeIcons[key]) return typeIcons[key];
-			var canvas = document.createElement('canvas');
-			canvas.width = 32;
-			canvas.height = 14;
-			var context = canvas.getContext('2d');
-			var rgb = [1, 3, 5].map(function (i) { return parseInt(type.color.slice(i, i + 2), 16); });
-			context.fillStyle = 'rgb(' + rgb.map(function (c) { return Math.round(c * 0.45 + 15); }).join(',') + ')';
-			context.fillRect(0, 1, 32, 12);
-			context.fillStyle = type.color;
-			context.fillRect(1, 2, 30, 10);
-			var glyphs = type.label.split('').map(function (c) { return (TYPE_GLYPHS[c] || TYPE_GLYPHS['?']).split('|'); });
-			var width = function (gap) {
-				return glyphs.reduce(function (sum, glyph) { return sum + glyph[0].length - 1; }, 0) + gap * (glyphs.length - 1);
-			};
-			var gap = glyphs.length <= 3 ? 3 : glyphs.length === 4 ? 2 : 1;
-			if (width(gap) > 30) gap = 0;
-			var start = 1 + Math.max(0, Math.ceil((30 - width(gap) - 1) / 2));
-			['s', 'W'].forEach(function (pixel) {
-				context.fillStyle = pixel === 'W' ? '#ffffff' : '#525252';
-				var x = start;
-				glyphs.forEach(function (glyph) {
-					for (var row = 0; row < glyph.length; row++) {
-						for (var col = 0; col < glyph[row].length; col++) {
-							if (glyph[row][col] === pixel && x + col >= 1 && x + col <= 30) context.fillRect(x + col, 3 + row, 1, 1);
-						}
-					}
-					x += glyph[0].length - 1 + gap;
-				});
-			});
-			typeIcons[key] = canvas.toDataURL();
-			return typeIcons[key];
-		}
-
 		var getTypeIcon = Dex.getTypeIcon;
 		Dex.getTypeIcon = function (type, b) {
 			var id = toID(type);
@@ -603,10 +505,7 @@
 				var size = fit(image, 32, 14);
 				return '<img src="' + imageURL(image) + '" alt="' + BattleLog.escapeHTML(Dex.types.get(type).name || id) + '" width="' + size[0] + '" height="' + size[1] + '" class="pixelated' + (b ? ' b' : '') + '" />';
 			}
-			var entry = view && view.TypeChart[id];
-			var custom = entry && (TYPES.indexOf(id) < 0 || entry.color || entry.label) ? typeStyle(id, entry) : TYPES.indexOf(id) < 0 && DexViews.types[id];
-			if (!custom) return getTypeIcon.apply(this, arguments);
-			return '<img src="' + typeIconURL(custom) + '" alt="' + BattleLog.escapeHTML(custom.name) + '" height="14" width="32" class="pixelated' + (b ? ' b' : '') + '" />';
+			return getTypeIcon.call(this, TYPES.indexOf(id) < 0 ? '???' : type, b);
 		};
 
 		var runMajor = Battle.prototype.runMajor;
