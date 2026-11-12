@@ -1,7 +1,5 @@
 (function ($) {
 
-	var DEX_SLOTS = 3;
-
 	var DexViews = window.DexViews;
 	var DexConfirmPopup = DexViews.ui.DexConfirmPopup;
 	var OFFICIAL_BADGE = DexViews.ui.OFFICIAL_BADGE;
@@ -89,7 +87,6 @@
 			buf += '<p><small>' + summary.counts.map(function (count) {
 				return '<strong>' + count.name + ':</strong> ' + count.total + ' total, ' + count.custom + ' custom, ' + count.modified + ' modified';
 			}).join('<br />') + '</small></p>';
-			buf += '<p class="dexdatasize">' + this.dataSizeHTML() + '</p>';
 			buf += '<p><button class="button" name="worldDex"><i class="fa fa-globe"></i> Use as world</button></p>';
 			buf += '<div class="dexrest">' + this.dexRestHTML() + '</div>';
 			this.$el.html(buf);
@@ -117,13 +114,6 @@
 			var $description = $form.find('textarea[name=description]');
 			if (!$description.is(':focus') && !this.descriptionTimer) $description.val(summary.description || '');
 			this.$('.dexrest').html(this.dexRestHTML());
-			this.$('.dexdatasize').html(this.dataSizeHTML());
-		},
-		dataSizeHTML: function () {
-			var summary = this.room.curSummary;
-			var storage = this.room.dexStorage;
-			if (summary.official || !storage) return '';
-			return '<small>Battle data: ' + Math.ceil(summary.size / 1024) + ' KB of ' + Math.round(storage.data / 1024) + ' KB</small>';
 		},
 		dexRestHTML: function () {
 			var summary = this.room.curSummary;
@@ -227,8 +217,14 @@
 		return bytes < 1024 * 1024 ? Math.ceil(bytes / 1024) + ' KB' : (bytes / 1024 / 1024).toFixed(1).replace(/\.0$/, '') + ' MB';
 	}
 
-	function storageHTML(storage, bare) {
-		return storage ? (bare ? '' : 'Your storage: ') + megabytes(storage.used) + ' of ' + megabytes(storage.limit) : '';
+	function storageHTML(room) {
+		if (!room.dexStorage || toID(room.dexSummary.owner) !== app.user.get('userid') || room.dexSummary.official) return '';
+		return '<p><small>Your sprite storage: ' + megabytes(room.dexStorage.sprites) + ' of ' + megabytes(room.dexStorage.spriteLimit) + '</small></p>';
+	}
+
+	function storageFolderHTML(storage) {
+		return '<div class="folder"><div class="text"><small>Data: ' + (storage ? megabytes(storage.data) + ' of ' + megabytes(storage.dataLimit) : '') + '</small></div></div>' +
+			'<div class="folder"><div class="text"><small>Sprites: ' + (storage ? megabytes(storage.sprites) + ' of ' + megabytes(storage.spriteLimit) : '') + '</small></div></div>';
 	}
 
 	function shrinkSprite(file, kind) {
@@ -270,7 +266,6 @@
 		}).then(function (result) {
 			room.setSaveState(result.error ? 'failed' : 'saved');
 			if (result.error) app.addPopup(Popup, { message: result.error });
-			room.dexStorageKey = null;
 			app.send('/crq dexes');
 		}, function (err) {
 			room.setSaveState('failed');
@@ -303,7 +298,7 @@
 			buf += '<p><input type="file" name="file" accept="image/png,image/gif" /></p>';
 			buf += '<p><small>' + (room.dexSummary.official ? 'Official dex: any size' : data.kind.slice(0, 4) === 'icon' ? 'Best at 40&times;30. Bigger than 64&times;64 is shrunk to 40&times;30' :
 				'Best at 96&times;96. Bigger than 192&times;192 is shrunk to 96&times;96') + '. Pixel art only.</small></p>';
-			if (!room.dexSummary.official && room.dexStorage) buf += '<p><small>' + storageHTML(room.dexStorage) + '</small></p>';
+			buf += storageHTML(room);
 			buf += '<p class="buttonbar"><button type="submit" class="button"><strong>Upload</strong></button>' +
 				(image ? ' <button type="button" name="clearSprite" class="button">Remove</button>' : '') +
 				' <button type="button" name="close" class="button">Cancel</button></p></form>';
@@ -317,7 +312,6 @@
 		},
 		clearSprite: function () {
 			this.close();
-			this.room.dexStorageKey = null;
 			this.room.editDex({ sprite: { name: this.room.dexSpecies.name, kind: this.kind, image: null } });
 		}
 	});
@@ -414,7 +408,7 @@
 				}
 				buf += '<p><input type="file" name="file" accept="image/png,image/gif" /></p>';
 				buf += '<p><small>' + (room.dexSummary.official ? 'Official dex: any size' : 'Best at 32&times;14. Bigger than 64&times;64 is shrunk to 32&times;14') + '. Pixel art only.</small></p>';
-				if (!room.dexSummary.official && room.dexStorage) buf += '<p><small>' + storageHTML(room.dexStorage) + '</small></p>';
+				buf += storageHTML(room);
 				buf += '</div>';
 			}
 			buf += '<p class="buttonbar">';
@@ -478,7 +472,6 @@
 			this.close();
 			if (sprite && file) uploadSprite(room, this.name, 'type', file);
 			if (!sprite && this.image) {
-				room.dexStorageKey = null;
 				room.editDex({ sprite: { name: this.name, kind: 'type', image: null } });
 			}
 			if (!fields.label && !fields.color) return;
@@ -568,8 +561,7 @@
 			if (!app.user.get('registered')) return;
 			DexViews.ui.request('dexstorage', '').then(function (storage) {
 				room.dexStorage = storage;
-				room.$('.dexstorage').text(storageHTML(storage, true));
-				if (room.settingsPopup) room.settingsPopup.sync();
+				room.updateFolderList();
 			}, function () {});
 		},
 		update: function () {
@@ -585,15 +577,15 @@
 			var all = slots.concat(shared, official);
 			var folders = all.map(function (summary) { return summary.id; });
 			if (folders.indexOf(this.curFolder) < 0) this.curFolder = folders[0] || '';
-			this.free = Math.max(0, DEX_SLOTS - slots.length);
-			this.updateFolderList(slots, shared, official);
-			var storageKey = JSON.stringify([userid, slots.concat(shared).map(function (summary) { return summary.id; })]);
+			this.folderLists = { slots: slots, shared: shared, official: official };
+			this.updateFolderList();
+			var storageKey = JSON.stringify([userid, slots.map(function (summary) { return summary.hash; })]);
 			if (storageKey !== this.dexStorageKey) {
 				this.dexStorageKey = storageKey;
 				this.loadDexStorage();
 			}
 			var summary = all[folders.indexOf(this.curFolder)];
-			var key = JSON.stringify([userid, summary, this.free]);
+			var key = JSON.stringify([userid, summary]);
 			this.dexOptions = this.dexOptionsHTML(slots, shared, official);
 			this.$('select[name=dexpicker]').html(this.dexOptions);
 			if (key === this.teamListKey) return this.settleDexSave();
@@ -603,12 +595,15 @@
 		dexPickerHTML: function (heading) {
 			return '<div class="dexpicker">' + heading + '<select name="dexpicker">' + this.dexOptions + '</select></div>';
 		},
-		updateFolderList: function (slots, shared, official) {
+		updateFolderList: function () {
+			var slots = this.folderLists.slots;
+			var shared = this.folderLists.shared;
+			var official = this.folderLists.official;
 			var buf = '<div class="folderlist"><div class="folderlistbefore"></div>';
 			buf += '<div class="folder"><h3>Dexes</h3></div>';
 			for (var i = 0; i < slots.length; i++) buf += this.folderHTML(slots[i]);
 			buf += '<div class="folder"><div class="selectFolder" data-value="+"><i class="fa fa-plus"></i><em>(new dex)</em></div></div>';
-			buf += '<div class="foldersep"></div><div class="folder"><h3>Storage</h3><small class="dexstorage">' + storageHTML(this.dexStorage, true) + '</small></div>';
+			buf += '<div class="foldersep"></div><div class="folder"><h3>Storage</h3></div>' + storageFolderHTML(this.dexStorage);
 			if (shared.length) buf += '<div class="foldersep"></div><div class="folder"><h3>Shared with you</h3></div>';
 			for (var i = 0; i < shared.length; i++) buf += this.folderHTML(shared[i]);
 			if (official.length) buf += '<div class="foldersep"></div><div class="folder"><h3>Official</h3></div>';
@@ -1408,10 +1403,6 @@
 		newDex: function (sourceEl) {
 			if (!app.user.get('named')) {
 				app.addPopup(Popup, { message: "Log in to make dexes.", sourceEl: sourceEl });
-				return;
-			}
-			if (!this.free) {
-				app.addPopup(Popup, { message: "You can own at most " + DEX_SLOTS + " dexes.", sourceEl: sourceEl });
 				return;
 			}
 			app.addPopup(DexNamePopup, {
