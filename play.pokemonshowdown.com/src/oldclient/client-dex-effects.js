@@ -104,77 +104,77 @@
 		['pp', "PP", 'pp'], ['priority', "Priority", 'priority']
 	];
 	var DAMAGE_STATS = 'overrideOffensivePokemon overrideOffensiveStat overrideDefensivePokemon overrideDefensiveStat';
-	var flagSentence = function (path, text) {
-		return [path, text, function (field) { return '<label class="checkbox">' + field(path, 'bool') + ' ' + text + '</label>'; }, true];
+	var flagSentence = function (path, text, title) {
+		return [path, text, function (field) { return '<label class="checkbox">' + field(path, 'bool') + ' ' + text + '</label>'; }, true, title];
 	};
 	var SENTENCES = {
 		Moves: [
 			["Animation", [
-				['animations', "Plays ___ then ___", function (field, data, room) { return 'Plays ' + field('animations', 'animations', defaultAnimations(room.dexEffect.id)); }]
+				['animations', "Plays ___ then ___", function (field, data, room) { return 'Plays ' + field('animations', 'animations', defaultAnimations(room.dexEffect.id)); }, false, "Animation"]
 			]],
 			["Damage", [
-				[DAMAGE_STATS, "Attacks with ___ ___ against ___ ___", function (field, data, room) { return room.dexDamageStatsHTML(data); }],
+				[DAMAGE_STATS, "Attacks with ___ ___ against ___ ___", function (field, data, room) { return room.dexDamageStatsHTML(data); }, false, "Damage"],
 				['ignoreImmunity', "This move ___ type immunities", function (field, data) {
 					return field('ignoreImmunity', 'immunity', data.category === 'Status');
-				}],
-				['damage', "Deals ___ damage", function (field) { return 'Deals ' + field('damage', 'fixeddamage') + ' damage'; }],
+				}, false, "Type immunities"],
+				['damage', "Deals ___ damage", function (field) { return 'Deals ' + field('damage', 'fixeddamage') + ' damage'; }, false, "Fixed damage"],
 				['ohko', "Knocks out the target in one hit, but ___ types are immune", function (field) {
 					return 'Knocks out the target in one hit, but ' + field('ohko', 'ohkotype') + ' types are immune';
-				}]
+				}, false, "One-hit KO"]
 			]],
 			["Hits", [
 				['multihit multiaccuracy', "Hits ___ to ___ times, checking accuracy ___", function (field) {
 					return 'Hits ' + field('multihit', 'range') + ' times, checking accuracy ' + field('multiaccuracy', 'flag', ["once", "before every hit"]);
-				}],
+				}, false, "Hits"],
 				['critRatio willCrit', "Its critical hit ratio is ___", function (field) {
 					return 'Its critical hit ratio is ' + field('critRatio willCrit', 'crit');
-				}]
+				}, false, "Critical hits"]
 			]],
 			["Target", [
-				['status', "Inflicts ___ on the target", function (field) { return 'Inflicts ' + field('status', 'select', 'status') + ' on the target'; }],
+				['status', "Inflicts ___ on the target", function (field) { return 'Inflicts ' + field('status', 'select', 'status') + ' on the target'; }, false, "Status"],
 				['volatileStatus', "Gives the target ___", function (field) {
 					return 'Gives the target ' + field('volatileStatus', 'select', 'condition:volatileStatus');
-				}],
-				['boosts', "Changes the target's ___", function (field) { return 'Changes the target\'s ' + field('boosts', 'boostlist'); }],
-				flagSentence('forceSwitch', "Forces the target to switch out")
+				}, false, "Target's volatile status"],
+				['boosts', "Changes the target's ___", function (field) { return 'Changes the target\'s ' + field('boosts', 'boostlist'); }, false, "Target's stat changes"],
+				flagSentence('forceSwitch', "Forces the target to switch out", "Forced switch")
 			]],
 			["User", [
 				['self.boosts', "Changes the user's ___ after each hit", function (field) {
 					return 'Changes the user\'s ' + field('self.boosts', 'boostlist') + ' after each hit';
-				}],
+				}, false, "User's stat changes"],
 				['selfBoost.boosts', "Changes the user's ___ once after the move", function (field) {
 					return 'Changes the user\'s ' + field('selfBoost.boosts', 'boostlist') + ' once after the move';
-				}],
+				}, false, "User's stat changes"],
 				['self.volatileStatus', "Gives the user ___", function (field) {
 					return 'Gives the user ' + field('self.volatileStatus', 'select', 'condition:volatileStatus');
-				}],
+				}, false, "User's volatile status"],
 				['drain', "Heals the user by ___/___ of the damage dealt", function (field) {
 					return 'Heals the user by ' + field('drain', 'fraction') + ' of the damage dealt';
-				}],
+				}, false, "Drain"],
 				['recoil', "Hurts the user by ___/___ of the damage dealt", function (field) {
 					return 'Hurts the user by ' + field('recoil', 'fraction') + ' of the damage dealt';
-				}],
-				flagSentence('hasCrashDamage', "Gets the power boost from Reckless"),
-				['heal', "Heals the user by ___/___ of its max HP", function (field) { return 'Heals the user by ' + field('heal', 'fraction') + ' of its max HP'; }],
+				}, false, "Recoil"],
+				flagSentence('hasCrashDamage', "Gets the power boost from Reckless", "Reckless"),
+				['heal', "Heals the user by ___/___ of its max HP", function (field) { return 'Heals the user by ' + field('heal', 'fraction') + ' of its max HP'; }, false, "Healing"],
 				['selfSwitch', "The user switches out ___", function (field) {
 					return 'The user switches out ' + field('selfSwitch', 'select', [['true', "normally"], ['copyvolatile', "passing on its stat changes"], ['shedtail', "leaving a substitute"]]);
-				}],
+				}, false, "Switching out"],
 				['selfdestruct', "The user faints ___", function (field) {
 					return 'The user faints ' + field('selfdestruct', 'select', [['always', "always"], ['ifHit', "if it hits"]]);
-				}]
+				}, false, "Fainting"]
 			]],
 			["Chance", [
-				['secondaries', "Has a ___% chance to inflict ___, give the target ___, or change stats", function (field) { return field('secondaries', 'secondaries'); }],
-				flagSentence('hasSheerForceBoost', "Gets the power boost from Sheer Force")
+				['secondaries', "Has a ___% chance to inflict ___, give the target ___, or change stats", function (field) { return field('secondaries', 'secondaries'); }, false, "Secondary effect"],
+				flagSentence('hasSheerForceBoost', "Gets the power boost from Sheer Force", "Sheer Force")
 			]],
 			["Field", [
-				['weather', "Sets the weather to ___", function (field) { return 'Sets the weather to ' + field('weather', 'select', 'condition:weather'); }],
-				['terrain', "Sets the terrain to ___", function (field) { return 'Sets the terrain to ' + field('terrain', 'select', 'condition:terrain'); }],
+				['weather', "Sets the weather to ___", function (field) { return 'Sets the weather to ' + field('weather', 'select', 'condition:weather'); }, false, "Weather"],
+				['terrain', "Sets the terrain to ___", function (field) { return 'Sets the terrain to ' + field('terrain', 'select', 'condition:terrain'); }, false, "Terrain"],
 				['pseudoWeather', "Starts ___ on the field", function (field) {
 					return 'Starts ' + field('pseudoWeather', 'select', 'condition:pseudoWeather') + ' on the field';
-				}],
-				['sideCondition', "Sets ___ on a side", function (field) { return 'Sets ' + field('sideCondition', 'select', 'condition:sideCondition') + ' on a side'; }],
-				['slotCondition', "Sets ___ on a slot", function (field) { return 'Sets ' + field('slotCondition', 'select', 'condition:slotCondition') + ' on a slot'; }]
+				}, false, "Field condition"],
+				['sideCondition', "Sets ___ on a side", function (field) { return 'Sets ' + field('sideCondition', 'select', 'condition:sideCondition') + ' on a side'; }, false, "Side condition"],
+				['slotCondition', "Sets ___ on a slot", function (field) { return 'Sets ' + field('slotCondition', 'select', 'condition:slotCondition') + ' on a slot'; }, false, "Slot condition"]
 			]]
 		],
 		Abilities: [],
@@ -183,35 +183,23 @@
 				['fling.basePower fling.status fling.volatileStatus', "When flung, has ___ power, inflicts ___ and gives the target ___", function (field) {
 					return 'When flung, has ' + field('fling.basePower', 'int', [0, 250]) + ' power, inflicts ' + field('fling.status', 'select', 'status') +
 						' and gives the target ' + field('fling.volatileStatus', 'select', 'condition:volatileStatus');
-				}]
+				}, false, "Fling"]
 			]],
 			["Natural Gift", [
 				['naturalGift.type naturalGift.basePower', "Makes Natural Gift ___-type with ___ power", function (field) {
 					return 'Makes Natural Gift ' + field('naturalGift.type', 'select', 'type') + '-type with ' + field('naturalGift.basePower', 'int', [0, 250]) + ' power';
-				}]
+				}, false, "Natural Gift"]
 			]],
 			["Held", [
-				['boosts', "Changes the holder's ___", function (field) { return 'Changes the holder\'s ' + field('boosts', 'boostlist'); }]
+				['boosts', "Changes the holder's ___", function (field) { return 'Changes the holder\'s ' + field('boosts', 'boostlist'); }, false, "Holder's stat changes"]
 			]],
 			["Icon", [
-				['spriteFrom', "Uses the icon of ___", function (field) { return 'Uses the icon of ' + field('spriteFrom', 'select', 'ref:Items'); }],
-				['spritenum', "Uses icon number ___", function (field) { return 'Uses icon number ' + field('spritenum', 'int', [0, 761]); }]
+				['spriteFrom', "Uses the icon of ___", function (field) { return 'Uses the icon of ' + field('spriteFrom', 'select', 'ref:Items'); }, false, "Icon"],
+				['spritenum', "Uses icon number ___", function (field) { return 'Uses icon number ' + field('spritenum', 'int', [0, 761]); }, false, "Icon number"]
 			]]
 		],
 		Conditions: []
 	};
-	var TITLES = {
-		ignoreImmunity: "Type immunities",
-		damage: "Fixed damage", ohko: "One-hit KO", 'multihit multiaccuracy': "Hits", 'critRatio willCrit': "Critical hits",
-		status: "Status", volatileStatus: "Target's volatile status", 'Moves:boosts': "Target's stat changes", forceSwitch: "Forced switch",
-		'self.boosts': "User's stat changes", 'selfBoost.boosts': "User's stat changes", 'self.volatileStatus': "User's volatile status",
-		drain: "Drain", recoil: "Recoil", hasCrashDamage: "Reckless", heal: "Healing", selfSwitch: "Switching out", selfdestruct: "Fainting",
-		secondaries: "Secondary effect", hasSheerForceBoost: "Sheer Force", weather: "Weather", terrain: "Terrain",
-		pseudoWeather: "Field condition", sideCondition: "Side condition", slotCondition: "Slot condition", animations: "Animation",
-		'fling.basePower fling.status fling.volatileStatus': "Fling", 'naturalGift.type naturalGift.basePower': "Natural Gift",
-		'Items:boosts': "Holder's stat changes", spriteFrom: "Icon", spritenum: "Icon number"
-	};
-	TITLES[DAMAGE_STATS] = "Damage";
 	var CRIT_CHOICES = [['1', "normal"], ['2', "high"], ['3', "very high"], ['4', "maximum"], ['always', "100% (always crits)"]];
 	var BOOST_CHOICES = [6, 5, 4, 3, 2, 1, 0, -1, -2, -3, -4, -5, -6].map(function (amount) { return [amount, amount ? priorityText(amount) : '']; });
 	var GETTERS = DexViews.ui.GETTERS;
@@ -324,14 +312,6 @@
 		return parts.join(' ') || "(code)";
 	}
 
-	function sentenceText(control, value, options) {
-		if (control === 'flag') return value ? options[1] : options[0];
-		var choice = control === 'select' && Array.isArray(options) && options.filter(function (option) { return String(option[0]) === String(value); })[0];
-		if (choice) return choice[1];
-		if (control === 'select' && blank(value)) return "nothing";
-		return valueText(control, value, options);
-	}
-
 	function secondarySentence(secondary) {
 		var parts = [];
 		if (secondary.status) parts.push('inflict ' + summaryName(secondary.status) + ' on the target');
@@ -407,6 +387,9 @@
 	}
 
 	function valueText(control, value, options) {
+		if (control === 'flag') return value ? options[1] : options[0];
+		var choice = control === 'select' && Array.isArray(options) && options.filter(function (entry) { return Array.isArray(entry) && String(entry[0]) === String(value); })[0];
+		if (choice) return choice[1];
 		if (control === 'animations') value = value || options;
 		if (control === 'immunity') {
 			var ignores = blank(value) ? options : value;
@@ -421,7 +404,6 @@
 		if (control === 'priority') return priorityText(value);
 		if (control === 'boostlist') return escape(boostsText(value)) || '&mdash;';
 		if (control === 'crit') return value[1] ? CRIT_CHOICES[4][1] : (CRIT_CHOICES.filter(function (choice) { return choice[0] === String(value[0] || 1); })[0] || [0, value[0]])[1];
-		if (control === 'flag') return value ? options[1] : options[0];
 		if (control === 'fixeddamage' && value === 'level') return "the user's level in";
 		if (control === 'ohkotype' && value === true) return "no";
 		if (control === 'fraction' && Array.isArray(value)) return value.join('/');
@@ -437,10 +419,6 @@
 		if (control === 'select' && typeof options === 'string' && options.slice(0, 4) === 'ref:') {
 			var ref = (refOptions(options.slice(4).split(','), 'id', DexViews.current) || []).filter(function (entry) { return entry[0] === toID(value); })[0];
 			if (ref) return ref[1];
-		}
-		if (control === 'select' && Array.isArray(options)) {
-			var option = options.filter(function (entry) { return Array.isArray(entry) && String(entry[0]) === String(value); })[0];
-			if (option) return option[1];
 		}
 		return escape(String(value));
 	}
@@ -724,7 +702,8 @@
 				path.indexOf(' ') >= 0 && control !== 'bool' ? path.split(' ').map(function (each) { return getPath(data, each); }) : getPath(data, path);
 			if (!this.dexEffectCanEdit(path) && !className) {
 				if (control === 'bool') return '<input type="checkbox" disabled' + (value ? ' checked' : '') + ' data-edit="' + escape(path) + '" />';
-				return '<span class="dexvalue" data-edit="' + escape(path) + '">' + (control === 'secondaries' ? secondarySentence(value[0] || {}) : sentenceText(control, value, options)) + '</span>';
+				return '<span class="dexvalue" data-edit="' + escape(path) + '">' + (control === 'secondaries' ? secondarySentence(value[0] || {}) :
+					control === 'select' && blank(value) ? "nothing" : valueText(control, value, options)) + '</span>';
 			}
 			if (!this.dexEffectCanEdit(path)) {
 				return '<div class="textbox dexfield' + (className ? ' ' + className : '') + '" data-edit="' + escape(path) + '">' + valueText(control, value, options) + '</div>';
@@ -934,12 +913,11 @@
 		},
 		dexEffectStatsHTML: function (data) {
 			var self = this;
-			var table = this.dexEffect.table;
 			var lines = [];
 			$.each(this.dexEffectSections(data), function (i, section) {
 				$.each(section[1], function (j, entry) {
 					if (entry[0].slice(0, 10) === 'condition.' || !self.dexAttributeShown(entry, data)) return;
-					var title = entry[4] || TITLES[table + ':' + entry[0]] || TITLES[entry[0]] || section[0];
+					var title = entry[4];
 					var summaries = entry[0] === 'secondaries' ? secondaryList(data).map(secondaryText) : [attributeSummary(entry, data)];
 					$.each(summaries, function (k, text) {
 						var summary = escape(text) || '&mdash;';
@@ -996,7 +974,7 @@
 					return $.each(secondaryList(data), function (i) { box(entry, section, i); });
 				}
 				var removable = editable && self.dexEffectCanEdit(entry[0]) && entry[0].slice(0, 10) !== 'condition.';
-				var title = entry[4] || TITLES[table + ':' + entry[0]] || TITLES[entry[0]] || section[0];
+				var title = entry[4];
 				var remove = index === undefined ? ['removeDexAttribute', escape(entry[0])] : ['removeDexSecondary', index];
 				var fieldAt = index === undefined ? field : function (path, control) {
 					return self.dexEffectFieldHTML(path, control, index, data);
@@ -1029,9 +1007,8 @@
 				var rows = [];
 				$.each(section[1], function (j, entry) {
 					if (self.dexAttributeShown(entry, data) && entry[0] !== 'secondaries' || !self.dexEffectCanEdit(entry[0]) || !entry[1]) return;
-					if (query && toID(entry[1] + ' ' + section[0] + ' ' + (TITLES[self.dexEffect.table + ':' + entry[0]] || TITLES[entry[0]] || '')).indexOf(query) < 0) return;
-					var title = entry[4] || TITLES[self.dexEffect.table + ':' + entry[0]] || TITLES[entry[0]] || section[0];
-					rows.push(DexViews.ui.sentenceRowHTML('attribute|' + escape(entry[0]), title, escape(entry[1])));
+					if (query && toID(entry[1] + ' ' + section[0] + ' ' + entry[4]).indexOf(query) < 0) return;
+					rows.push(DexViews.ui.sentenceRowHTML('attribute|' + escape(entry[0]), entry[4], escape(entry[1])));
 				});
 				if (rows.length) groups.push([section[0], rows]);
 			});
@@ -1691,9 +1668,8 @@
 	});
 	_.extend(window.DexBuilderRoom.prototype.events, {
 		'click .dexmonpage .dexmoveattributes [data-attr]': 'clickDexAttributeLine',
-		'change .dexmonpage .dexeffectfield input': 'changeDexEffectField',
-		'change .dexmonpage .dexeffectfield select': 'changeDexEffectField',
-		'change .dexmonpage .dexeffectfield textarea': 'changeDexEffectField',
+		'change .dexmonpage .dexeffectfield input, .dexmonpage .dexeffectfield select, .dexmonpage .dexeffectfield textarea': 'changeDexEffectField',
+
 		'focus .dexmonpage input[name=effectflags]': 'focusDexEffectFlags',
 		'input .dexmonpage input[name=effectflags]': 'searchDexEffectFlags',
 		'input .dexmonpage input.dexinline': 'resizeDexInline',
