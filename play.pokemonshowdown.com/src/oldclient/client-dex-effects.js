@@ -8,16 +8,13 @@
 
 	var KINDS = DexViews.ui.EFFECT_KINDS;
 	var CODE = DexViews.ui.CODE;
-	var NAMES = { Moves: 'Move', Abilities: 'Ability', Items: 'Item', Conditions: 'Condition' };
-	var ICONS = { Abilities: 'star', Conditions: 'cloud' };
+	var NAMES = { Moves: 'Move', Abilities: 'Ability', Items: 'Item' };
+	var ICONS = { Abilities: 'star' };
 	var CONTROL = ['name', 'inheritsFrom', 'slots', 'events', 'spriteFrom'];
 	var BOOSTS = { atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', spe: 'Spe', accuracy: 'Acc', evasion: 'Eva' };
 	var STATS = ['hp', 'atk', 'def', 'spa', 'spd', 'spe', 'accuracy', 'evasion'];
 	var STATUSES = [['brn', "Burn"], ['par', "Paralysis"], ['slp', "Sleep"], ['frz', "Freeze"], ['psn', "Poison"], ['tox', "Toxic"]];
 	var CATEGORIES = ['Physical', 'Special', 'Status'];
-	var CONDITION_KINDS = {
-		status: "Status", volatileStatus: "Volatile", sideCondition: "Side", slotCondition: "Slot", pseudoWeather: "Field", weather: "Weather", terrain: "Terrain"
-	};
 	var YES = [['true', "Yes"]];
 	var MOVE_TARGETS = [
 		['normal', "Adjacent"], ['any', "Any"], ['self', "Self"], ['adjacentAlly', "Adjacent ally"], ['adjacentAllyOrSelf', "Ally or self"],
@@ -197,8 +194,7 @@
 				['spriteFrom', "Uses the icon of ___", function (field) { return 'Uses the icon of ' + field('spriteFrom', 'select', 'ref:Items'); }, false, "Icon"],
 				['spritenum', "Uses icon number ___", function (field) { return 'Uses icon number ' + field('spritenum', 'int', [0, 761]); }, false, "Icon number"]
 			]]
-		],
-		Conditions: []
+		]
 	};
 	var CRIT_CHOICES = [['1', "normal"], ['2', "high"], ['3', "very high"], ['4', "maximum"], ['always', "100% (always crits)"]];
 	var BOOST_CHOICES = [6, 5, 4, 3, 2, 1, 0, -1, -2, -3, -4, -5, -6].map(function (amount) { return [amount, amount ? priorityText(amount) : '']; });
@@ -240,6 +236,15 @@
 	}
 
 	var entries = null;
+
+	function fixSlots(data) {
+		$.each(data.handlers, function (i, handler) {
+			$.each(handler.slots, function (j, slot) {
+				slot.fixed = slot.kind === 'ref' && [data.id, data.base].indexOf(toID(slot.value)) >= 0;
+			});
+		});
+		return data;
+	}
 
 	function refOptions(tables, form, view) {
 		if (!entries) return null;
@@ -643,6 +648,7 @@
 			if (this.dexCodeFor !== table + ':' + id) {
 				this.dexCodeFor = table + ':' + id;
 				this.dexCodePending = {};
+				this.dexConditionPending = {};
 			}
 			this.dexSpecies = null;
 			this.$('.dexsearchpage, .dexpage').hide();
@@ -659,12 +665,10 @@
 			var room = this;
 			request('dexeffect', this.dexid + ', ' + KINDS[table] + ', ' + id).then(function (data) {
 				if (room.dexEffect !== effect) return;
-				$.each(data.handlers, function (i, handler) {
-					$.each(handler.slots, function (j, slot) {
-						slot.fixed = slot.kind === 'ref' && [data.id, data.base].indexOf(toID(slot.value)) >= 0;
-					});
-				});
-				room.dexEffectData = data;
+				room.dexEffectData = fixSlots(data);
+				room.dexConditionView = room.dexBaseView || room.dexView;
+				room.dexConditionData = {};
+				$.each(data.conditions, function (conditionid, condition) { room.dexConditionData[conditionid] = fixSlots(condition); });
 				effect.name = data.name;
 				room.renderDexEffect();
 			}, function (err) {
@@ -722,6 +726,10 @@
 			return wrap('data-path', path, control, controlHTML(control, value, options, this.dexView, className));
 		},
 		renderDexEffect: function () {
+			if (this.dexConditionBox) {
+				this.dexConditionDirty = true;
+				return;
+			}
 			var effect = this.dexEffect;
 			var info = this.dexEffectData;
 			var table = effect.table;
@@ -749,9 +757,7 @@
 			var limit = table === 'Moves' ? 55 : 90;
 			var count = this.dexEffectCanEdit('shortDesc') ? ' (<span class="dexdesccount">' + (data.shortDesc || '').length + '/' + limit + '</span>)' : '';
 			var desc = table === 'Moves' ? ['shortdesc', 'dexfield'] : ['shortdescbox', 'dexfield dexdescbox'];
-			if (table !== 'Conditions') {
-				buf += '<div class="setrow"><div class="setcell dexshortdesc"><label>Short description' + count + '</label>' + this.dexEffectFieldHTML('shortDesc', desc[0], limit, data, desc[1]) + '</div></div>';
-			}
+			buf += '<div class="setrow"><div class="setcell dexshortdesc"><label>Short description' + count + '</label>' + this.dexEffectFieldHTML('shortDesc', desc[0], limit, data, desc[1]) + '</div></div>';
 			if (table === 'Moves') {
 				buf += '<div class="setrow dexmovenumbers">';
 				for (var n = 0; n < MOVE_NUMBERS.length; n++) {
@@ -768,8 +774,7 @@
 			var cells = {
 				Moves: [['Target', 'target', 'select', MOVE_TARGETS], ['Learned by']],
 				Abilities: [['Pokémon']],
-				Items: [],
-				Conditions: [['Duration', 'duration', 'int', [1, 100]], ['Counter max', 'counterMax', 'int', [1, 10000]]]
+				Items: []
 			}[table];
 			for (var c = 0; c < cells.length; c++) {
 				buf += '<div class="setcell' + (cells[c][1] ? '' : ' setcell-learnset') + '"><label' + (cells[c][1] ? '' : ' class="dexlearnsetlabel" data-name="' + cells[c][0] + '"') + '>' + cells[c][0] + '</label>';
@@ -786,10 +791,8 @@
 			if (FLAGS[table] || PROPERTIES[table]) buf += '<div class="dexstatresults dexeffectpanel" data-panel="flags"></div>';
 			buf += '<div class="dexstatresults dexeffectpanel" data-panel="fields">' + this.dexEffectFieldsHTML(data) + '</div>';
 			buf += this.dexAttributePanelHTML();
-			if (table !== 'Conditions') {
-				buf += '<div class="dexstatresults dexeffectpanel" data-panel="description"><div class="pad dexfieldsection dexeffectfields">' +
-					'<label class="label">Description</label>' + this.dexEffectFieldHTML('desc', 'textarea', null, data) + '</div></div>';
-			}
+			buf += '<div class="dexstatresults dexeffectpanel" data-panel="description"><div class="pad dexfieldsection dexeffectfields">' +
+				'<label class="label">Description</label>' + this.dexEffectFieldHTML('desc', 'textarea', null, data) + '</div></div>';
 			buf += '<div class="dexstatresults dexeffectpanel dexcode" data-panel="code">' + this.dexEffectCodeHTML() + '</div>';
 			this.$('.dexmonpage').html('<div class="teamwrapper">' + buf + '</div>');
 			this.dexPicker = null;
@@ -811,7 +814,9 @@
 		markDexEffectEdits: function () {
 			var info = this.dexEffectData;
 			var original = info && info.original;
-			var $page = this.$('.dexmonpage');
+			var box = this.dexConditionBox;
+			var $page = box ? $(box) : this.$('.dexmonpage');
+			var own = function () { return !!box || !$(this).closest('[data-condition]').length; };
 			$page.find('button[name=toggleDexEdits]').toggle(!!original);
 			if (!original) return;
 			this.markDexCodeEdits(this.dexEffectCodeValues(), original);
@@ -829,7 +834,7 @@
 					if ((now || {})[this.dataset.stat] !== (was || {})[this.dataset.stat]) $(this).addClass('dexedited');
 				});
 			};
-			$page.find('[data-path], [data-edit]').each(function () {
+			$page.find('[data-path], [data-edit]').filter(own).each(function () {
 				var path = this.getAttribute('data-path') || this.getAttribute('data-edit');
 				if (path === 'secondaries') return;
 				mark($(this), valueOf(data, path), valueOf(original, path));
@@ -854,12 +859,12 @@
 			if ($page.find('[data-panel=fields] .dexedited').filter(function () {
 				return !inMain[this.getAttribute('data-path') || this.getAttribute('data-edit')];
 			}).length) $page.find('.setstats').addClass('dexedited');
-			$page.find('[data-slotkeys]').each(function () {
+			$page.find('[data-slotkeys]').filter(own).each(function () {
 				if (this.getAttribute('data-slotkeys').split(' ').some(function (key) {
 					return slots[key] && String(self.dexEffectSlotValue(key, slots[key])) !== String(slots[key].original);
 				})) $(this).addClass('dexedited');
 			});
-			$page.find('[data-event]').each(function () {
+			$page.find('[data-event]').filter(own).each(function () {
 				var path = this.getAttribute('data-event');
 				if ($(this).find('select').val() !== path.slice(path.lastIndexOf('.') + 1)) $(this).addClass('dexedited');
 			});
@@ -867,7 +872,9 @@
 		dexEffectIconHTML: function (data) {
 			var table = this.dexEffect.table;
 			if (table === 'Moves') return this.dexEffectIconSelectHTML('type', data.type) + this.dexEffectIconSelectHTML('category', data.category);
-			if (table === 'Items') return '<span class="itemicon dexitemicon" style="' + Dex.getItemIcon($.extend({}, data, { id: this.dexEffect.id })) + '"></span>';
+			if (table === 'Items') {
+				return '<button class="dexspritebutton" name="showDexSprite" value="item"><span class="itemicon dexitemicon" style="' + Dex.getItemIcon($.extend({}, data, { id: this.dexEffect.id })) + '"></span></button>';
+			}
 			return '<i class="fa fa-' + ICONS[table] + ' dexeffecticon"></i>';
 		},
 		dexEffectIconSelectHTML: function (path, value) {
@@ -1205,7 +1212,109 @@
 			return buf;
 		},
 		dexEffectCodeHTML: function () {
-			return '<div class="pad"><div class="setchart dexcodebox">' + this.dexCodeHTML(this.dexEffect.id, this.dexEffectCodeValues(), this.dexEffectCodeNode()) + '</div></div>';
+			return '<div class="pad"><div class="setchart dexcodebox">' + this.dexCodeHTML(this.dexEffect.id, this.dexEffectCodeValues(), this.dexEffectCodeNode()) + '</div>' +
+				this.dexConditionsHTML() + '</div>';
+		},
+		dexConditionIds: function () {
+			var entries = DexViews.entries[this.dexid];
+			if (!entries) return [];
+			if (!this.dexEffect) {
+				return [this.dexSpecies.id, toID(this.dexSpecies.baseSpecies)].filter(function (id) { return entries.Conditions[id]; }).slice(0, 1);
+			}
+			var view = this.dexView;
+			var own = this.dexEffect.id;
+			var ids = [];
+			var text = JSON.stringify(this.dexEffectValues()) + JSON.stringify(this.dexEffectDraft() || {}) +
+				this.dexEffectData.handlers.map(function (handler) { return handler.code || ''; }).join('\n');
+			text.replace(/(['"`])([^'"`\n]{1,40})\1/g, function (match, quote, value) {
+				var id = toID(value);
+				if (id !== own && entries.Conditions[id] && ids.indexOf(id) < 0 && !view.dex.species.get(id).exists) ids.push(id);
+				return match;
+			});
+			return ids;
+		},
+		dexConditionsHTML: function () {
+			var room = this;
+			if (this.dexConditionView !== (this.dexBaseView || this.dexView)) {
+				this.dexConditionView = this.dexBaseView || this.dexView;
+				this.dexConditionData = {};
+			}
+			var data = this.dexConditionData;
+			var here = this.dexEffect && this.dexEffectData.name;
+			return this.dexConditionIds().map(function (id) {
+				if (!(id in data)) room.loadDexCondition(id);
+				var info = data[id];
+				if (info === false) return '';
+				var buf = '<div class="setchart dexcodebox" data-condition="' + escape(id) + '"><p class="dexconditionhead"><strong>' + escape(room.dexConditionInfo(id).name) + '</strong>';
+				var others = info ? info.users.filter(function (name) { return name !== here; }) : [];
+				if (others.length) {
+					buf += ' <small title="' + escape(others.join(', ')) + '">Also used by ' + escape(others.slice(0, 3).join(', ')) +
+						(others.length > 3 ? ' and ' + (others.length - 3) + ' more' : '') + '</small>';
+				}
+				if (info && info.official && room.dexEditable) {
+					buf += ' <button class="button" name="resetDexCondition" value="' + escape(id) + '"' + (room.dexResettable('Conditions', id) ? '' : ' style="display:none"') +
+						'><i class="fa fa-undo"></i> Reset to base</button>';
+				}
+				buf += '</p>';
+				if (!info) return buf + '<p><em>Loading...</em></p></div>';
+				return buf + room.withDexCondition(id, function () {
+					return this.dexCodeHTML(id, this.dexEffectCodeValues(), this.dexEffectCodeNode());
+				}) + '</div>';
+			}).join('');
+		},
+		loadDexCondition: function (id) {
+			var room = this;
+			var data = this.dexConditionData;
+			data[id] = null;
+			request('dexeffect', this.dexid + ', condition, ' + id).then(function (info) {
+				if (room.dexConditionData !== data) return;
+				data[id] = fixSlots(info);
+				room.refreshDexCode();
+			}, function () {
+				if (room.dexConditionData === data) data[id] = false;
+			});
+		},
+		withDexCondition: function (id, fn, box) {
+			var saved = [this.dexEffect, this.dexEffectData, this.dexCodePending, this.dexConditionBox];
+			var pending = this.dexConditionPending || (this.dexConditionPending = {});
+			var info = this.dexConditionData[id];
+			this.dexEffect = { table: 'Conditions', id: id, name: info.name, from: '' };
+			this.dexEffectData = info;
+			this.dexCodePending = pending[id] || {};
+			this.dexConditionBox = box || true;
+			entries = DexViews.entries[this.dexid] || null;
+			try {
+				return fn.call(this);
+			} finally {
+				pending[id] = this.dexCodePending;
+				this.dexEffect = saved[0];
+				this.dexEffectData = saved[1];
+				this.dexCodePending = saved[2];
+				this.dexConditionBox = saved[3];
+			}
+		},
+		inDexCondition: function (el, method, args) {
+			var box = !this.dexConditionBox && $(el).closest('[data-condition]')[0];
+			if (!box) return false;
+			this.dexConditionDirty = false;
+			this.withDexCondition(box.getAttribute('data-condition'), function () { method.apply(this, args); }, box);
+			if (this.dexConditionDirty) this.refreshDexCode();
+			else this.markDexEdits();
+			return true;
+		},
+		markDexConditionEdits: function () {
+			var room = this;
+			this.$('.dexmonpage [data-condition]').each(function () {
+				var box = this;
+				var id = box.getAttribute('data-condition');
+				if (!room.dexConditionData[id]) return;
+				$(box).find('pre select.dexinline').each(function () { fitInline(this); });
+				$(box).find('button[name=resetDexCondition]').toggle(room.dexResettable('Conditions', id));
+				room.withDexCondition(id, room.markDexEffectEdits, box);
+			});
+		},
+		resetDexCondition: function (id, button) {
+			this.deleteDexEntries('Conditions', [id], true, button);
 		},
 		dexEffectCodeValues: function () {
 			var info = this.dexEffectData;
@@ -1437,65 +1546,12 @@
 			if (from) return this.openDexPokemon(from);
 			this.closeDexPokemon();
 		},
-		setupDexConditionList: function (search) {
-			var room = this;
-			var renderRow = search.renderRow;
-			search.renderRow = function (id, type, matchStart, matchLength, errorMessage, attrs) {
-				if (type !== 'condition') return renderRow.apply(this, arguments);
-				var info = room.dexConditionInfo(id);
-				return DexViews.ui.chartRowHTML('condition|' + id, '<span class="col movenamecol">' + escape(info.name) + '</span> ' +
-					'<span class="col widelabelcol"><em>Kind</em><br />' + (CONDITION_KINDS[info.kind] || '&mdash;') + '</span> ' +
-					'<span class="col movedesccol">' + escape(info.desc) + '</span>', attrs);
-			};
-			search.find = function (query) {
-				this.q = toID(query);
-				this.resultSet = room.dexConditionRows(this.q);
-				this.renderedIndex = 0;
-				this.renderingDone = false;
-				this.updateScroll();
-				return true;
-			};
-			search.find('');
-		},
 		dexConditionInfo: function (id) {
 			var entries = DexViews.entries[this.dexid];
 			var names = entries.names || {};
 			var status = STATUSES.filter(function (entry) { return entry[0] === id; })[0];
 			var info = entries.conditions[id] || ['', ''];
 			return { name: status && (names[id] || id) === id ? status[1] : names[id] || id, kind: info[0], desc: info[1] };
-		},
-		dexConditionRows: function (query) {
-			var entries = DexViews.entries[this.dexid];
-			if (!entries || !entries.Conditions) return [['html', '<p><em>Loading...</em></p>']];
-			var room = this;
-			var custom = entries.custom.Conditions || [];
-			var modified = entries.modified.Conditions || [];
-			var nameOf = function (id) {
-				return room.dexConditionInfo(id).name;
-			};
-			var kinds = Object.keys(CONDITION_KINDS);
-			var rank = function (id) {
-				var kind = kinds.indexOf((entries.conditions[id] || [''])[0]);
-				return kind < 0 ? kinds.length : kind;
-			};
-			var needed = this.dexScope !== 'out';
-			var ids = Object.keys(entries.Conditions).sort(function (a, b) {
-				return rank(a) - rank(b) || nameOf(a).localeCompare(nameOf(b));
-			}).filter(function (id) {
-				return !!entries.needed[id] === needed && (!query || toID(nameOf(id)).indexOf(query) >= 0);
-			});
-			var groups = [
-				["Custom conditions", ids.filter(function (id) { return custom.indexOf(id) >= 0; })],
-				["Modified conditions", ids.filter(function (id) { return modified.indexOf(id) >= 0; })],
-				["Conditions", ids.filter(function (id) { return custom.indexOf(id) < 0 && modified.indexOf(id) < 0; })]
-			];
-			var rows = [];
-			$.each(groups, function (i, group) {
-				if (!group[1].length) return;
-				rows.push(['header', escape(group[0])]);
-				$.each(group[1], function (j, id) { rows.push(['condition', id]); });
-			});
-			return rows;
 		},
 		dexEffectDraft: function () {
 			var effect = this.dexEffect;
@@ -1511,6 +1567,7 @@
 			this.draftDex('effects', effect.table + ':' + effect.id, $.extend({ name: this.dexEffectData.name }, fields));
 		},
 		changeDexEffectField: function (e) {
+			if (this.inDexCondition(e.currentTarget, this.changeDexEffectField, arguments)) return;
 			if (!this.dexEffectData) return;
 			var $wrap = $(e.currentTarget).closest('[data-path], [data-slot], [data-event]');
 			var value = readField($wrap);
@@ -1528,7 +1585,8 @@
 					var same = slot.kind === 'number' ? String(value) === String(slot.original) : toID(value) === toID(slot.original);
 					fields.slots[key] = value === null || same ? null : value;
 				});
-				this.$('.dexmonpage [data-slot]').filter(function () { return this.dataset.slot === $wrap.attr('data-slot'); })
+				var box = $wrap.closest('[data-condition]')[0];
+				this.$('.dexmonpage [data-slot]').filter(function () { return this.dataset.slot === $wrap.attr('data-slot') && $(this).closest('[data-condition]')[0] === box; })
 					.find('select, input').val($(e.currentTarget).val()).each(function () { fitInline(this); });
 				var $pair = $wrap.closest('.dexpair');
 				if ($pair.length) {
@@ -1553,6 +1611,7 @@
 			var edited = $(e.currentTarget).closest('.dexsentence').attr('data-attribute');
 			if (edited) (this.dexAddedAttributes = this.dexAddedAttributes || {})[edited] = true;
 			$(e.currentTarget).filter('.dexboostcell').toggleClass('dexboostup', Number(e.currentTarget.value) > 0).toggleClass('dexboostdown', Number(e.currentTarget.value) < 0);
+			if (this.dexConditionBox) return;
 			var data = this.dexEffectValues();
 			if (['type', 'category'].indexOf($wrap.attr('data-path')) >= 0 ||
 				['immunity', 'fixeddamage', 'boostlist', 'secondaries'].indexOf($wrap.attr('data-control')) >= 0) return this.renderDexEffect();
@@ -1621,10 +1680,10 @@
 		dexEffectMembershipHTML: function (info) {
 			var table = this.dexEffect.table;
 			var entries = DexViews.entries[this.dexid];
-			if (table !== 'Conditions' && entries && !entries[table][this.dexEffect.id]) {
+			if (entries && !entries[table][this.dexEffect.id]) {
 				return ' <button name="addDexEffect"><i class="fa fa-plus-circle"></i>Add to dex</button>';
 			}
-			var buf = table !== 'Conditions' || !info.official ? ' <button name="deleteDexEffect"><i class="fa fa-trash"></i>Delete</button>' : '';
+			var buf = ' <button name="deleteDexEffect"><i class="fa fa-trash"></i>Delete</button>';
 			return buf + (info.official ? ' <button name="resetDexEffect"' + (this.dexResettable(table, this.dexEffect.id) ? '' : ' style="display:none"') +
 				'><i class="fa fa-undo"></i>Reset to base</button>' : '');
 		},

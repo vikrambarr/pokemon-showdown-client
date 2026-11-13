@@ -50,8 +50,7 @@
 	transform-origin: top left;
 }
 .dexpokemon,
-.dextierlist,
-.dexconditionlist {
+.dextierlist {
 	margin-left: -8px;
 }
 .dexpage,
@@ -484,6 +483,13 @@
 }
 .dexcodebox p {
 	margin: 4px 0 0 0;
+}
+.dexcodebox .dexconditionhead {
+	margin: 0 0 6px 2px;
+	line-height: 22px;
+}
+.dexconditionhead .button {
+	float: right;
 }
 .dexspritebox {
 	display: flex;
@@ -1044,6 +1050,49 @@
 	height: 24px;
 	zoom: 2;
 	image-rendering: pixelated;
+}
+.dexspritebutton {
+	padding: 0;
+	border: 0;
+	background: none;
+	cursor: pointer;
+}
+.dexspriteview {
+	display: flex;
+	width: fit-content;
+	margin: 8px auto 0;
+	overflow: hidden;
+	border: 1px solid var(--dexline);
+	border-radius: 4px;
+	background: repeating-conic-gradient(var(--dexchip) 0% 25%, transparent 0% 50%) 0 0 / 16px 16px, var(--dexfield);
+}
+.dexspriteview img {
+	display: block;
+}
+.dexspritemissing {
+	display: block;
+	width: 29px;
+	height: 21px;
+	zoom: 2;
+	image-rendering: pixelated;
+}
+.dexspriteview .dexspritemissing {
+	zoom: 3;
+}
+.dexspriteview-icon .dexspritemissing {
+	zoom: 2;
+}
+.dexspriteview .itemicon {
+	width: 24px;
+	height: 24px;
+	zoom: 5;
+	image-rendering: pixelated;
+}
+.dexspritebuttons {
+	display: flex;
+	justify-content: center;
+	gap: 6px;
+	margin: 8px 0;
 }
 .dexmoveicons .dexeffecticon {
 	font-size: 36px;

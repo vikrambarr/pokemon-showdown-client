@@ -4,12 +4,11 @@
 	var DexConfirmPopup = DexViews.ui.DexConfirmPopup;
 	var OFFICIAL_BADGE = DexViews.ui.OFFICIAL_BADGE;
 	var PICKER_CARET = ' <i class="fa fa-caret-down dexpickercaret"></i>';
-	var TAB_ICONS = { Pokedex: 'paw', Moves: 'bolt', Abilities: 'star', Items: 'shopping-bag', Conditions: 'cloud', TypeChart: 'th' };
+	var TAB_ICONS = { Pokedex: 'paw', Moves: 'bolt', Abilities: 'star', Items: 'shopping-bag', TypeChart: 'th' };
 	var SINGLES_TIERS = ['AG', 'Uber', '(Uber)', 'OU', '(OU)', 'UUBL', 'UU', 'RUBL', 'RU', 'NUBL', 'NU', '(NU)', 'PUBL', 'PU', '(PU)', 'ZUBL', 'ZU', 'NFE', 'LC', 'Illegal', 'Unreleased'];
 	var DOUBLES_TIERS = ['DUber', '(DUber)', 'DOU', 'DBL', '(DOU)', 'DUU', '(DUU)', 'NFE', 'LC', 'Illegal', 'Unreleased'];
 	var TIER_STYLES = [['singles', "Singles", 'tier'], ['natdex', "National Dex", 'natDexTier'], ['doubles', "Doubles", 'doublesTier'], ['vgc', "VGC", '']];
 	var EFFECT_KINDS = DexViews.ui.EFFECT_KINDS;
-	var SPRITE_KINDS = { front: 'Front', back: 'Back', 'front-shiny': 'Shiny front', 'back-shiny': 'Shiny back', icon: 'Icon' };
 
 	function baseValue(summary) {
 		return summary.parents.length ? summary.parents.join('+') : summary.mod;
@@ -229,7 +228,8 @@
 	}
 
 	function shrinkSprite(file, kind) {
-		var box = kind === 'type' ? { max: 64, width: 32, height: 14 } : kind.slice(0, 4) === 'icon' ? { max: 64, width: 40, height: 30 } : { max: 192, width: 96, height: 96 };
+		var box = kind === 'type' ? { max: 64, width: 32, height: 14 } : kind === 'item' ? { max: 0, width: 64, height: 64, pad: true } :
+			kind.slice(0, 4) === 'icon' ? { max: 0, width: 32, height: 32, pad: true, keep: [40, 30] } : { max: 192, width: 96, height: 96 };
 		return new Promise(function (resolve) {
 			var image = new Image();
 			var url = URL.createObjectURL(file);
@@ -239,14 +239,20 @@
 			};
 			image.onload = function () {
 				URL.revokeObjectURL(url);
-				if (image.naturalWidth <= box.max && image.naturalHeight <= box.max) return resolve(file);
+				var width = image.naturalWidth;
+				var height = image.naturalHeight;
+				if (width <= box.max && height <= box.max) return resolve(file);
+				if (box.pad && width === box.width && height === box.height) return resolve(file);
+				if (box.keep && width === box.keep[0] && height === box.keep[1]) return resolve(file);
 				var scale = Math.min(box.width / image.naturalWidth, box.height / image.naturalHeight);
+				width = Math.max(1, Math.round(width * scale));
+				height = Math.max(1, Math.round(height * scale));
 				var canvas = document.createElement('canvas');
-				canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-				canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+				canvas.width = box.pad ? box.width : width;
+				canvas.height = box.pad ? box.height : height;
 				var context = canvas.getContext('2d');
 				context.imageSmoothingEnabled = false;
-				context.drawImage(image, 0, 0, canvas.width, canvas.height);
+				context.drawImage(image, Math.floor((canvas.width - width) / 2), Math.floor((canvas.height - height) / 2), width, height);
 				canvas.toBlob(function (blob) { resolve(blob || file); }, 'image/png');
 			};
 			image.src = url;
@@ -274,50 +280,64 @@
 		});
 	}
 
+	var SPRITE_BOXES = { icon: [96, 96], item: [128, 128] };
+
+	function missingSpriteHTML() {
+		return '<span class="dexspritemissing" style="' + Object.getPrototypeOf(Dex).getPokemonIcon.call(Dex, '') + ';background-position:-6px -7px"></span>';
+	}
+
 	var DexSpritePopup = Popup.extend({
+		events: {
+			'change input[name=file]': 'uploadFile'
+		},
 		initialize: function (data) {
 			this.room = data.room;
 			this.kind = data.kind;
+			this.name = data.name;
 			var room = this.room;
-			var uploadid = (room.dexView.sprites[room.dexSpecies.id] || {})[data.kind];
-			var image = uploadid && room.dexView.images[uploadid];
-			var standard = !image && room.dexStandardSprite(data.kind);
-			var buf = '<form><p><strong>' + SPRITE_KINDS[data.kind] + ' sprite</strong></p>';
+			var view = room.dexView;
+			var id = toID(data.name);
+			var uploadid = data.kind === 'item' ? view.itemSprites[id] : (view.sprites[id] || {})[data.kind];
+			var image = uploadid && view.images[uploadid];
+			var box = SPRITE_BOXES[data.kind] || [192, 192];
+			var inner = missingSpriteHTML();
 			if (image) {
-				buf += '<p><img src="' + Dex.resourcePrefix + 'sprites/custom/' + BattleLog.escapeHTML(image.file) + '" width="' + image.width * 2 + '" height="' + image.height * 2 + '" alt=""' +
-					(image.pixelated ? ' class="pixelated"' : '') + ' /></p><p><small>' + image.width + '&times;' + image.height +
-					(image.artist ? ', by ' + BattleLog.escapeHTML(image.artist) : '') + '</small></p>';
-			} else if (standard) {
-				buf += '<p>' + standard.html + '</p><p><small>Standard sprite (' + standard.size + ')</small></p>';
+				var scale = Math.min(box[0] / image.width, box[1] / image.height);
+				if (scale > 1) scale = Math.floor(scale);
+				inner = '<img src="' + DexViews.imageURL(image) + '" width="' + Math.round(image.width * scale) + '" height="' + Math.round(image.height * scale) + '" alt=""' +
+					(image.pixelated ? ' class="pixelated"' : '') + ' />';
+			} else if (data.kind === 'item') {
+				inner = '<span class="itemicon" style="' + Object.getPrototypeOf(Dex).getItemIcon.call(Dex, view.dex.items.get(data.name)) + '"></span>';
 			} else {
-				buf += '<p><em>No sprite.</em></p>';
+				var standard = room.dexStandardSprite(data.kind);
+				if (standard) inner = standard.html;
 			}
-			if (!room.dexEditable) {
-				this.$el.html(buf + '<p class="buttonbar"><button type="button" name="close" class="button">Close</button></p></form>');
-				return;
+			var buf = '<div class="dexspriteview dexspriteview-' + (SPRITE_BOXES[data.kind] ? data.kind : 'battle') + '"' +
+				(image && image.artist ? ' title="' + BattleLog.escapeHTML(image.artist) + '"' : '') + '>' + inner + '</div>';
+			if (room.dexEditable) {
+				buf += '<div class="dexspritebuttons"><button type="button" class="button" name="pickSprite" title="Upload"><i class="fa fa-upload"></i></button>' +
+					(image ? '<button type="button" class="button" name="clearSprite" title="Remove"><i class="fa fa-trash"></i></button>' : '') + '</div>' +
+					'<input type="file" name="file" accept="image/png,image/gif" style="display:none" />';
 			}
-			buf += '<p><input type="file" name="file" accept="image/png,image/gif" /></p>';
-			buf += '<p><small>' + (room.dexSummary.official ? 'Official dex: any size' : data.kind.slice(0, 4) === 'icon' ? 'Best at 40&times;30. Bigger than 64&times;64 is shrunk to 40&times;30' :
-				'Best at 96&times;96. Bigger than 192&times;192 is shrunk to 96&times;96') + '. Pixel art only.</small></p>';
-			buf += storageHTML(room);
-			buf += '<p class="buttonbar"><button type="submit" class="button"><strong>Upload</strong></button>' +
-				(image ? ' <button type="button" name="clearSprite" class="button">Remove</button>' : '') +
-				' <button type="button" name="close" class="button">Cancel</button></p></form>';
 			this.$el.html(buf);
 		},
-		submit: function () {
+		pickSprite: function () {
+			this.$('input[name=file]').click();
+		},
+		uploadFile: function () {
 			var file = this.$('input[name=file]')[0].files[0];
 			if (!file) return;
 			this.close();
-			uploadSprite(this.room, this.room.dexSpecies.name, this.kind, file);
+			uploadSprite(this.room, this.name, this.kind, file);
 		},
 		clearSprite: function () {
 			this.close();
-			this.room.editDex({ sprite: { name: this.room.dexSpecies.name, kind: this.kind, image: null } });
+			this.room.editDex({ sprite: { name: this.name, kind: this.kind, image: null } });
 		}
 	});
 
 	DexViews.ui.DexSpritePopup = DexSpritePopup;
+	DexViews.ui.missingSpriteHTML = missingSpriteHTML;
 
 	var SOURCED = { pokemon: 1, move: 1, ability: 1, item: 1 };
 
@@ -876,28 +896,18 @@
 			var kind = count && { Pokedex: 'pokemon', Moves: 'move', Abilities: 'ability', Items: 'item' }[count.table];
 			var pokemon = !!kind;
 			var formats = tab === 'formats';
-			var conditions = !!count && count.table === 'Conditions';
-			var buf = pokemon || formats ? '' : conditions ? '<div class="dexconditionlist"></div>' : this.renderDexTypes();
+			var buf = pokemon || formats ? '' : this.renderDexTypes();
 			this.$('.dexpage button[name=showDexTab]').removeClass('cur').filter('[value="' + tab + '"]').addClass('cur');
 			if (count && count.table !== 'Pokedex') DexViews.loadEntries(this.dexid);
-			if (this.dexTabSearch && this.dexTabSearch !== this.dexSearch) this.$('input[name=pokemonsearch]').val('');
-			if (kind || conditions) this.$('input[name=pokemonsearch]').attr('placeholder', $('<span>').html('Search ' + count.name).text());
+			if (kind) this.$('input[name=pokemonsearch]').attr('placeholder', $('<span>').html('Search ' + count.name).text());
 			var typedSearch = this.dexSearch.engine.typedSearch;
 			if (kind && (typedSearch.searchType !== kind || typedSearch.dexScope !== this.dexScopeKey(kind))) {
 				this.$('input[name=pokemonsearch]').val('');
 				this.dexSearch.setType(kind, 'gen' + this.dexSourceGen(kind));
 			}
-			this.$('.dexpokemonsearch').toggle(pokemon || conditions);
+			this.$('.dexpokemonsearch').toggle(pokemon);
 			this.$('.dexpokemon').toggle(pokemon);
 			this.$('.dextabempty').toggle(!!buf).html(buf);
-			this.dexTabSearch = this.dexSearch;
-			if (conditions) {
-				this.$('input[name=pokemonsearch]').val('');
-				if (this.dexSearch.q) this.dexSearch.find('');
-				this.dexTabSearch = this.createDexList(this.$('.dexconditionlist'), 'dexListZoom');
-				this.setupDexConditionList(this.dexTabSearch);
-				this.dexTabSelect = DexViews.ui.selectable(this.dexTabSearch, this.dexSelectOptions(function () { return 'condition'; }));
-			}
 			this.$('.dexformatpage').toggle(formats);
 			if (pokemon) this.dexSearch.updateScroll();
 			if (formats && this.dexFormatId !== this.dexFormat) this.openDexFormat(this.dexFormat);
@@ -909,7 +919,7 @@
 			var scopeTabs = this.dexScopeHTML(this.dexKind());
 			this.$('.dexscope').html(scopeTabs).toggle(!!scopeTabs);
 			this.$('.dexsourcepick').html(this.dexSourceHTML(kind));
-			this.activeDexSelect().render();
+			this.dexSelect.render();
 			if (this.dexTab !== 'formats' || this.dexFormat) return;
 			this.$('.dexformatpage').html('<div class="pad"><p><em>This dex has no formats yet.</em></p>' +
 				(this.dexEditable ? '<p><button class="button" name="newDexFormat"><i class="fa fa-plus"></i> New format</button></p>' : '') + '</div>');
@@ -1033,14 +1043,14 @@
 			});
 		},
 		searchPokemon: function (e) {
-			(this.dexTabSearch || this.dexSearch).find(e.currentTarget.value);
+			this.dexSearch.find(e.currentTarget.value);
 		},
 		searchPokemonKey: function (e) {
 			if (e.keyCode === 8 && !e.currentTarget.value) this.dexSearch.removeFilter();
 		},
 		clickDexEntry: function (e) {
 			e.preventDefault();
-			if (this.activeDexSelect().click(e)) return;
+			if (this.dexSelect.click(e)) return;
 			var entry = e.currentTarget.dataset.entry.split('|');
 			if (SOURCED[entry[0]] && entry[0] === this.dexKind() && this.dexScope === 'out' && this.dexSource) {
 				this.openSourceEntry(entry[0], entry[1]);
@@ -1058,9 +1068,6 @@
 			if (!this.dexSearch.addFilter(e.currentTarget)) return;
 			this.$('input[name=pokemonsearch]').val('');
 			this.dexSearch.find('');
-		},
-		activeDexSelect: function () {
-			return this.dexTabSearch && this.dexTabSearch !== this.dexSearch ? this.dexTabSelect : this.dexSelect;
 		},
 		dexSelectOptions: function (type) {
 			var room = this;
@@ -1096,7 +1103,7 @@
 			var table = DexViews.ui.ENTRY_TABLES[kind];
 			var mine = entries.own[table] || {};
 			return [
-				{ label: "Delete", icon: 'trash', applies: function (id) { return mine[id] === 'custom' || kind !== 'condition' && !!entries[table][id]; }, run: function (ids, button, done) {
+				{ label: "Delete", icon: 'trash', applies: function (id) { return mine[id] === 'custom' || !!entries[table][id]; }, run: function (ids, button, done) {
 					room.deleteDexEntries(table, ids, false, button, done);
 				} },
 				{ label: "Reset", icon: 'undo', applies: function (id) { return room.dexResettable(table, id); }, run: function (ids, button, done) {
@@ -1107,7 +1114,7 @@
 		dexSourceData: null,
 		dexKind: function () {
 			var count = this.dexSummary && this.dexSummary.counts[this.dexTab];
-			return count && { Pokedex: 'pokemon', Moves: 'move', Abilities: 'ability', Items: 'item', Conditions: 'condition' }[count.table] || '';
+			return count && { Pokedex: 'pokemon', Moves: 'move', Abilities: 'ability', Items: 'item' }[count.table] || '';
 		},
 		dexSourceView: function (kind) {
 			var data = this.dexSourceData;
@@ -1128,7 +1135,7 @@
 			return (view || this.dexView).gen;
 		},
 		dexScopeHTML: function (kind) {
-			if (!SOURCED[kind] && kind !== 'condition' || this.type === 'dexview') return '';
+			if (!SOURCED[kind] || this.type === 'dexview') return '';
 			return ['in', 'out'].map(function (scope) {
 				return '<li><button class="button' + (scope === this.dexScope ? ' cur' : '') + '" name="setDexScope" value="' + scope + '">' + (scope === 'in' ? "This dex" : "Other dexes") + '</button></li>';
 			}, this).join('');
