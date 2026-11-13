@@ -666,6 +666,7 @@
 			this.dexCodeSave(keys[0], root[keys[0]]);
 		},
 		changeDexCode: function (e) {
+			if (this.inDexCondition(e.currentTarget, this.changeDexCode, arguments)) return;
 			var $leaf = $(e.currentTarget).closest('[data-codepath]');
 			var kind = $leaf.attr('data-kind');
 			var raw = e.currentTarget.value;
@@ -684,13 +685,15 @@
 			}
 			this.dexCodeEdit($leaf.attr('data-codepath'), function (parent, key) { parent[key] = value; });
 		},
-		removeDexCode: function (path) {
+		removeDexCode: function (path, button) {
+			if (this.inDexCondition(button, this.removeDexCode, arguments)) return;
 			this.dexCodeEdit(path, function (parent, key) {
 				if (Array.isArray(parent)) parent.splice(Number(key), 1);
 				else delete parent[key];
 			});
 		},
-		addDexCode: function (path) {
+		addDexCode: function (path, button) {
+			if (this.inDexCondition(button, this.addDexCode, arguments)) return;
 			var node = this.dexCodeNodeAt(path);
 			var item = codeDefault(node.item);
 			var list = this.dexCodeValues();
@@ -714,6 +717,7 @@
 			return value ? value.length : 0;
 		},
 		addDexCodeKey: function (e) {
+			if (this.inDexCondition(e.currentTarget, this.addDexCodeKey, arguments)) return;
 			var key = e.currentTarget.value;
 			var path = e.currentTarget.dataset.codepath;
 			if (!key) return;
@@ -763,7 +767,8 @@
 			this.refreshDexCode();
 		},
 		markDexCodeEdits: function (now, was) {
-			this.$('.dexmonpage .dexcodebox [data-codepath]').each(function () {
+			var $boxes = this.dexConditionBox ? $(this.dexConditionBox) : this.$('.dexmonpage .dexcodebox:not([data-condition])');
+			$boxes.find('[data-codepath]').each(function () {
 				var path = this.dataset.codepath.split('.');
 				var get = function (object) {
 					for (var i = 0; i < path.length && object !== undefined && object !== null; i++) object = object[path[i]];
@@ -886,7 +891,7 @@
 			return '<div class="setchart dexcodebox dexspritebox">' + SPRITE_CELLS.map(function (cell) {
 				var image = sprites[cell[0]] && view.images[sprites[cell[0]]];
 				var html = image ? '<img src="' + Dex.resourcePrefix + 'sprites/custom/' + BattleLog.escapeHTML(image.file) + '" alt=""' + (image.pixelated ? ' class="pixelated"' : '') + ' />' :
-					(room.dexStandardSprite(cell[0]) || { html: '<em>No sprite</em>' }).html;
+					(room.dexStandardSprite(cell[0]) || { html: DexViews.ui.missingSpriteHTML() }).html;
 				return '<button class="dexspritecell" name="showDexSprite" value="' + cell[0] + '"><span class="dexspriteimg">' + html + '</span><small>' + cell[2] + '</small></button>';
 			}).join('') + '</div>';
 		},
@@ -903,6 +908,10 @@
 			return '<div class="setchart dexcodebox">' + this.dexCodeHTML(species.id, { learnset: this.dexSpeciesLearnset(species) }, CODE.obj({ learnset: node.fields.learnset }, false, ['learnset'])) + '</div>';
 		},
 		refreshDexCode: function () {
+			if (this.dexConditionBox) {
+				this.dexConditionDirty = true;
+				return;
+			}
 			var top = this.$('.dexmonpage [data-panel=code]').scrollTop();
 			this.refreshDexPage();
 			this.$('.dexmonpage [data-panel=code]').scrollTop(top);
@@ -929,6 +938,7 @@
 			if (this.dexCodeFor !== 'Pokedex:' + species.id) {
 				this.dexCodeFor = 'Pokedex:' + species.id;
 				this.dexCodePending = {};
+				this.dexConditionPending = {};
 			}
 
 			buf += '<div class="teamchartbox individual"><ol class="teamchart"><li' + stageHue(view, species) + '>';
@@ -941,7 +951,7 @@
 			buf += '<div class="dexstatresults dexeffectpanel" data-panel="details" style="display:none">' + this.dexDetailsHTML() + '</div>';
 			if (editable) buf += this.dexAttributePanelHTML();
 			buf += '<div class="dexstatresults dexeffectpanel dexcode" data-panel="code" style="display:none"><div class="pad">' + this.dexSpritesCodeHTML(species) +
-				'<div class="setchart dexcodebox">' + this.dexSpeciesCodeHTML(species) + '</div>' +
+				'<div class="setchart dexcodebox">' + this.dexSpeciesCodeHTML(species) + '</div>' + this.dexConditionsHTML() +
 				this.dexLearnsetCodeHTML(species) + '</div></div>';
 			this.dexSpeciesBST = species.bst;
 			this.$('.dexmonpage').html('<div class="teamwrapper">' + buf + '</div>');
@@ -1113,9 +1123,11 @@
 			return keys.some(function (key) { return DexViews.ui.changedValue(species[key], base.species[key]); });
 		},
 		markDexEdits: function () {
+			if (this.dexConditionBox) return;
 			this.$el.toggleClass('dexshowedits', !!Storage.prefs('dexshowedits'));
 			var $page = this.$('.dexmonpage');
 			$page.find('.dexedited').removeClass('dexedited');
+			this.markDexConditionEdits();
 			var room = this;
 			$page.find('button[name=resetDexPokemon]').each(function () {
 				$(this).toggle(room.dexResettable('Pokedex', toID(this.value)));
@@ -1205,6 +1217,7 @@
 			var species = this.dexSpecies;
 			if (!species) return;
 			if (!DexViews.entries[view.dexid]) return DexViews.loadEntries(view.dexid);
+			if (entriesLoaded && this.dexConditionIds().length && !this.$('.dexmonpage [data-condition]').length) return this.refreshDexCode();
 			this.$('.dexmonpage .setmenu').replaceWith(this.dexPokemonMenuHTML());
 			this.markDexEdits();
 			this.$('.dexmonpage .dexlearnsetlabel').text('Learnset (' + this.dexLearnsetCount(species) + ')');
@@ -1383,7 +1396,6 @@
 		setupDexPicker: function () {
 			var table = this.dexEffect && this.dexEffect.table;
 			var search = this.dexPicker = DexViews.ui.panelSearch(this.$('.dexmonpage [data-panel=picker]'));
-			if (table === 'Conditions') return this.setupDexConditionList(search);
 			viewSearch(search, this.dexView, DexViews.ui.dexEntryResults(this.dexid));
 			search.setType(table ? DexViews.ui.EFFECT_KINDS[table] : 'pokemon', 'gen' + this.dexView.gen);
 		},
@@ -1617,7 +1629,8 @@
 		},
 		showDexSprite: function (kind, button) {
 			if (this.openDexFamilyRow(button)) button = this.$('.dexmonpage button[name=showDexSprite][value="' + kind + '"]')[0];
-			app.addPopup(DexViews.ui.DexSpritePopup, { room: this, kind: kind, sourceEl: button });
+			var name = this.dexEffect ? this.dexEffectData.name : this.dexSpecies.name;
+			app.addPopup(DexViews.ui.DexSpritePopup, { room: this, name: name, kind: kind, sourceEl: button });
 		},
 		newDexPokemon: function (value, button) {
 			var room = this;

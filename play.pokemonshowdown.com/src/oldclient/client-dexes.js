@@ -84,10 +84,10 @@
 				if (room.dexid !== dexid && !(room.dexView && room.dexView.dexid === dexid)) return;
 				var typedSearch = room.dexSearch && room.dexSearch.engine.typedSearch;
 				if (typedSearch) room.dexSearch.setType(typedSearch.searchType, 'gen' + room.dexView.gen);
-				if (room.dexSelect) room.activeDexSelect().render();
+				if (room.dexSelect) room.dexSelect.render();
 				if (room.dexFormatSearch && room.dexFormatKind) room.showDexFormatList(room.dexFormatKind);
 				if (room.dexSpecies) room.updateDexLearnsetCount(true);
-				if (room.dexSummary && room.dexSummary.counts[room.dexTab] && ['Conditions', 'TypeChart'].includes(room.dexSummary.counts[room.dexTab].table)) room.showDexTab(room.dexTab);
+				if (room.dexSummary && room.dexSummary.counts[room.dexTab] && room.dexSummary.counts[room.dexTab].table === 'TypeChart') room.showDexTab(room.dexTab);
 				if (room.dexEffect && room.dexEffectData) room.renderDexEffect();
 			});
 		}, function () {

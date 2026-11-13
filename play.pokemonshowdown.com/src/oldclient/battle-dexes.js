@@ -457,7 +457,7 @@
 				image = sprites && (pokemon.gender === 'F' && sprites['icon-f'] || sprites.icon);
 			}
 			if (!image) return icon;
-			var size = fit(image, 40, 30);
+			var size = image.width <= 40 && image.height <= 32 ? [image.width, image.height] : fit(image, 40, 30);
 			var end = icon.indexOf(';');
 			return 'background:transparent url(' + imageURL(image) + ') no-repeat center / ' + size[0] + 'px ' + size[1] + 'px' +
 				(image.pixelated ? ';image-rendering:pixelated' : '') + (end < 0 ? '' : icon.slice(end));
