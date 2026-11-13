@@ -22,6 +22,20 @@
 
 	window.DexViews.ui.DexFormatPopup = DexFormatPopup;
 
+	var DexEnginePopup = Popup.extend({
+		initialize: function (data) {
+			this.pick = data.pick;
+			this.$el.html('<ul class="popupmenu">' + data.details.engines.map(function (engine) {
+				return '<li><button class="option' + (engine.id === data.details.engine ? ' cur' : '') + '" name="pickEngine" value="' + BattleLog.escapeHTML(engine.id) + '">' +
+					BattleLog.escapeHTML(engine.name) + '</button></li>';
+			}).join('') + '</ul>');
+		},
+		pickEngine: function (engine) {
+			this.close();
+			this.pick(engine);
+		}
+	});
+
 	var formatRules = {};
 
 	function requestFormat(target) {
@@ -80,6 +94,8 @@
 			buf += '<div class="formatsettings"><p>';
 			buf += '<label class="label">Dex: <strong>' + BattleLog.escapeHTML(details.dex) + '</strong></label> ';
 			buf += '<label class="label">Mod: <strong>' + BattleLog.escapeHTML(details.mod) + '</strong></label> ';
+			var engineName = BattleLog.escapeHTML((details.engines.find(function (engine) { return engine.id === details.engine; }) || { name: details.engine }).name);
+			buf += '<label class="label">Engine: ' + (this.dexEditable ? '<button class="select" name="selectDexEngine">' + engineName + '</button>' : '<strong>' + engineName + '</strong>') + '</label> ';
 			buf += '<label class="label">Game type: <strong>' + BattleLog.escapeHTML(FORMAT_GAME_TYPES[details.gameType] || details.gameType) + '</strong></label></p>';
 			if (this.dexEditable) {
 				buf += '<p><label class="label">Name: <input type="text" class="textbox" name="formatname" value="' + BattleLog.escapeHTML(details.name) + '" size="20" maxlength="40" /></label> ' +
@@ -103,6 +119,7 @@
 				for (var c = 0; c < ruleChildren.length; c++) brought[ruleChildren[c]] = 1;
 			}
 			var ruleRoots = Object.keys(ruleById).filter(function (ruleid) {
+				if (ruleid === 'infinitefusionmod') return false;
 				var source = details.sources[ruleid];
 				return !brought[ruleid] || details.rules.includes(ruleid) && (!source || !ruleById[toID(source)]);
 			});
@@ -306,6 +323,12 @@
 				if (room.dexFormat === formatid) room.showDexFormatDetails(details);
 				app.addPopup(Popup, { message: "That change doesn't work for the following reason:\n\n- " + err.message });
 			});
+		},
+		selectDexEngine: function (value, button) {
+			var room = this;
+			app.addPopup(DexEnginePopup, { details: this.dexFormatDetails, sourceEl: button, pick: function (engine) {
+				if (engine !== room.dexFormatDetails.engine) room.saveDexFormat({ engine: engine });
+			} });
 		},
 		renameDexFormat: function (e) {
 			var name = $.trim(e.currentTarget.value);
