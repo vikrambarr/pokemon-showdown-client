@@ -1248,12 +1248,10 @@
 					var layer = room.dexDraft && room.dexDraft[pokemon ? 'pokemon' : 'effects'];
 					$.each(ids, function (i, id) {
 						if (layer) delete layer[pokemon ? id : table + ':' + id];
-						if (whole) return;
-						var edit = {};
-						edit[(reset ? 'reset' : 'delete') + (pokemon ? 'pokemon' : EFFECT_KINDS[table])] = names[i];
-						room.editDex(edit, names[i]);
 					});
-					if (whole) room.editDex({ deletepokemon: names });
+					var edit = {};
+					edit[(reset ? 'reset' : 'delete') + (pokemon ? 'pokemon' : EFFECT_KINDS[table])] = names;
+					room.editDex(edit, names.length === 1 ? names[0] : '');
 					room.applyDexDraft();
 					if (done) done();
 					if (whole && (room.dexSpecies || room.dexFamilyOf)) room.closeDexPokemon();
@@ -1389,23 +1387,27 @@
 		saveDexDraft: function () {
 			var draft = this.dexDraft;
 			if (!draft || this.dexSaving) return false;
-			var room = this;
 			this.dexSaving = draft;
 			this.dexDraft = null;
+			var edit = {};
+			var restores = [];
+			var add = function (kind, restore) {
+				(edit[kind] || (edit[kind] = [])).push(restore[2]);
+				restores.push(restore);
+			};
 			$.each(draft.pokemon, function (id, fields) {
-				room.editDex({ pokemon: fields }, fields.name, ['pokemon', id, fields]);
+				add('pokemon', ['pokemon', id, fields]);
 			});
 			$.each(draft.tiers, function (i, op) {
-				room.editDex({ tiers: op }, op.reset ? "Tiers" : op.species.join(', '), ['tiers', '', op]);
+				add('tiers', ['tiers', '', op]);
 			});
 			$.each(draft.formats, function (id, fields) {
-				room.editDex({ format: fields }, fields.name, ['formats', id, fields]);
+				add('format', ['formats', id, fields]);
 			});
 			$.each(draft.effects, function (key, fields) {
-				var edit = {};
-				edit[EFFECT_KINDS[key.split(':')[0]]] = fields;
-				room.editDex(edit, fields.name, ['effects', key, fields]);
+				add(EFFECT_KINDS[key.split(':')[0]], ['effects', key, fields]);
 			});
+			this.editDex(edit, '', restores);
 			this.updateDexDraftBar();
 			return true;
 		},
@@ -1432,7 +1434,11 @@
 			var next = this.dexInFlight = this.dexEdits.shift() || null;
 			if (!next) return;
 			this.setSaveState('saving');
-			app.send('/crq dexedit ' + next.dexid + ', ' + JSON.stringify(next.edit));
+			var message = '/crq dexedit ' + next.dexid + ', ' + JSON.stringify(next.edit);
+			var limit = app.user.get('registered') ? 2 * 1024 * 1024 : 100 * 1024;
+			if (message.length < limit) return app.send(message);
+			this.answerDexEdit({ error: "This is too much to save at once (" + Math.ceil(message.length / 1024) + " KB of " + limit / 1024 + " KB" +
+				(app.user.get('registered') ? "" : "; log in to save up to 2048 KB") + "). Save fewer changes at a time." });
 		},
 		answerDexEdit: function (data) {
 			var sent = this.dexInFlight;
@@ -1440,7 +1446,7 @@
 			var answers = this.dexAnswers || (this.dexAnswers = { dexid: sent.dexid, errors: [], failed: [], saved: false });
 			if (data.error) {
 				answers.errors.push((sent.label ? sent.label + ': ' : '') + data.error);
-				if (sent.restore) answers.failed.push(sent.restore);
+				if (sent.restore) answers.failed = answers.failed.concat(sent.restore);
 			} else {
 				answers.saved = true;
 			}
