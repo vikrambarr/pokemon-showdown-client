@@ -163,7 +163,7 @@
 		renderSet: function (set, i) {
 			var buf = renderSet.call(this, set, i);
 			var rules = formatRules(this.curTeam.format);
-			var isFusion = !!set.fusion || rules.includes('infinitefusionmod');
+			var isFusion = !!set.fusion || rules.includes('fusionsmod');
 			var isDA = !!set.ability2 || rules.includes('doubleabilitymod');
 			if (isFusion) buf = buf.replace('<label>Pok&eacute;mon</label>', '<label>Pok&eacute;mon/Head</label>');
 			if (!set.species) return buf;
