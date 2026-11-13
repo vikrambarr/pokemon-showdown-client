@@ -737,30 +737,24 @@
 .dexstatresults .evcol {
 	margin-left: 8px;
 }
-.dexeditorlist {
-	list-style-type: none;
-	margin: 0 0 6px 0;
+.dexusername {
 	padding: 0;
-}
-.dexeditorlist li {
-	display: flex;
-	align-items: center;
-	gap: 4px;
-	min-height: 22px;
-}
-.dexeditorlist small {
-	color: #888888;
-}
-.dexeditorlist button.username {
-	background: transparent;
 	border: 0;
-	border-radius: 3px;
-	padding: 1px 4px;
-	font: bold 9pt Verdana, sans-serif;
+	background: none;
+	font: inherit;
 	cursor: pointer;
 }
-.dexeditorlist button.username:hover {
-	background: var(--dexchip);
+.dexusername:hover strong {
+	text-decoration: underline;
+}
+.dexworld .select,
+.dexeditors .select {
+	display: block;
+	width: 100%;
+	margin-top: 2px;
+}
+.dexeditors small {
+	color: var(--dexmuted);
 }
 .spritecell .shinystar {
 	position: relative;
@@ -1087,6 +1081,41 @@
 	height: 24px;
 	zoom: 5;
 	image-rendering: pixelated;
+}
+.ps-popup.dexspritepopup {
+	background: var(--dexpanel);
+}
+.dexcredits {
+	max-width: 192px;
+	margin: 6px auto 0;
+	text-align: center;
+	font-size: 9pt;
+}
+.dexcreditavatar {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	overflow: hidden;
+	vertical-align: middle;
+	border-radius: 50%;
+	background: var(--dexline);
+}
+.dexcreditavatar img {
+	width: 100%;
+	height: 100%;
+}
+.popupmenu .dexcreditavatar {
+	width: 14px;
+	height: 14px;
+	vertical-align: -3px;
+}
+.dexuseroptions .subtle {
+	line-height: 15px;
+}
+.dexuseroptions .subtle:hover {
+	text-decoration: none;
 }
 .dexspritebuttons {
 	display: flex;
