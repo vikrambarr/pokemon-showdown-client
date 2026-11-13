@@ -375,6 +375,7 @@
 			var id = toID(data.name);
 			var entries = DexViews.entries[room.dexid];
 			this.own = entries && entries.types[id];
+			this.drafted = !!(room.dexDraft && room.dexDraft.effects['TypeChart:' + id]);
 			this.vanilla = !!window.BattleTypeChart[id];
 			this.removed = !!(room.dexView.TypeChart[id] && room.dexView.TypeChart[id].isNonstandard);
 			var buf = '<form class="dextypeform"><p><span class="dextypepreview">' + Dex.getTypeIcon(data.name) + '</span> <strong>' + BattleLog.escapeHTML(data.name) + '</strong></p>';
@@ -398,7 +399,7 @@
 				if (this.image) buf += '<button type="button" name="clearSprite" class="button">Remove sprite</button> ';
 				buf += '<button type="button" name="deleteType" class="button">Delete</button> ';
 			}
-			if (this.own && this.vanilla) buf += '<button type="button" name="resetType" class="button">Reset to base</button> ';
+			if ((this.own || this.drafted) && this.vanilla) buf += '<button type="button" name="resetType" class="button">Reset to base</button> ';
 			this.$el.html(buf + '<button type="button" name="close" class="button">Cancel</button></p></form>');
 		},
 		previewType: function () {
@@ -434,12 +435,14 @@
 				"Reset to base", { deletetype: this.name });
 		},
 		confirmType: function (message, button, edit) {
+			var self = this;
 			var room = this.room;
 			var key = 'TypeChart:' + toID(this.name);
 			var save = function () {
 				if (room.dexDraft) delete room.dexDraft.effects[key];
 				room.applyDexDraft();
-				room.editDex(edit);
+				if (!edit.deletetype || self.own) room.editDex(edit);
+				if (room.$('.dextypechart').length) room.$('.dextabempty').html(room.renderDexTypes());
 			};
 			this.close();
 			if (!message) return save();
@@ -1081,12 +1084,11 @@
 				} }];
 			}
 			if (kind === 'pokemon') {
-				var own = entries.originals;
 				return [
 					{ label: "Delete", icon: 'trash', applies: function () { return true; }, run: function (ids, button, done) {
 						room.deleteDexEntries('Pokedex', ids, false, button, done);
 					} },
-					{ label: "Reset", icon: 'undo', applies: function (id) { return !!own[id]; }, run: function (ids, button, done) {
+					{ label: "Reset", icon: 'undo', applies: function (id) { return room.dexResettable('Pokedex', id); }, run: function (ids, button, done) {
 						room.deleteDexEntries('Pokedex', ids, true, button, done);
 					} }
 				];
@@ -1097,7 +1099,7 @@
 				{ label: "Delete", icon: 'trash', applies: function (id) { return mine[id] === 'custom' || kind !== 'condition' && !!entries[table][id]; }, run: function (ids, button, done) {
 					room.deleteDexEntries(table, ids, false, button, done);
 				} },
-				{ label: "Reset", icon: 'undo', applies: function (id) { return mine[id] === 'edited'; }, run: function (ids, button, done) {
+				{ label: "Reset", icon: 'undo', applies: function (id) { return room.dexResettable(table, id); }, run: function (ids, button, done) {
 					room.deleteDexEntries(table, ids, true, button, done);
 				} }
 			];
@@ -1126,7 +1128,7 @@
 			return (view || this.dexView).gen;
 		},
 		dexScopeHTML: function (kind) {
-			if (!SOURCED[kind] && kind !== 'condition') return '';
+			if (!SOURCED[kind] && kind !== 'condition' || this.type === 'dexview') return '';
 			return ['in', 'out'].map(function (scope) {
 				return '<li><button class="button' + (scope === this.dexScope ? ' cur' : '') + '" name="setDexScope" value="' + scope + '">' + (scope === 'in' ? "This dex" : "Other dexes") + '</button></li>';
 			}, this).join('');
@@ -1216,6 +1218,18 @@
 			edit[kind === 'pokemon' ? 'addpokemon' : 'add' + kind] = { from: source, names: ids.map(function (id) { return dex[getter].get(id).name; }) };
 			this.editDex(edit);
 		},
+		dexSavedEdit: function (table, id) {
+			var entries = DexViews.entries[this.dexid];
+			return !!entries && (table === 'Pokedex' ? !!entries.originals[id] : (entries.own[table] || {})[id] === 'edited');
+		},
+		dexResettable: function (table, id) {
+			var entries = DexViews.entries[this.dexid];
+			if (!entries || this.dexSavedEdit(table, id)) return !!entries;
+			var pokemon = table === 'Pokedex';
+			var layer = this.dexDraft && this.dexDraft[pokemon ? 'pokemon' : 'effects'];
+			var custom = pokemon ? entries.originals[id] === null : (entries.own[table] || {})[id] === 'custom';
+			return !custom && !!layer && !!layer[pokemon ? id : table + ':' + id];
+		},
 		dexEntryName: function (table, id) {
 			if (table === 'Conditions') return this.dexConditionInfo(id).name;
 			return this.dexView.dex[DexViews.ui.GETTERS[table]].get(id).name || id;
@@ -1249,9 +1263,10 @@
 					$.each(ids, function (i, id) {
 						if (layer) delete layer[pokemon ? id : table + ':' + id];
 					});
+					var sent = names.filter(function (name, i) { return !reset || room.dexSavedEdit(table, ids[i]); });
 					var edit = {};
-					edit[(reset ? 'reset' : 'delete') + (pokemon ? 'pokemon' : EFFECT_KINDS[table])] = names;
-					room.editDex(edit, names.length === 1 ? names[0] : '');
+					edit[(reset ? 'reset' : 'delete') + (pokemon ? 'pokemon' : EFFECT_KINDS[table])] = sent;
+					if (sent.length) room.editDex(edit, sent.length === 1 ? sent[0] : '');
 					room.applyDexDraft();
 					if (done) done();
 					if (whole && (room.dexSpecies || room.dexFamilyOf)) room.closeDexPokemon();
@@ -1351,7 +1366,7 @@
 			var base = this.dexBaseView;
 			if (base) this.dexView = DexViews.current = $.isEmptyObject(pokemon) && $.isEmptyObject(effects) ? base : DexViews.draft(base, pokemon, this.dexView, effects);
 			this.updateDexDraftBar();
-			if (this.dexSpecies || this.dexEffectData) this.markDexEdits();
+			if (this.dexSpecies || this.dexFamilyOf || this.dexEffectData) this.markDexEdits();
 		},
 		dexTierOps: function () {
 			return [].concat(this.dexSaving ? this.dexSaving.tiers : [], this.dexDraft ? this.dexDraft.tiers : []);
@@ -1451,6 +1466,11 @@
 				answers.saved = true;
 			}
 			if (data.stale) answers.stale = data.stale;
+			if (data.dexes) {
+				answers.dexes = data.dexes.map(function (summary) {
+					return summary.hash ? summary : (answers.dexes || []).filter(function (old) { return old.id === summary.id; })[0] || summary;
+				});
+			}
 			if (data.skipped) answers.skipped = (answers.skipped || []).concat(data.skipped);
 			if (sent.edit['delete'] && !data.error) this.curFolder = '';
 			if (data.formatid) {
@@ -1470,7 +1490,7 @@
 			this.setSaveState(errors.length ? 'failed' : 'saved');
 			DexViews.ui.showSaveProblems(errors, answers.stale);
 			if (!errors.length && answers.skipped) app.addPopup(Popup, { message: "Some Pok\u00e9mon weren't added:\n\n- " + answers.skipped.join('\n- ') });
-			if (answers.dexid !== this.dexid) return app.send('/crq dexes');
+			if (answers.dexid !== this.dexid) return DexViews.ui.listDexes(answers.dexes);
 			if (answers.failed.length) {
 				var later = this.dexDraft;
 				this.dexDraft = null;
@@ -1493,7 +1513,7 @@
 				this.dexSaving = null;
 			}
 			this.applyDexDraft();
-			app.send('/crq dexes');
+			DexViews.ui.listDexes(answers.dexes);
 			if (quit && !errors.length) quit.call(this);
 		}
 	});

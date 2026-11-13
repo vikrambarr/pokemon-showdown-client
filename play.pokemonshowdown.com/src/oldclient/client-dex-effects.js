@@ -1625,7 +1625,8 @@
 				return ' <button name="addDexEffect"><i class="fa fa-plus-circle"></i>Add to dex</button>';
 			}
 			var buf = table !== 'Conditions' || !info.official ? ' <button name="deleteDexEffect"><i class="fa fa-trash"></i>Delete</button>' : '';
-			return buf + (info.official && info.edited ? ' <button name="resetDexEffect"><i class="fa fa-undo"></i>Reset to base</button>' : '');
+			return buf + (info.official ? ' <button name="resetDexEffect"' + (this.dexResettable(table, this.dexEffect.id) ? '' : ' style="display:none"') +
+				'><i class="fa fa-undo"></i>Reset to base</button>' : '');
 		},
 		addDexEffect: function () {
 			var edit = {};

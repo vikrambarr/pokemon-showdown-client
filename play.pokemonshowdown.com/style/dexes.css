@@ -17,7 +17,7 @@
 	--dexcurborder: #555555;
 	--dexchip: rgba(0, 0, 0, 0.08);
 	--dextint: 45%, 90%;
-	--dexmark: 90%, 72%;
+	--dexmark: 55%, 80%;
 	--dexmarktext: #000000;
 	--dexedited: #FBE7A1;
 }
@@ -40,7 +40,7 @@
 	--dexcurborder: #BBBBBB;
 	--dexchip: rgba(255, 255, 255, 0.12);
 	--dextint: 25%, 20%;
-	--dexmark: 65%, 38%;
+	--dexmark: 35%, 32%;
 	--dexmarktext: #FFFFFF;
 	--dexedited: #5A4A16;
 }
