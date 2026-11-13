@@ -145,7 +145,8 @@
 					name: data.name, section: summary.name, column: column + 1, team: null,
 					searchShow: false, challengeShow: true, tournamentShow: true, rated: false,
 					isTeambuilderFormat: data.name.slice(-11) !== 'Custom Game', teambuilderFormat: '',
-					gen: summary.gen, mod: view ? view.modid : 'gen' + summary.gen, dexid: summary.id
+					gen: summary.gen, mod: view ? view.modid : 'gen' + summary.gen, dexid: summary.id,
+					isChampions: data.engine === 'champions', teambuilderLevel: data.engine === 'champions' ? 50 : null
 				});
 				format.id = data.id;
 				if (Dex.formats.cache[data.id]) {
@@ -153,6 +154,7 @@
 				} else {
 					BattleFormats[data.id] = Dex.formats.cache[data.id] = format;
 				}
+				Dex.formats.cache[toID(data.name)] = BattleFormats[data.id];
 				DexViews.formats[data.id] = summary;
 			}
 		}
@@ -160,6 +162,12 @@
 
 	function formatDex(format) {
 		return DexViews.formats[toID(format)] || null;
+	}
+
+	function viewFormat(summary, format) {
+		var suffix = format.startsWith(summary.id) ? format.slice(summary.id.length) : 'ou';
+		var champions = Dex.formats.get(format).isChampions && !suffix.includes('champions');
+		return 'gen' + DexViews.genOf(summary.mod) + (champions ? 'champions' : '') + suffix;
 	}
 
 	function loadedDex(summary) {
@@ -344,8 +352,7 @@
 			var summary = format && formatDex(format);
 			var view = summary && DexViews.views[summary.hash];
 			if (!view) return getTypedSearch.apply(this, arguments);
-			var suffix = format.startsWith(summary.id) ? format.slice(summary.id.length) : 'ou';
-			var search = getTypedSearch.call(this, searchType, 'gen' + view.gen + suffix, speciesOrSet);
+			var search = getTypedSearch.call(this, searchType, viewFormat(summary, toID(format)), speciesOrSet);
 			if (!search) return search;
 			search.dex = view.dex;
 			search.dexView = view;
@@ -377,7 +384,7 @@
 			var mod = Dex.mod;
 			Dex.mod = function () { return view.dex; };
 			try {
-				return callback('gen' + view.gen + formatid.slice(summary.id.length));
+				return callback(viewFormat(summary, toID(formatid)));
 			} finally {
 				Dex.mod = mod;
 			}

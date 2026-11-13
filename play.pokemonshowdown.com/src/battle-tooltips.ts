@@ -1615,7 +1615,7 @@ export class BattleTooltips {
 			move = this.battle.dex.moves.get(moveName);
 			maxpp = (move.pp === 1 || move.noPPBoosts ? move.pp : move.pp * 8 / 5);
 			if (this.battle.gen < 3) maxpp = Math.min(61, maxpp);
-			if (this.battle.tier.includes('Champions')) {
+			if (this.battle.format.isChampions) {
 				let pp = move.pp > 20 ? 20 : move.pp;
 				maxpp = (pp === 1 || move.noPPBoosts) ? pp : (pp / 5 + 1) * 4;
 			}
@@ -1712,7 +1712,7 @@ export class BattleTooltips {
 			max = tr(tr(tr((2 * baseSpe + 31) * level / 100 + 5) * maxNatureMult) * tr((70 / 255 / 10 + 1) * 100) / 100);
 			if (tier.includes('No Restrictions')) max += 200;
 			else if (tier.includes('Random')) max += 20;
-		} else if (tier.includes('Champions')) {
+		} else if (this.battle.format.isChampions) {
 			min = tr(minNatureMult * (baseSpe + 20));
 			ev0 = tr((2 * baseSpe + 31) * level / 100) + 5;
 			ev84 = tr((2 * baseSpe + 31 + 21) * level / 100) + 5;
