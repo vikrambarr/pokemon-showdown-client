@@ -119,7 +119,6 @@
 				for (var c = 0; c < ruleChildren.length; c++) brought[ruleChildren[c]] = 1;
 			}
 			var ruleRoots = Object.keys(ruleById).filter(function (ruleid) {
-				if (ruleid === 'infinitefusionmod') return false;
 				var source = details.sources[ruleid];
 				return !brought[ruleid] || details.rules.includes(ruleid) && (!source || !ruleById[toID(source)]);
 			});
