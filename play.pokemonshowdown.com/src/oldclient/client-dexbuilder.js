@@ -42,6 +42,68 @@
 		return buf.indexOf(' selected>') < 0 ? optionHTML(current, summary.base, current) + buf : buf;
 	}
 
+	function menuSectionHTML(title, rows) {
+		return '<p></p><details open><summary><strong style="color: #579">' + title + '</strong></summary>' + rows + '</details>';
+	}
+
+	function worldList(exceptid) {
+		var dexes = DexViews.list.filter(function (dex) { return dex.id !== exceptid; }).map(function (dex) {
+			return { value: dex.id, label: '[Gen ' + DexViews.genOf(dex.mod) + '] ' + dex.name, official: dex.official };
+		}).sort(function (a, b) {
+			return a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' });
+		});
+		var games = [];
+		for (var gen = 9; gen >= 1; gen--) games.push({ value: 'gen' + gen, label: 'Gen ' + gen });
+		return [
+			["Games", games],
+			["Official dexes", dexes.filter(function (dex) { return dex.official; })],
+			["Dexes", dexes.filter(function (dex) { return !dex.official; })]
+		];
+	}
+
+	function worldLabel(summary) {
+		var current = baseValue(summary);
+		var found = null;
+		worldList(summary.id).forEach(function (section) {
+			section[1].forEach(function (world) { if (world.value === current) found = world.label; });
+		});
+		return found || summary.base;
+	}
+
+	var DexWorldPopup = Popup.extend({
+		events: {
+			'input input[name=worldsearch]': 'searchWorlds'
+		},
+		initialize: function (data) {
+			this.data = data;
+			this.query = '';
+			this.$el.html('<p><ul class="popupmenu"><li><input name="worldsearch" class="textbox" placeholder="Search worlds" autocomplete="off" /></li></ul></p>' +
+				'<div class="dexworldoptions"></div><div style="clear:left"></div><p></p>');
+			this.render();
+			this.$('input[name=worldsearch]').focus();
+		},
+		render: function () {
+			var query = toID(this.query);
+			var current = this.data.current;
+			var buf = worldList(this.data.exceptid).map(function (section) {
+				var rows = section[1].filter(function (world) { return !query || toID(world.label).indexOf(query) >= 0; }).map(function (world) {
+					return '<li><button class="option' + (world.value === current ? ' cur' : '') + '" name="pickWorld" value="' + BattleLog.escapeHTML(world.value) + '">' +
+						BattleLog.escapeHTML(world.label) + '</button></li>';
+				}).join('');
+				return rows ? '<ul class="popupmenu" style="float:left;padding-left:5px">' + menuSectionHTML(section[0], rows) + '</ul>' : '';
+			}).join('');
+			this.$('.dexworldoptions').html(buf || '<ul class="popupmenu"><em>No worlds found</em></ul>');
+		},
+		searchWorlds: function (e) {
+			this.query = e.currentTarget.value;
+			this.render();
+		},
+		pickWorld: function (value, button) {
+			this.close();
+			if (value !== this.data.current) this.data.pick(value, $(button).text());
+		}
+	});
+
 	var DexNamePopup = Popup.extend({
 		type: 'semimodal',
 		initialize: function (data) {
@@ -66,7 +128,6 @@
 		events: {
 			'change input[name=name]': 'saveDexName',
 			'change input[name=private]': 'saveDexPrivate',
-			'change select[name=base]': 'saveDexBase',
 			'input textarea[name=description]': 'queueDexDescription',
 			'change textarea[name=description]': 'saveDexDescription',
 			'submit form': 'submitForm',
@@ -81,13 +142,13 @@
 			var buf = '<form class="dexsettings">';
 			buf += '<p><label class="label">Name:<br /><input type="text" class="textbox" name="name" value="' + BattleLog.escapeHTML(summary.name) + '" size="24" maxlength="40"' + locked + ' /></label></p>';
 			buf += '<p><label class="checkbox"><input type="checkbox" name="private"' + (summary.visibility === 'private' ? ' checked' : '') + locked + ' /> Private (unlisted)</label></p>';
-			buf += '<p><label class="label">World:<br /><select name="base" class="button"' + locked + '>' + baseOptions(summary) + '</select></label></p>';
+			buf += '<p><span class="label">World:</span><span class="dexworld">' + this.worldHTML() + '</span></p>';
+			buf += '<p><span class="label">Editors:</span><span class="dexeditors">' + this.editorsHTML() + '</span></p>';
 			buf += '<p><label class="label">Description:<br /><textarea class="textbox" name="description" rows="4" maxlength="512">' +
 				BattleLog.escapeHTML(summary.description || '') + '</textarea></label></p></form>';
 			buf += '<p><small>' + summary.counts.map(function (count) {
 				return '<strong>' + count.name + ':</strong> ' + count.total + ' total, ' + count.custom + ' custom, ' + count.modified + ' modified';
 			}).join('<br />') + '</small></p>';
-			buf += '<p><button class="button" name="worldDex"><i class="fa fa-globe"></i> Use as world</button></p>';
 			buf += '<div class="dexrest">' + this.dexRestHTML() + '</div>';
 			this.$el.html(buf);
 		},
@@ -109,33 +170,21 @@
 			var $form = this.$('form.dexsettings');
 			var $name = $form.find('input[name=name]');
 			if (!$name.is(':focus')) $name.val(summary.name);
-			$form.find('select[name=base]').html(baseOptions(summary));
+			$form.find('.dexworld').html(this.worldHTML());
 			$form.find('input[name=private]').prop('checked', summary.visibility === 'private');
 			var $description = $form.find('textarea[name=description]');
 			if (!$description.is(':focus') && !this.descriptionTimer) $description.val(summary.description || '');
+			this.$('.dexeditors').html(this.editorsHTML());
 			this.$('.dexrest').html(this.dexRestHTML());
+			if (this.editorPopup && app.popups.indexOf(this.editorPopup) >= 0) this.editorPopup.render();
+		},
+		editorsHTML: function () {
+			var summary = this.room.curSummary;
+			return '<button type="button" class="select" name="editDexEditors"><strong style="' + BattleLog.hashColor(toID(summary.owner)) + '">' + BattleLog.escapeHTML(summary.owner) + '</strong>' +
+				(summary.editors.length ? ' <small>+' + summary.editors.length + '</small>' : '') + '</button>';
 		},
 		dexRestHTML: function () {
-			var summary = this.room.curSummary;
-			var userid = app.user.get('userid');
-			var isOwner = this.isOwner();
-			var buf = '<h3>Editors</h3><form class="dexeditors"><ul class="dexeditorlist">';
-			buf += '<li>' + this.editorHTML(summary.owner) + ' <small>owner</small></li>';
-			for (var i = 0; i < summary.editors.length; i++) {
-				var editor = summary.editors[i];
-				buf += '<li>' + this.editorHTML(editor) + (isOwner || toID(editor) === userid ?
-					' <button class="button small" name="removeDexEditor" value="' + BattleLog.escapeHTML(editor) + '" title="Remove"><i class="fa fa-times"></i></button>' : '') + '</li>';
-			}
-			buf += '</ul>';
-			if (isOwner) {
-				buf += '<p><input type="text" class="textbox" name="editor" placeholder="Username" size="20" /> <button type="submit" class="button"><i class="fa fa-user-plus"></i> Add editor</button></p>';
-			}
-			buf += '</form>';
-			if (isOwner) buf += '<p><button class="button" name="deleteDex"><i class="fa fa-trash"></i> Delete dex</button></p>';
-			return buf;
-		},
-		editorHTML: function (name) {
-			return '<button type="button" class="username" data-name="' + BattleLog.escapeHTML(name) + '" style="' + BattleLog.hashColor(toID(name)) + '">' + BattleLog.escapeHTML(name) + '</button>';
+			return this.isOwner() ? '<p><button class="button" name="deleteDex"><i class="fa fa-trash"></i> Delete dex</button></p>' : '';
 		},
 		clickUsername: function (e) {
 			e.preventDefault();
@@ -145,13 +194,8 @@
 		editDex: function (edit) {
 			this.room.editDex(edit);
 		},
-		worldDex: function (value, button) {
-			this.close();
-			this.room.worldDex(value, this.sourceEl);
-		},
 		submitForm: function (e) {
 			e.preventDefault();
-			if ($(e.currentTarget).hasClass('dexeditors')) return this.addDexEditor();
 			this.saveDexName();
 		},
 		saveDexName: function () {
@@ -174,29 +218,68 @@
 			var description = $.trim(this.$('form.dexsettings textarea[name=description]').val());
 			if (description !== (this.room.curSummary.description || '')) this.editDex({ description: description });
 		},
-		saveDexBase: function (e) {
+		worldHTML: function () {
+			return '<button type="button" class="select" name="pickDexWorld"' + (this.isOwner() ? '' : ' disabled') + '>' + BattleLog.escapeHTML(worldLabel(this.room.curSummary)) + '</button>';
+		},
+		pickDexWorld: function (value, button) {
+			var self = this;
 			var summary = this.room.curSummary;
-			var $select = $(e.currentTarget);
-			var base = $select.val();
-			var label = $select.find('option:selected').text();
-			$select.val(baseValue(summary));
+			app.addPopup(DexWorldPopup, {
+				sourceEl: button, sourcePopup: this, current: baseValue(summary), exceptid: summary.id,
+				pick: function (base, label) { self.saveDexBase(base, label, button); }
+			});
+		},
+		saveDexBase: function (base, label, button) {
+			var summary = this.room.curSummary;
 			var self = this;
 			app.addPopup(DexConfirmPopup, {
 				message: 'Change the world of ' + BattleLog.escapeHTML(summary.name) + ' to ' + BattleLog.escapeHTML(label) + '?<br /><br />' +
 					'Its Pok&eacute;mon go back to the new world\'s, and custom or edited things that don\'t work on it are skipped until you fix them. ' +
 					'If too much breaks, you may need to clear the dex.',
 				button: "Change world",
-				sourceEl: e.currentTarget,
+				sourceEl: button,
 				sourcePopup: this,
 				callback: function () { self.editDex({ base: base }); }
 			});
 		},
-		addDexEditor: function () {
-			var name = $.trim(this.$('input[name=editor]').val());
-			if (name) this.editDex({ editor: name, add: true });
-		},
-		removeDexEditor: function (name) {
-			this.editDex({ editor: name });
+		editDexEditors: function (value, button) {
+			var self = this;
+			var room = this.room;
+			var userid = app.user.get('userid');
+			var people = function () { return [room.curSummary.owner].concat(room.curSummary.editors).map(toID); };
+			var avatars = {};
+			var change = function (editors) {
+				room.curSummary = $.extend({}, room.curSummary, { editors: editors });
+				self.sync();
+			};
+			this.editorPopup = app.addPopup(DexUserPopup, {
+				sourceEl: button, sourcePopup: this, dexid: room.dexid, title: "Editors", editable: this.isOwner(),
+				list: function () {
+					return [{ name: room.curSummary.owner, owner: true }].concat(room.curSummary.editors.map(function (name) { return { name: name }; })).map(function (person) {
+						return $.extend(person, { avatar: avatars[toID(person.name)] });
+					});
+				},
+				removable: function (editor) { return !editor.owner && (self.isOwner() || toID(editor.name) === userid); },
+				exclude: function (user) { return people().indexOf(toID(user.name)) >= 0; },
+				add: function (user) {
+					avatars[toID(user.name)] = user.avatar;
+					change(room.curSummary.editors.concat([user.name]));
+					self.editDex({ editor: user.name, add: true });
+				},
+				remove: function (index) {
+					var name = room.curSummary.editors[index - 1];
+					change(room.curSummary.editors.filter(function (editor) { return editor !== name; }));
+					self.editDex({ editor: name });
+				}
+			});
+			var popup = this.editorPopup;
+			DexViews.ui.request('dexeditors', room.dexid).then(function (data) {
+				var names = [room.curSummary.owner].concat(room.curSummary.editors);
+				$.each(data.people, function (i, person) {
+					if (names[i]) avatars[toID(names[i])] = person.avatar;
+				});
+				if (app.popups.indexOf(popup) >= 0) popup.render();
+			});
 		},
 		deleteDex: function () {
 			var self = this;
@@ -281,14 +364,127 @@
 	}
 
 	var SPRITE_BOXES = { icon: [96, 96], item: [128, 128] };
+	var MAX_CREDITS = 8;
 
 	function missingSpriteHTML() {
 		return '<span class="dexspritemissing" style="' + Object.getPrototypeOf(Dex).getPokemonIcon.call(Dex, '') + ';background-position:-6px -7px"></span>';
 	}
 
+	var creditStates = {};
+
+	function creditKey(credit) {
+		return credit.account ? 'a:' + credit.account : 'n:' + toID(credit.name);
+	}
+
+	function creditAvatarHTML(credit) {
+		var title = credit.name + (credit.username && toID(credit.username) !== toID(credit.name) ? ' (' + credit.username + ')' : '');
+		return '<span class="dexcreditavatar" title="' + BattleLog.escapeHTML(title) + '">' +
+			(credit.avatar ? '<img src="' + BattleLog.escapeHTML(credit.avatar) + '" alt="" />' : '') + '</span>';
+	}
+
+	function loadCredits(uploadid) {
+		if (!creditStates[uploadid]) {
+			creditStates[uploadid] = DexViews.ui.request('dexcredits', uploadid).then(function (data) {
+				return { list: data.credits[uploadid] || [], editable: !!data.editable[uploadid], account: data.account || '' };
+			});
+			creditStates[uploadid].catch(function () { delete creditStates[uploadid]; });
+		}
+		return creditStates[uploadid];
+	}
+
+	function usernameHTML(name) {
+		var escaped = BattleLog.escapeHTML(name);
+		return '<button type="button" class="username dexusername" data-name="' + escaped + '"><strong style="' + BattleLog.hashColor(toID(name)) + '">' + escaped + '</strong></button>';
+	}
+
+	var DexUserPopup = Popup.extend({
+		events: {
+			'input input[name=usersearch]': 'searchUsers'
+		},
+		initialize: function (data) {
+			this.data = data;
+			this.results = [];
+			this.shown = [];
+			this.query = '';
+			this.$el.html('<p><ul class="popupmenu"><li class="dexusersearch"><input name="usersearch" class="textbox" placeholder="Search users" autocomplete="off" /></li></ul></p>' +
+				'<ul class="popupmenu dexuseroptions" style="float:left"></ul><div style="clear:left"></div><p></p>');
+			this.render();
+			if (this.editable()) {
+				this.search('');
+				this.$('input[name=usersearch]').focus();
+			}
+		},
+		editable: function () {
+			return this.data.editable !== false;
+		},
+		list: function () {
+			return this.data.list ? this.data.list() : [];
+		},
+		render: function () {
+			var data = this.data;
+			var list = this.list();
+			var editable = this.editable();
+			var full = !!data.max && list.length >= data.max;
+			var section = menuSectionHTML;
+			var option = function (name, value, user, action) {
+				return '<li><button class="option" name="' + name + '" value="' + value + '">' + creditAvatarHTML(user) + ' ' + BattleLog.escapeHTML(user.name) +
+					(action ? '<i class="fa fa-' + action + ' subtle" style="float: right;"></i>' : '') + '</button></li>';
+			};
+			var buf = '';
+			if (data.title && list.length) {
+				buf += section(data.title, list.map(function (user, i) {
+					var removable = !!data.removable && data.removable(user);
+					return option('removeUser', removable ? i : '', user, removable && 'times');
+				}).join(''));
+			}
+			var taken = list.map(creditKey);
+			var excluded = function (user) { return taken.indexOf(creditKey(user)) >= 0 || !!data.exclude && data.exclude(user); };
+			this.shown = full || !editable ? [] : this.results.filter(function (user) { return !excluded(user); });
+			var rows = this.shown.map(function (user, i) { return option('addUser', i, user, 'plus'); }).join('');
+			if (data.names && editable && !full && toID(this.query) && taken.indexOf('n:' + toID(this.query)) < 0) {
+				rows += option('addUser', 'name', { name: this.query }, 'plus');
+			}
+			if (rows) buf += section(this.query ? "Results" : "Suggestions", rows);
+			this.$('.dexusersearch').toggle(editable && !full);
+			this.$('.dexuseroptions').html(buf);
+		},
+		search: function (query) {
+			var self = this;
+			clearTimeout(this.searchTimer);
+			this.searchTimer = setTimeout(function () {
+				DexViews.ui.request('dexcreditsearch', (self.data.dexid || '') + ', ' + query).then(function (data) {
+					if (query !== self.query) return;
+					self.results = data.profiles;
+					self.render();
+				});
+			}, query ? 250 : 0);
+		},
+		searchUsers: function (e) {
+			this.query = $.trim(e.currentTarget.value).slice(0, 100);
+			this.results = [];
+			this.render();
+			this.search(this.query);
+		},
+		addUser: function (value) {
+			var user = value === 'name' ? { name: this.query } : this.shown[Number(value)];
+			if (!user) return;
+			if (this.data.closeOnPick) this.close();
+			this.data.add(user, this);
+			if (this.data.closeOnPick) return;
+			this.$('input[name=usersearch]').val('').focus();
+			this.query = '';
+			this.search('');
+		},
+		removeUser: function (value) {
+			if (value !== '') this.data.remove(Number(value), this);
+		}
+	});
+
 	var DexSpritePopup = Popup.extend({
 		events: {
-			'change input[name=file]': 'uploadFile'
+			'change input[name=file]': 'uploadFile',
+			'click .username': 'clickUsername',
+			'click': 'closeCredits'
 		},
 		initialize: function (data) {
 			this.room = data.room;
@@ -312,14 +508,57 @@
 				var standard = room.dexStandardSprite(data.kind);
 				if (standard) inner = standard.html;
 			}
-			var buf = '<div class="dexspriteview dexspriteview-' + (SPRITE_BOXES[data.kind] ? data.kind : 'battle') + '"' +
-				(image && image.artist ? ' title="' + BattleLog.escapeHTML(image.artist) + '"' : '') + '>' + inner + '</div>';
-			if (room.dexEditable) {
-				buf += '<div class="dexspritebuttons"><button type="button" class="button" name="pickSprite" title="Upload"><i class="fa fa-upload"></i></button>' +
-					(image ? '<button type="button" class="button" name="clearSprite" title="Remove"><i class="fa fa-trash"></i></button>' : '') + '</div>' +
-					'<input type="file" name="file" accept="image/png,image/gif" style="display:none" />';
-			}
-			this.$el.html(buf);
+			var buf = '<div class="dexspriteview dexspriteview-' + (SPRITE_BOXES[data.kind] ? data.kind : 'battle') + '">' + inner + '</div>';
+			if (image) buf += '<div class="dexcredits" style="display:none"></div>';
+			var buttons = (room.dexEditable ? '<button type="button" class="button" name="pickSprite" title="Upload"><i class="fa fa-upload"></i></button>' : '') +
+				(image ? '<button type="button" class="button" name="editCredits" title="Credits" style="display:none"><i class="fa fa-user-plus"></i></button>' : '') +
+				(image && room.dexEditable ? '<button type="button" class="button" name="clearSprite" title="Remove"><i class="fa fa-trash"></i></button>' : '');
+			if (buttons) buf += '<div class="dexspritebuttons">' + buttons + '</div>';
+			if (room.dexEditable) buf += '<input type="file" name="file" accept="image/png,image/gif" style="display:none" />';
+			this.$el.addClass('dexspritepopup').html(buf);
+			var chart = room.$('.dexmonpage .teamchart .setchart')[0];
+			if (chart) this.$el.css('background-color', getComputedStyle(chart).backgroundColor);
+			this.uploadid = image ? uploadid : null;
+			if (image) loadCredits(uploadid).then(this.renderCredits.bind(this));
+		},
+		renderCredits: function (state) {
+			this.$('.dexcredits').html(state.list.map(function (credit) {
+				return credit.account ? usernameHTML(credit.name) : '<span>' + BattleLog.escapeHTML(credit.name) + '</span>';
+			}).join(', ')).toggle(!!state.list.length);
+			this.$('button[name=editCredits]').toggle(state.editable || state.list.some(function (credit) { return !!credit.account && credit.account === state.account; }));
+		},
+		clickUsername: function (e) {
+			e.preventDefault();
+			e.stopImmediatePropagation();
+			this.closeCredits();
+			app.addPopup(UserPopup, { name: $(e.currentTarget).data('name'), sourceEl: e.currentTarget, sourcePopup: this });
+		},
+		closeCredits: function () {
+			while (app.popups.length && app.popups[app.popups.length - 1] !== this) app.popups.pop().remove();
+		},
+		editCredits: function (value, button) {
+			var self = this;
+			var uploadid = this.uploadid;
+			loadCredits(uploadid).then(function (state) {
+				var save = function (list, popup) {
+					var input = list.map(function (credit) { return credit.account ? { account: credit.account } : { name: credit.name }; });
+					DexViews.ui.request('dexsetcredits', uploadid + ', ' + JSON.stringify({ credits: input })).then(function (data) {
+						state.list = data.credits;
+						creditStates[uploadid] = Promise.resolve(state);
+						popup.render();
+						self.renderCredits(state);
+					}, function (err) {
+						app.addPopup(Popup, { message: err.message });
+					});
+				};
+				app.addPopup(DexUserPopup, {
+					sourceEl: button, sourcePopup: self, dexid: self.room.dexid, title: "Credits", names: true, max: MAX_CREDITS, editable: state.editable,
+					list: function () { return state.list; },
+					removable: function (credit) { return state.editable || !!credit.account && credit.account === state.account; },
+					add: function (credit, popup) { save(state.list.concat([credit]), popup); },
+					remove: function (index, popup) { save(state.list.filter(function (credit, i) { return i !== index; }), popup); }
+				});
+			});
 		},
 		pickSprite: function () {
 			this.$('input[name=file]').click();
@@ -337,6 +576,8 @@
 	});
 
 	DexViews.ui.DexSpritePopup = DexSpritePopup;
+	DexViews.ui.DexUserPopup = DexUserPopup;
+	DexViews.ui.usernameHTML = usernameHTML;
 	DexViews.ui.missingSpriteHTML = missingSpriteHTML;
 
 	var SOURCED = { pokemon: 1, move: 1, ability: 1, item: 1 };

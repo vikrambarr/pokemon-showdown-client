@@ -320,7 +320,7 @@
 			app.addPopup(Popup, { htmlMessage: data.error ? BattleLog.escapeHTML(data.error) : BattleLog.sanitizeHTML(data.html) });
 			app.send('/crq dexes');
 		});
-		$.each(['dex', 'dexentries', 'dexeffect', 'dexformat', 'dexrules', 'dexupload', 'dexstorage', 'dexsource'], function (i, cmd) {
+		$.each(['dex', 'dexentries', 'dexeffect', 'dexformat', 'dexrules', 'dexupload', 'dexstorage', 'dexsource', 'dexcredits', 'dexsetcredits', 'dexcreditsearch', 'dexeditors'], function (i, cmd) {
 			app.on('response:' + cmd, function (data) {
 				answer(cmd, data);
 			});
