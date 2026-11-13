@@ -17,6 +17,7 @@
 
 	var DexViews = window.DexViews;
 	var requests = {};
+	var preloaded = {};
 	DexViews.list = [];
 	DexViews.formats = {};
 	DexViews.entries = {};
@@ -66,7 +67,10 @@
 
 	function loadEntries(dexid) {
 		if (DexViews.entries[dexid] || !dexid || missingEntries[dexid]) return;
-		request('dexentries', dexid).then(function (data) {
+		var ready = preloaded[dexid];
+		var current = DexViews.list.filter(function (other) { return other.id === dexid; })[0];
+		delete preloaded[dexid];
+		(ready && current && ready.hash === current.hash ? Promise.resolve(ready.entries) : request('dexentries', dexid)).then(function (data) {
 			var entries = { custom: data.custom, modified: data.modified, names: data.names, choices: data.choices, species: data.Pokedex, world: toSet(data.world || []), needed: toSet(data.needed || []), own: data.own, originals: data.originals || {}, conditions: data.conditions || {}, types: data.types || {} };
 			$.each(['Moves', 'Abilities', 'Items', 'Conditions'], function (i, table) {
 				var ids = entries[table] = {};
@@ -79,7 +83,7 @@
 			$.each(dexRooms(), function (j, room) {
 				if (room.dexid !== dexid && !(room.dexView && room.dexView.dexid === dexid)) return;
 				var typedSearch = room.dexSearch && room.dexSearch.engine.typedSearch;
-				if (typedSearch && (typedSearch.searchType !== 'pokemon' || room.dexScope === 'out')) room.dexSearch.setType(typedSearch.searchType, 'gen' + room.dexView.gen);
+				if (typedSearch) room.dexSearch.setType(typedSearch.searchType, 'gen' + room.dexView.gen);
 				if (room.dexSelect) room.activeDexSelect().render();
 				if (room.dexFormatSearch && room.dexFormatKind) room.showDexFormatList(room.dexFormatKind);
 				if (room.dexSpecies) room.updateDexLearnsetCount(true);
@@ -299,6 +303,8 @@
 		});
 		app.on('response:dexcreate response:dexedit', function (data) {
 			if (!data) return;
+			if (data.dex) DexViews.layers[data.dex.hash] = DexViews.layers[data.dex.hash] || Promise.resolve(data.dex);
+			if (data.entries) preloaded[data.id] = { hash: data.hash, entries: data.entries };
 			if (app.rooms.dexbuilder && app.rooms.dexbuilder.answerDexEdit(data)) return;
 			showSaveProblems(data.error ? [data.error] : [], data.stale);
 			if (app.rooms.dexbuilder && app.rooms.dexbuilder.saveState === 'saving') app.rooms.dexbuilder.setSaveState(data.error ? 'failed' : 'saved');
@@ -307,7 +313,7 @@
 				delete DexViews.formatDetails[data.formatid];
 				if (app.rooms.dexbuilder) app.rooms.dexbuilder.dexFormat = data.formatid;
 			}
-			app.send('/crq dexes');
+			listDexes(data.dexes);
 		});
 		app.on('response:dexfork response:dexforkline', function (data) {
 			if (!data) return;
@@ -604,6 +610,11 @@
 		}
 	}
 
+	function listDexes(dexes) {
+		if (dexes) app.trigger('response:dexes', dexes);
+		else app.send('/crq dexes');
+	}
+
 	function canEdit(summary) {
 		return [summary.owner].concat(summary.editors || []).some(function (name) { return toID(name) === app.user.get('userid'); });
 	}
@@ -638,6 +649,30 @@
 	function dexEntryResults(dexid) {
 		return function (typedSearch, searchType) {
 			typedSearch.dexid = dexid;
+			if (searchType === 'pokemon') {
+				typedSearch.getBaseResults = function () {
+					var dex = this.dex;
+					var entries = !this.dexPool && DexViews.entries[dexid];
+					var custom = toSet(entries ? entries.custom.Pokedex || [] : []);
+					var modified = toSet(entries ? entries.modified.Pokedex || [] : []);
+					var ids = Object.keys(this.dexPool || this.dexView.species).filter(function (id) {
+						var species = dex.species.get(id);
+						return species.exists && !species.isCosmeticForme;
+					}).sort(function (a, b) {
+						return dex.species.get(a).name.localeCompare(dex.species.get(b).name);
+					});
+					var results = [];
+					$.each([["Custom Pok\u00e9mon", custom], ["Modified Pok\u00e9mon", modified], ["Pok\u00e9mon", null]], function (i, group) {
+						var rows = ids.filter(function (id) {
+							return group[1] ? !!group[1][id] : !custom[id] && !modified[id];
+						});
+						if (rows.length) results.push(['header', group[0]]);
+						results = results.concat(rows.map(function (id) { return ['pokemon', id]; }));
+					});
+					return results;
+				};
+				return;
+			}
 			var table = SEARCH_TABLES[searchType];
 			if (!table) return;
 			typedSearch.getBaseResults = function () {
@@ -995,7 +1030,7 @@
 		request: request, compareFormats: compareFormats, openDexPage: openDexPage, DexConfirmPopup: DexConfirmPopup,
 		HIDE_BUTTON: HIDE_BUTTON, OFFICIAL_BADGE: OFFICIAL_BADGE, canEdit: canEdit, viewSearch: viewSearch, panelSearch: panelSearch, rowClasses: rowClasses, selectable: selectable,
 		EFFECT_KINDS: EFFECT_KINDS, ENTRY_TABLES: ENTRY_TABLES, GETTERS: GETTERS, dexEntryResults: dexEntryResults, chartHTML: chartHTML, chartRowHTML: chartRowHTML, sentenceRowHTML: sentenceRowHTML,
-		dropEmptyHeaders: dropEmptyHeaders, shownInDex: shownInDex, learnRows: learnRows, showSaveProblems: showSaveProblems, setTierStyle: setTierStyle, tierHeader: tierHeader, changedValue: changedValue
+		dropEmptyHeaders: dropEmptyHeaders, shownInDex: shownInDex, learnRows: learnRows, showSaveProblems: showSaveProblems, listDexes: listDexes, setTierStyle: setTierStyle, tierHeader: tierHeader, changedValue: changedValue
 	};
 
 })(window.jQuery);

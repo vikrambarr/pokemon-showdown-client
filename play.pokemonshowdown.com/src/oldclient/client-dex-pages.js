@@ -1079,7 +1079,8 @@
 			if (!this.dexView.species[species.id]) return ' <button name="addDexPokemon"' + value + '><i class="fa fa-plus-circle"></i>Add to dex</button>';
 			var entries = DexViews.entries[this.dexView.dexid];
 			return ' <button name="deleteDexPokemon"' + value + '><i class="fa fa-trash"></i>Delete</button>' +
-				(entries && entries.originals[species.id] ? ' <button name="resetDexPokemon"' + value + '><i class="fa fa-undo"></i>Reset to base</button>' : '');
+				(entries && entries.originals[species.id] !== null ? ' <button name="resetDexPokemon"' + value +
+				(this.dexResettable('Pokedex', species.id) ? '' : ' style="display:none"') + '><i class="fa fa-undo"></i>Reset to base</button>' : '');
 		},
 		dexEditsHTML: function () {
 			var on = !!Storage.prefs('dexshowedits');
@@ -1115,7 +1116,14 @@
 			this.$el.toggleClass('dexshowedits', !!Storage.prefs('dexshowedits'));
 			var $page = this.$('.dexmonpage');
 			$page.find('.dexedited').removeClass('dexedited');
-			if (this.dexEffect) return this.markDexEffectEdits();
+			var room = this;
+			$page.find('button[name=resetDexPokemon]').each(function () {
+				$(this).toggle(room.dexResettable('Pokedex', toID(this.value)));
+			});
+			if (this.dexEffect) {
+				$page.find('button[name=resetDexEffect]').toggle(this.dexResettable(this.dexEffect.table, this.dexEffect.id));
+				return this.markDexEffectEdits();
+			}
 			var base = this.dexEditBase = this.dexSpeciesBase();
 			$page.find('button[name=toggleDexEdits]').toggle(!!base);
 			if (!base) return;
