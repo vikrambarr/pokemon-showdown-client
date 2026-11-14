@@ -38,6 +38,10 @@
 
 	var formatRules = {};
 
+	function ruleSpecId(spec) {
+		return toID(spec.replace(/^[\^!]+/, '').split('=')[0]);
+	}
+
 	function requestFormat(target) {
 		var formatid = target.split(',')[0];
 		if (!formatRules[formatid]) {
@@ -87,7 +91,7 @@
 			var settings = {};
 			for (var i = 0; i < details.ruleset.length; i++) {
 				var spec = details.ruleset[i].replace(/^\^/, '');
-				settings[toID(spec.replace(/^!/, ''))] = spec.charAt(0) === '!' ? 'off' : 'on';
+				settings[ruleSpecId(spec)] = /^!(?!!)/.test(spec) ? 'off' : 'on';
 			}
 			var buf = '<div class="pad" style="padding-top:0">';
 			buf += '<p><label class="label">Format:</label><button class="select formatselect" name="selectDexFormat" value="' + BattleLog.escapeHTML(details.id) + '">' + BattleLog.escapeFormat(details.id) + '</button></p>';
@@ -234,12 +238,25 @@
 				});
 				var childBuf = '';
 				for (var i = 0; i < kids.length; i++) childBuf += renderNode(kids[i], ancestors.concat([ruleid]), activeHere);
+				var value = activeHere && details.values[ruleid] || '';
+				var valueBuf = '';
+				if (rule.value && editable) {
+					valueBuf = ' <input type="text" class="textbox" name="dexRuleValue" data-rule="' + ruleid + '" value="' + BattleLog.escapeHTML(value) + '" size="8"' +
+						(rule.options ? ' list="dexrulevalues-' + ruleid + '"' : '') + ' />';
+					if (rule.options) {
+						valueBuf += '<datalist id="dexrulevalues-' + ruleid + '">' + rule.options.map(function (option) {
+							return '<option value="' + BattleLog.escapeHTML(option) + '"></option>';
+						}).join('') + '</datalist>';
+					}
+				} else if (value) {
+					valueBuf = ' <strong>' + BattleLog.escapeHTML(value) + '</strong>';
+				}
 				if (query && !childBuf && !(rule.name + ' ' + (rule.desc || '')).toLowerCase().includes(query)) return '';
 				var title = on ? (source ? "Required by " + source + (elsewhere ? ", highlighted there" : "") : elsewhere ? "On, highlighted at the top" : "On") :
 					off ? "Off, switched off by this format" : "Off";
 				return '<li><button type="button" class="button' + (on ? (elsewhere ? ' ruleelsewhere' : ' ruleon') : '') + '" title="' + BattleLog.escapeHTML(title) + '"' +
 					(editable ? ' name="toggleDexRule" value="' + ruleid + '"' : '') + '>' +
-					BattleLog.escapeHTML(rule.name) + '</button>' +
+					BattleLog.escapeHTML(rule.name) + '</button>' + valueBuf +
 					(rule.desc ? ' <small class="ruletreedesc">' + BattleLog.sanitizeHTML(rule.desc) + '</small>' : '') +
 					(childBuf ? '<ul>' + childBuf + '</ul>' : '') + '</li>';
 			};
@@ -336,6 +353,7 @@
 		toggleDexRule: function (ruleid) {
 			var details = this.dexFormatDetails;
 			var rule = this.dexFormatTree.byId[ruleid];
+			if (rule.value) return this.setDexRuleValue(ruleid, details.rules.includes(ruleid) ? '' : null);
 			var ruleset = details.ruleset.slice();
 			var index = ruleset.findIndex(function (spec) { return !spec.includes('=') && toID(spec.replace(/^[!^]/, '')) === ruleid; });
 			var on = index >= 0 ? ruleset[index].charAt(0) === '!' : !details.rules.includes(ruleid);
@@ -347,6 +365,31 @@
 			this.saveDexFormat({ ruleset: ruleset }, function (local) {
 				local.rules = local.rules.filter(function (other) { return other !== ruleid; }).concat(on ? [ruleid] : []);
 			});
+		},
+		setDexRuleValue: function (ruleid, value) {
+			var details = this.dexFormatDetails;
+			var rule = this.dexFormatTree.byId[ruleid];
+			var own = details.ruleset.filter(function (spec) { return ruleSpecId(spec) === ruleid; })[0];
+			var inherited = own ? /^\^?!/.test(own) : details.rules.includes(ruleid);
+			var ruleset = details.ruleset.filter(function (spec) { return spec !== own; });
+			if (value === null) {
+				if (!own || own.includes('=')) return this.$('input[name=dexRuleValue][data-rule="' + ruleid + '"]').focus();
+			} else if (!value) {
+				if (inherited) ruleset.push('!' + rule.name);
+			} else if (inherited && value === (own ? (details.defaults || {})[ruleid] : details.values[ruleid])) {
+				if (!own) return;
+			} else {
+				ruleset.push((inherited ? '!!' : '') + rule.name + ' = ' + value);
+				if (ruleset[ruleset.length - 1] === own) return;
+			}
+			this.saveDexFormat({ ruleset: ruleset }, function (local) {
+				local.rules = local.rules.filter(function (other) { return other !== ruleid; }).concat(value === '' ? [] : [ruleid]);
+				if (value) local.values[ruleid] = value;
+				else delete local.values[ruleid];
+			});
+		},
+		changeDexRuleValue: function (e) {
+			this.setDexRuleValue(e.currentTarget.dataset.rule, $.trim(e.currentTarget.value));
 		},
 		toggleDexBan: function (name, button, banned, kind) {
 			var details = this.dexFormatDetails;
@@ -423,7 +466,8 @@
 	_.extend(window.DexBuilderRoom.prototype.events, {
 		'input input[name=formatsearch]': 'searchDexFormat',
 		'click .dexformatpage .utilichart a[data-entry]': 'clickDexFormatEntry',
-		'change input[name=formatname]': 'renameDexFormat'
+		'change input[name=formatname]': 'renameDexFormat',
+		'change input[name=dexRuleValue]': 'changeDexRuleValue'
 	});
 
 })(window.jQuery);

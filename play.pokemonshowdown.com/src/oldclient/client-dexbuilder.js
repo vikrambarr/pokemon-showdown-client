@@ -311,7 +311,7 @@
 	}
 
 	function shrinkSprite(file, kind) {
-		var box = kind === 'type' ? { max: 64, width: 32, height: 14 } : kind === 'item' ? { max: 0, width: 64, height: 64, pad: true } :
+		var box = kind === 'type' ? { max: 0, width: 32, height: 14, pad: true } : kind === 'item' ? { max: 0, width: 64, height: 64, pad: true } :
 			kind.slice(0, 4) === 'icon' ? { max: 0, width: 32, height: 32, pad: true, keep: [40, 30] } : { max: 192, width: 96, height: 96 };
 		return new Promise(function (resolve) {
 			var image = new Image();
@@ -344,7 +344,7 @@
 
 	function uploadSprite(room, name, kind, file) {
 		room.setSaveState('saving');
-		(room.dexSummary.official ? Promise.resolve(file) : shrinkSprite(file, kind)).then(function (shrunk) {
+		(room.dexSummary.official && kind !== 'type' ? Promise.resolve(file) : shrinkSprite(file, kind)).then(function (shrunk) {
 			file = shrunk;
 			return DexViews.ui.request('dexupload', room.dexid + ', ' + name + ', ' + kind);
 		}).then(function (data) {
@@ -627,7 +627,9 @@
 
 	var DexTypePopup = Popup.extend({
 		events: {
-			'change input[name=file]': 'previewType'
+			'change input[name=file]': 'previewType',
+			'click .username': 'clickUsername',
+			'click': 'closeCredits'
 		},
 		initialize: function (data) {
 			this.room = data.room;
@@ -644,12 +646,15 @@
 				buf += '<p><small>Removed from this dex.</small></p>';
 			} else {
 				var image = this.image = DexViews.typeSprite(room.dexView, id);
+				this.uploadid = image ? room.dexView.typeSprites[id] : null;
 				if (image) {
 					buf += '<p><img src="' + DexViews.imageURL(image) + '" width="' + image.width * 2 + '" height="' + image.height * 2 + '" alt="" class="pixelated" /></p>' +
-						'<p><small>' + image.width + '&times;' + image.height + (image.artist ? ', by ' + BattleLog.escapeHTML(image.artist) : '') + '</small></p>';
+						'<p><small>' + image.width + '&times;' + image.height + '</small> ' +
+						'<button type="button" class="button" name="editCredits" title="Credits" style="display:none"><i class="fa fa-user-plus"></i></button></p>' +
+						'<div class="dexcredits" style="display:none"></div>';
 				}
 				buf += '<p><input type="file" name="file" accept="image/png,image/gif" /></p>';
-				buf += '<p><small>' + (room.dexSummary.official ? 'Official dex: any size' : 'Best at 32&times;14. Bigger than 64&times;64 is shrunk to 32&times;14') + '. Pixel art only.</small></p>';
+				buf += '<p><small>Resized to 32&times;14. Pixel art only.</small></p>';
 				buf += storageHTML(room);
 			}
 			buf += '<p class="buttonbar">';
@@ -662,7 +667,12 @@
 			}
 			if ((this.own || this.drafted) && this.vanilla) buf += '<button type="button" name="resetType" class="button">Reset to base</button> ';
 			this.$el.html(buf + '<button type="button" name="close" class="button">Cancel</button></p></form>');
+			if (this.uploadid) loadCredits(this.uploadid).then(this.renderCredits.bind(this));
 		},
+		renderCredits: DexSpritePopup.prototype.renderCredits,
+		clickUsername: DexSpritePopup.prototype.clickUsername,
+		closeCredits: DexSpritePopup.prototype.closeCredits,
+		editCredits: DexSpritePopup.prototype.editCredits,
 		previewType: function () {
 			var file = this.$('input[name=file]')[0].files[0];
 			if (this.objectURL) URL.revokeObjectURL(this.objectURL);
@@ -1122,7 +1132,9 @@
 				this.dexTab = String(tab);
 				return;
 			}
-			var tiers = String(tab) === 'tiers';
+			tab = String(tab || 0);
+			this.$('.dexpage button[name=showDexTab]').removeClass('cur').filter('[value="' + tab + '"]').addClass('cur');
+			var tiers = tab === 'tiers';
 			this.$('.dextierpage').toggle(tiers);
 			this.scaleDex();
 			if (tiers) {
@@ -1132,13 +1144,12 @@
 				this.renderDexTiers();
 				return;
 			}
-			this.dexTab = tab = String(tab || 0);
+			this.dexTab = tab;
 			var count = this.dexSummary.counts[tab];
 			var kind = count && { Pokedex: 'pokemon', Moves: 'move', Abilities: 'ability', Items: 'item' }[count.table];
 			var pokemon = !!kind;
 			var formats = tab === 'formats';
 			var buf = pokemon || formats ? '' : this.renderDexTypes();
-			this.$('.dexpage button[name=showDexTab]').removeClass('cur').filter('[value="' + tab + '"]').addClass('cur');
 			if (count && count.table !== 'Pokedex') DexViews.loadEntries(this.dexid);
 			if (kind) this.$('input[name=pokemonsearch]').attr('placeholder', $('<span>').html('Search ' + count.name).text());
 			var typedSearch = this.dexSearch.engine.typedSearch;
