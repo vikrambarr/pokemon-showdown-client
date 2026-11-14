@@ -434,13 +434,19 @@
 		newDexFormat: function (value, button) {
 			var room = this;
 			var options = '';
+			var section = null;
 			for (var id in BattleFormats) {
 				var format = BattleFormats[id];
 				if (format.dexid || format.team || !id.startsWith('gen')) continue;
+				if (format.section !== section) {
+					options += (section !== null ? '</optgroup>' : '') + '<optgroup label="' + BattleLog.escapeHTML(format.section || '') + '">';
+					section = format.section;
+				}
 				options += '<option value="' + id + '"' + (id === 'gen' + this.dexView.gen + 'ou' ? ' selected' : '') + '>' + BattleLog.escapeHTML(format.name) + '</option>';
 			}
+			if (section !== null) options += '</optgroup>';
 			app.addPopup(DexViews.ui.DexNamePopup, {
-				fields: '<p><label class="label">Start from:<br /><select name="from" class="button">' + options + '</select></label></p>',
+				fields: '<p><label class="label">Start from:<br /><select name="from" class="button dexsearch">' + options + '</select></label></p>',
 				sourceEl: button,
 				callback: function (name, data) {
 					room.editDex({ format: { name: name, from: data.from } });

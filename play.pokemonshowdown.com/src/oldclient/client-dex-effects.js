@@ -280,6 +280,10 @@
 		return options;
 	}
 
+	function searchable(options) {
+		return typeof options === 'string' && (options === 'flag' || /^(ref|name|condition):/.test(options));
+	}
+
 	function optionsHTML(options, value, blankLabel) {
 		var buf = blankLabel !== undefined ? '<option value=""' + (blank(value) ? ' selected' : '') + '>' + blankLabel + '</option>' : '';
 		var found = blank(value);
@@ -491,14 +495,14 @@
 		case 'animations':
 			var moves = animationOptions();
 			var animations = Array.isArray(value) ? value : options;
-			return '<select class="button' + cls + '" data-default="' + options.join(' ') + '">' + optionsHTML(moves, animations[0], '&mdash;') + '</select> then ' +
-				'<select class="button' + cls + '">' + optionsHTML(moves, animations[1], '&mdash;') + '</select>';
+			return '<select class="button dexsearch' + cls + '" data-default="' + options.join(' ') + '">' + optionsHTML(moves, animations[0], '&mdash;') + '</select> then ' +
+				'<select class="button dexsearch' + cls + '">' + optionsHTML(moves, animations[1], '&mdash;') + '</select>';
 		case 'textarea':
 			return '<textarea class="textbox" rows="3">' + escape(blank(value) ? '' : String(value)) + '</textarea>';
 		case 'select':
 			var choices = selectOptions(options, view);
 			if (!choices) return controlHTML('text', value, null, view, className);
-			return '<select class="button' + cls + '">' + optionsHTML(choices, value === true ? 'true' : value === false ? 'false' : value, '&mdash;') + '</select>';
+			return '<select class="button' + (searchable(options) ? ' dexsearch' : '') + cls + '">' + optionsHTML(choices, value === true ? 'true' : value === false ? 'false' : value, '&mdash;') + '</select>';
 		default:
 			return '<input type="text" class="textbox' + cls + '" value="' + escape(blank(value) ? '' : String(value)) + '" autocomplete="off" />';
 		}
@@ -1185,7 +1189,7 @@
 					}).filter(Boolean)[0];
 					choices = [[value, escape(name || String(value))]].concat(choices);
 				}
-				var inner = choices ? '<select class="dexinline dexmark"' + style(key) + was + '>' + optionsHTML(choices, value) + '</select>' :
+				var inner = choices ? '<select class="dexinline dexmark' + (searchable(options) ? ' dexsearch' : '') + '"' + style(key) + was + '>' + optionsHTML(choices, value) + '</select>' :
 					'<input type="text" class="dexinline dexmark" value="' + escape(String(value)) + '"' + style(key, String(value).length + 1) + was + ' />';
 				return wrap('data-slot', linked[key] || key, choices ? 'select' : 'text', inner);
 			};
@@ -1347,8 +1351,8 @@
 			var statuses = STATUSES.map(function (status) { return status[0]; });
 			var secondaryFieldsOf = function () {
 				return {
-					chance: CODE.whole(1, 100, 100), boosts: boosts, status: CODE.choice(statuses), volatileStatus: CODE.choice(conditions('volatileStatus')),
-					sideCondition: CODE.choice(conditions('sideCondition')), pseudoWeather: CODE.choice(conditions('pseudoWeather'))
+					chance: CODE.whole(1, 100, 100), boosts: boosts, status: CODE.choice(statuses), volatileStatus: CODE.search(conditions('volatileStatus')),
+					sideCondition: CODE.search(conditions('sideCondition')), pseudoWeather: CODE.search(conditions('pseudoWeather'))
 				};
 			};
 			var secondary = CODE.obj($.extend(secondaryFieldsOf(), { self: CODE.obj(secondaryFieldsOf(), true) }), true, [], { chance: 100 });
@@ -1361,18 +1365,18 @@
 					target: CODE.choice(MOVE_TARGETS.map(function (target) { return target[0]; })), critRatio: CODE.whole(1, 6, 2), flags: flags('Moves'),
 					drain: fraction, recoil: fraction, heal: fraction, secondary: secondary, secondaries: CODE.list(secondary, 1, 5, true),
 					self: CODE.obj(secondaryFieldsOf(), true), boosts: boosts, selfBoost: CODE.obj({ boosts: boosts }, false, ['boosts']),
-					status: CODE.choice(statuses), volatileStatus: CODE.choice(conditions('volatileStatus')), sideCondition: CODE.choice(conditions('sideCondition')),
-					slotCondition: CODE.choice(conditions('slotCondition')), pseudoWeather: CODE.choice(conditions('pseudoWeather')),
-					weather: CODE.choice(conditions('weather')), terrain: CODE.choice(conditions('terrain')), multihit: CODE.json(2),
+					status: CODE.choice(statuses), volatileStatus: CODE.search(conditions('volatileStatus')), sideCondition: CODE.search(conditions('sideCondition')),
+					slotCondition: CODE.search(conditions('slotCondition')), pseudoWeather: CODE.search(conditions('pseudoWeather')),
+					weather: CODE.search(conditions('weather')), terrain: CODE.search(conditions('terrain')), multihit: CODE.json(2),
 					selfSwitch: CODE.choice([true, 'copyvolatile', 'shedtail']), selfdestruct: CODE.choice(['always', 'ifHit']), ignoreImmunity: CODE.json(true),
 					overrideOffensiveStat: CODE.choice(STATS.slice(1, 6)), overrideDefensiveStat: CODE.choice(STATS.slice(1, 6)),
 					overrideOffensivePokemon: CODE.choice(['target', 'source']), overrideDefensivePokemon: CODE.choice(['target', 'source']),
 					damage: CODE.json('level'), ohko: CODE.json(true),
-					animations: CODE.list(CODE.choice(function () { return animationOptions(); }), 1, 2)
+					animations: CODE.list(CODE.search(function () { return animationOptions(); }), 1, 2)
 				},
 				Abilities: { flags: flags('Abilities'), suppressWeather: CODE.bool() },
 				Items: {
-					fling: CODE.obj({ basePower: CODE.whole(0, 250, 10), status: CODE.choice(statuses), volatileStatus: CODE.choice(conditions('volatileStatus')) },
+					fling: CODE.obj({ basePower: CODE.whole(0, 250, 10), status: CODE.choice(statuses), volatileStatus: CODE.search(conditions('volatileStatus')) },
 						true, [], { basePower: 10 }),
 					naturalGift: CODE.obj({ basePower: CODE.whole(0, 250, 80), type: CODE.choice(function () { return selectOptions('type', view); }) },
 						true, [], { basePower: 80, type: 'Normal' }),

@@ -280,6 +280,9 @@
 		choice: function (options, def) {
 			return { kind: 'select', options: options, def: def };
 		},
+		search: function (options, def) {
+			return { kind: 'select', options: options, def: def, search: true };
+		},
 		fixed: function (def) {
 			return { kind: 'fixed', def: def };
 		},
@@ -375,7 +378,7 @@
 			var options = codeOptions(node);
 			var current = JSON.stringify(value);
 			if (value !== undefined && !options.some(function (option) { return JSON.stringify(option[0]) === current; })) options = [[value, value]].concat(options);
-			inner = '<select class="dexinline dexmark" style="width: ' + (codeWidth(current || '') + 2) + 'ch; ' + color + '">' + options.map(function (option) {
+			inner = '<select class="dexinline dexmark' + (node.search ? ' dexsearch' : '') + '" style="width: ' + (codeWidth(current || '') + 2) + 'ch; ' + color + '">' + options.map(function (option) {
 				var literal = JSON.stringify(option[0]);
 				return '<option value="' + escape(literal) + '"' + (literal === current ? ' selected' : '') + '>' + escape(literal) + '</option>';
 			}).join('') + '</select>';
@@ -401,15 +404,19 @@
 			this.name = data.name;
 			var room = this.room;
 			var source = room.dexSummary;
+			var userid = app.user.get('userid');
 			var targets = editableDexes().filter(function (dex) { return dex.id !== source.id && dex.parents.indexOf(source.id) < 0; });
+			var group = function (label, list) {
+				if (!list.length) return '';
+				return '<optgroup label="' + label + '">' + list.map(function (target) {
+					return '<option value="' + BattleLog.escapeHTML(target.id) + '"' + (target.id === room.copyTarget ? ' selected' : '') + '>' + BattleLog.escapeHTML(target.name) + '</option>';
+				}).join('') + '</optgroup>';
+			};
+			var buf = '<form class="dexcreate"><p><label class="label">Copy ' + BattleLog.escapeHTML(data.name) + ' into:<br /><select name="target" class="button dexsearch">' +
+				group("This dex", room.dexEditable ? [source] : []) +
+				group("Your dexes", targets.filter(function (dex) { return toID(dex.owner) === userid; })) +
+				group("Shared with you", targets.filter(function (dex) { return toID(dex.owner) !== userid; })) + '</select></label></p>';
 			if (room.dexEditable) targets.unshift(source);
-			var buf = '<form class="dexcreate"><p><label class="label">Copy ' + BattleLog.escapeHTML(data.name) + ' into:<br /><select name="target" class="button">';
-			for (var i = 0; i < targets.length; i++) {
-				var target = targets[i];
-				buf += '<option value="' + BattleLog.escapeHTML(target.id) + '"' + (target.id === room.copyTarget ? ' selected' : '') + '>' +
-					BattleLog.escapeHTML(target.name) + (target.id === source.id ? ' (this dex)' : '') + '</option>';
-			}
-			buf += '</select></label></p>';
 			buf += '<p class="dexcopyname"><label class="label">New name:<br /><input type="text" class="textbox" name="name" maxlength="40" /></label></p>';
 			if (data.line) buf += '<p class="dexcopyline"><label class="checkbox"><input type="checkbox" name="line" /> With its evolution line</label></p>';
 			buf += '<p class="buttonbar"><button type="submit" class="button"><strong>Copy</strong></button> <button type="button" name="close" class="button">Cancel</button></p></form>';
@@ -840,9 +847,9 @@
 				};
 			};
 			var abilities = names('abilities', window.BattleAbilities, 'Abilities');
-			var species = CODE.choice(names('species', window.BattlePokedex, 'Pokedex'));
-			var items = CODE.choice(names('items', window.BattleItems, 'Items'));
-			var moves = CODE.choice(names('moves', window.BattleMovedex, 'Moves'));
+			var species = CODE.search(names('species', window.BattlePokedex, 'Pokedex'));
+			var items = CODE.search(names('items', window.BattleItems, 'Items'));
+			var moves = CODE.search(names('moves', window.BattleMovedex, 'Moves'));
 			var stats = {};
 			$.each(BattleStatNames, function (stat) { stats[stat] = CODE.whole(1, 255, 50); });
 			var fields = {
@@ -850,7 +857,7 @@
 				gender: CODE.choice(['M', 'F', 'N']),
 				genderRatio: CODE.obj({ M: CODE.num(0, 1, 0.5), F: CODE.num(0, 1, 0.5) }, false, ['M', 'F']),
 				baseStats: CODE.obj(stats, false, Object.keys(stats)),
-				abilities: CODE.map(CODE.choice(abilities), ['0', '1', 'H', 'S'], ['0']),
+				abilities: CODE.map(CODE.search(abilities), ['0', '1', 'H', 'S'], ['0']),
 				heightm: CODE.num(0.01, 200, 1),
 				weightkg: CODE.num(0, 10000, 10),
 				color: CODE.choice(COLORS),
@@ -865,7 +872,7 @@
 				tags: CODE.list(text(40), 1, 8),
 				cosmeticFormes: CODE.list(text(40), 1, 32),
 				requiredItem: items,
-				requiredAbility: CODE.choice(abilities),
+				requiredAbility: CODE.search(abilities),
 				requiredMove: moves,
 				battleOnly: CODE.json(),
 				changesFrom: species,

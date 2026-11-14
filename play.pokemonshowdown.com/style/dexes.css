@@ -356,9 +356,29 @@
 .dextypechart th img {
 	display: block;
 }
-.dextypechart tr:first-child th img {
+.dextypechart tr.dextypeheads th img {
 	margin: 9px -9px;
 	transform: rotate(-90deg);
+}
+.dextypechart table {
+	border: none;
+}
+.dextypechart th.dextypebare {
+	border: none;
+	background: none;
+	padding: 0 2px;
+	text-align: center;
+}
+.dextypex {
+	border: none;
+	background: none;
+	padding: 0 4px;
+	font-size: 14px;
+	color: var(--dexmuted);
+	cursor: pointer;
+}
+.dextypex:hover {
+	color: #CC3333;
 }
 .dextypechart th:first-child {
 	position: sticky;
@@ -586,6 +606,10 @@
 	padding: 2px;
 	font-size: 8pt;
 	color: #888888;
+}
+.dexpicklist {
+	max-height: 360px;
+	overflow-y: auto;
 }
 .dexpicker {
 	position: relative;
@@ -1080,6 +1104,10 @@
 	width: 24px;
 	height: 24px;
 	zoom: 5;
+	image-rendering: pixelated;
+}
+.dexspriteview-type img {
+	zoom: 4;
 	image-rendering: pixelated;
 }
 .ps-popup.dexspritepopup {
