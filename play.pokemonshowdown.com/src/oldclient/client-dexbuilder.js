@@ -70,38 +70,79 @@
 		return found || summary.base;
 	}
 
-	var DexWorldPopup = Popup.extend({
+	var DexPickPopup = Popup.extend({
 		events: {
-			'input input[name=worldsearch]': 'searchWorlds'
+			'input input[name=picksearch]': 'searchPicks'
 		},
 		initialize: function (data) {
 			this.data = data;
 			this.query = '';
-			this.$el.html('<p><ul class="popupmenu"><li><input name="worldsearch" class="textbox" placeholder="Search worlds" autocomplete="off" /></li></ul></p>' +
-				'<div class="dexworldoptions"></div><div style="clear:left"></div><p></p>');
+			this.$el.html('<p><ul class="popupmenu"><li><input name="picksearch" class="textbox" placeholder="Search" autocomplete="off" /></li></ul></p>' +
+				'<div class="dexpickoptions"></div><div style="clear:left"></div><p></p>');
 			this.render();
-			this.$('input[name=worldsearch]').focus();
+			this.$('input[name=picksearch]').focus();
 		},
 		render: function () {
 			var query = toID(this.query);
 			var current = this.data.current;
-			var buf = worldList(this.data.exceptid).map(function (section) {
-				var rows = section[1].filter(function (world) { return !query || toID(world.label).indexOf(query) >= 0; }).map(function (world) {
-					return '<li><button class="option' + (world.value === current ? ' cur' : '') + '" name="pickWorld" value="' + BattleLog.escapeHTML(world.value) + '">' +
-						BattleLog.escapeHTML(world.label) + '</button></li>';
+			var buf = this.data.sections.map(function (section, i) {
+				var rows = section[1].map(function (option, j) {
+					if (query && toID(option.label).indexOf(query) < 0) return '';
+					return '<li><button class="option' + (option.value === current ? ' cur' : '') + '" name="pickOption" value="' + i + ',' + j + '">' +
+						BattleLog.escapeHTML(option.label) + '</button></li>';
 				}).join('');
-				return rows ? '<ul class="popupmenu" style="float:left;padding-left:5px">' + menuSectionHTML(section[0], rows) + '</ul>' : '';
+				return rows && section[0] ? menuSectionHTML(section[0], rows) : rows;
 			}).join('');
-			this.$('.dexworldoptions').html(buf || '<ul class="popupmenu"><em>No worlds found</em></ul>');
+			this.$('.dexpickoptions').html('<ul class="popupmenu dexpicklist">' + (buf || '<em>Nothing found</em>') + '</ul>');
 		},
-		searchWorlds: function (e) {
+		searchPicks: function (e) {
 			this.query = e.currentTarget.value;
 			this.render();
 		},
-		pickWorld: function (value, button) {
+		pickOption: function (value) {
+			var at = value.split(',');
+			var option = this.data.sections[at[0]][1][at[1]];
 			this.close();
-			if (value !== this.data.current) this.data.pick(value, $(button).text());
+			if (option.value !== this.data.current) this.data.pick(option.value, option.label);
 		}
+	});
+
+	DexViews.ui.DexPickPopup = DexPickPopup;
+
+	function selectSections(select) {
+		var sections = [];
+		var loose = null;
+		var options = function (list) {
+			return $(list).filter('option:not(:disabled)').map(function () { return { value: this.value, label: this.textContent }; }).get();
+		};
+		$(select).children().each(function () {
+			if (this.tagName === 'OPTGROUP') {
+				loose = null;
+				sections.push([BattleLog.escapeHTML(this.label), options(this.children)]);
+			} else {
+				if (!loose) sections.push(loose = ['', []]);
+				loose[1] = loose[1].concat(options(this));
+			}
+		});
+		return sections;
+	}
+
+	function openSelectPicker(select) {
+		app.addPopup(DexPickPopup, {
+			sourceEl: select,
+			sourcePopup: app.popups.filter(function (popup) { return $.contains(popup.el, select); })[0],
+			sections: selectSections(select),
+			current: select.value,
+			pick: function (value) { $(select).val(value).trigger('change'); }
+		});
+	}
+
+	$(document).on('mousedown touchstart', 'select.dexsearch', function (e) {
+		if (e.type === 'mousedown' && e.which !== 1) return;
+		e.preventDefault();
+		if (e.type === 'touchstart') openSelectPicker(this);
+	}).on('click', 'select.dexsearch', function () {
+		openSelectPicker(this);
 	});
 
 	var DexNamePopup = Popup.extend({
@@ -146,9 +187,6 @@
 			buf += '<p><span class="label">Editors:</span><span class="dexeditors">' + this.editorsHTML() + '</span></p>';
 			buf += '<p><label class="label">Description:<br /><textarea class="textbox" name="description" rows="4" maxlength="512">' +
 				BattleLog.escapeHTML(summary.description || '') + '</textarea></label></p></form>';
-			buf += '<p><small>' + summary.counts.map(function (count) {
-				return '<strong>' + count.name + ':</strong> ' + count.total + ' total, ' + count.custom + ' custom, ' + count.modified + ' modified';
-			}).join('<br />') + '</small></p>';
 			buf += '<div class="dexrest">' + this.dexRestHTML() + '</div>';
 			this.$el.html(buf);
 		},
@@ -224,8 +262,8 @@
 		pickDexWorld: function (value, button) {
 			var self = this;
 			var summary = this.room.curSummary;
-			app.addPopup(DexWorldPopup, {
-				sourceEl: button, sourcePopup: this, current: baseValue(summary), exceptid: summary.id,
+			app.addPopup(DexPickPopup, {
+				sourceEl: button, sourcePopup: this, current: baseValue(summary), sections: worldList(summary.id),
 				pick: function (base, label) { self.saveDexBase(base, label, button); }
 			});
 		},
@@ -233,9 +271,7 @@
 			var summary = this.room.curSummary;
 			var self = this;
 			app.addPopup(DexConfirmPopup, {
-				message: 'Change the world of ' + BattleLog.escapeHTML(summary.name) + ' to ' + BattleLog.escapeHTML(label) + '?<br /><br />' +
-					'Its Pok&eacute;mon go back to the new world\'s, and custom or edited things that don\'t work on it are skipped until you fix them. ' +
-					'If too much breaks, you may need to clear the dex.',
+				message: 'Change the world of ' + BattleLog.escapeHTML(summary.name) + ' to ' + BattleLog.escapeHTML(label) + '?',
 				button: "Change world",
 				sourceEl: button,
 				sourcePopup: this,
@@ -298,11 +334,6 @@
 
 	function megabytes(bytes) {
 		return bytes < 1024 * 1024 ? Math.ceil(bytes / 1024) + ' KB' : (bytes / 1024 / 1024).toFixed(1).replace(/\.0$/, '') + ' MB';
-	}
-
-	function storageHTML(room) {
-		if (!room.dexStorage || toID(room.dexSummary.owner) !== app.user.get('userid') || room.dexSummary.official) return '';
-		return '<p><small>Your sprite storage: ' + megabytes(room.dexStorage.sprites) + ' of ' + megabytes(room.dexStorage.spriteLimit) + '</small></p>';
 	}
 
 	function storageFolderHTML(storage) {
@@ -625,11 +656,23 @@
 		}
 	});
 
+	function confirmTypeEdit(room, name, message, button, edit) {
+		var id = toID(name);
+		var entries = DexViews.entries[room.dexid];
+		var own = entries && entries.types[id];
+		var save = function () {
+			if (room.dexDraft) delete room.dexDraft.effects['TypeChart:' + id];
+			room.applyDexDraft();
+			if (!edit.deletetype || own) room.editDex(edit);
+			if (room.$('.dextypechart').length) room.$('.dextabempty').html(room.renderDexTypes());
+		};
+		if (!message) return save();
+		app.addPopup(DexConfirmPopup, { message: message, button: button, callback: save });
+	}
+
 	var DexTypePopup = Popup.extend({
 		events: {
-			'change input[name=file]': 'previewType',
-			'click .username': 'clickUsername',
-			'click': 'closeCredits'
+			'change input[name=file]': 'uploadFile'
 		},
 		initialize: function (data) {
 			this.room = data.room;
@@ -637,87 +680,40 @@
 			var room = this.room;
 			var id = toID(data.name);
 			var entries = DexViews.entries[room.dexid];
-			this.own = entries && entries.types[id];
-			this.drafted = !!(room.dexDraft && room.dexDraft.effects['TypeChart:' + id]);
-			this.vanilla = !!window.BattleTypeChart[id];
-			this.removed = !!(room.dexView.TypeChart[id] && room.dexView.TypeChart[id].isNonstandard);
-			var buf = '<form class="dextypeform"><p><span class="dextypepreview">' + Dex.getTypeIcon(data.name) + '</span> <strong>' + BattleLog.escapeHTML(data.name) + '</strong></p>';
-			if (this.removed) {
-				buf += '<p><small>Removed from this dex.</small></p>';
+			var own = entries && entries.types[id];
+			var drafted = !!(room.dexDraft && room.dexDraft.effects['TypeChart:' + id]);
+			var removed = !!(room.dexView.TypeChart[id] && room.dexView.TypeChart[id].isNonstandard);
+			var image = !removed && DexViews.typeSprite(room.dexView, id);
+			var buf = '<div class="dexspriteview dexspriteview-type">' + Dex.getTypeIcon(data.name) + '</div><div class="dexspritebuttons">';
+			if (removed) {
+				buf += '<button type="button" class="button" name="restoreType">Restore</button>';
 			} else {
-				var image = this.image = DexViews.typeSprite(room.dexView, id);
-				this.uploadid = image ? room.dexView.typeSprites[id] : null;
-				if (image) {
-					buf += '<p><img src="' + DexViews.imageURL(image) + '" width="' + image.width * 2 + '" height="' + image.height * 2 + '" alt="" class="pixelated" /></p>' +
-						'<p><small>' + image.width + '&times;' + image.height + '</small> ' +
-						'<button type="button" class="button" name="editCredits" title="Credits" style="display:none"><i class="fa fa-user-plus"></i></button></p>' +
-						'<div class="dexcredits" style="display:none"></div>';
-				}
-				buf += '<p><input type="file" name="file" accept="image/png,image/gif" /></p>';
-				buf += '<p><small>Resized to 32&times;14. Pixel art only.</small></p>';
-				buf += storageHTML(room);
+				buf += '<button type="button" class="button" name="pickSprite" title="Upload"><i class="fa fa-upload"></i></button>' +
+					(image ? '<button type="button" class="button" name="clearSprite" title="Remove"><i class="fa fa-trash"></i></button>' : '');
 			}
-			buf += '<p class="buttonbar">';
-			if (this.removed) {
-				buf += '<button type="button" name="restoreType" class="button"><strong>Restore</strong></button> ';
-			} else {
-				buf += '<button type="submit" class="button"><strong>Done</strong></button> ';
-				if (this.image) buf += '<button type="button" name="clearSprite" class="button">Remove sprite</button> ';
-				buf += '<button type="button" name="deleteType" class="button">Delete</button> ';
-			}
-			if ((this.own || this.drafted) && this.vanilla) buf += '<button type="button" name="resetType" class="button">Reset to base</button> ';
-			this.$el.html(buf + '<button type="button" name="close" class="button">Cancel</button></p></form>');
-			if (this.uploadid) loadCredits(this.uploadid).then(this.renderCredits.bind(this));
+			buf += '</div>';
+			if ((own || drafted) && window.BattleTypeChart[id]) buf += '<div class="dexspritebuttons"><button type="button" class="button" name="resetType">Reset to base</button></div>';
+			if (!removed) buf += '<input type="file" name="file" accept="image/png,image/gif" style="display:none" />';
+			this.$el.addClass('dexspritepopup').html(buf);
 		},
-		renderCredits: DexSpritePopup.prototype.renderCredits,
-		clickUsername: DexSpritePopup.prototype.clickUsername,
-		closeCredits: DexSpritePopup.prototype.closeCredits,
-		editCredits: DexSpritePopup.prototype.editCredits,
-		previewType: function () {
+		pickSprite: DexSpritePopup.prototype.pickSprite,
+		uploadFile: function () {
 			var file = this.$('input[name=file]')[0].files[0];
-			if (this.objectURL) URL.revokeObjectURL(this.objectURL);
-			this.objectURL = file ? URL.createObjectURL(file) : null;
-			var src = this.objectURL || this.image && DexViews.imageURL(this.image);
-			this.$('.dextypepreview').html(src ? '<img src="' + BattleLog.escapeHTML(src) + '" alt="" class="pixelated" style="max-width:32px;max-height:14px" />' : Dex.getTypeIcon(this.name));
-		},
-		submit: function () {
-			var file = this.$('input[name=file]')[0].files[0];
+			if (!file) return;
 			this.close();
-			if (file) uploadSprite(this.room, this.name, 'type', file);
+			uploadSprite(this.room, this.name, 'type', file);
 		},
 		clearSprite: function () {
 			this.close();
 			this.room.editDex({ sprite: { name: this.name, kind: 'type', image: null } });
 		},
-		close: function () {
-			if (this.objectURL) URL.revokeObjectURL(this.objectURL);
-			Popup.prototype.close.apply(this, arguments);
-		},
-		deleteType: function () {
-			var name = BattleLog.escapeHTML(this.name);
-			this.confirmType(this.vanilla ? 'Remove the ' + name + ' type from this dex? Its matchups become neutral, and Pok&eacute;mon and moves that have it keep it.' :
-				'Delete the ' + name + ' type from this dex?', "Delete", this.vanilla ? { type: { name: this.name, removed: true } } : { deletetype: this.name });
-		},
 		restoreType: function () {
-			this.confirmType(null, null, { type: { name: this.name, removed: null } });
+			this.close();
+			confirmTypeEdit(this.room, this.name, null, null, { type: { name: this.name, removed: null } });
 		},
 		resetType: function () {
-			this.confirmType('Reset ' + BattleLog.escapeHTML(this.name) + ' to its base matchups and look? Every edit to it in this dex is removed.',
-				"Reset to base", { deletetype: this.name });
-		},
-		confirmType: function (message, button, edit) {
-			var self = this;
-			var room = this.room;
-			var key = 'TypeChart:' + toID(this.name);
-			var save = function () {
-				if (room.dexDraft) delete room.dexDraft.effects[key];
-				room.applyDexDraft();
-				if (!edit.deletetype || self.own) room.editDex(edit);
-				if (room.$('.dextypechart').length) room.$('.dextabempty').html(room.renderDexTypes());
-			};
 			this.close();
-			if (!message) return save();
-			app.addPopup(DexConfirmPopup, { message: message, button: button, callback: save });
+			confirmTypeEdit(this.room, this.name, 'Reset ' + BattleLog.escapeHTML(this.name) + ' to its base matchups and look?', "Reset to base", { deletetype: this.name });
 		}
 	});
 
@@ -806,7 +802,7 @@
 			this.updateTeamList(summary);
 		},
 		dexPickerHTML: function (heading) {
-			return '<div class="dexpicker">' + heading + '<select name="dexpicker">' + this.dexOptions + '</select></div>';
+			return '<div class="dexpicker">' + heading + '<select name="dexpicker" class="dexsearch">' + this.dexOptions + '</select></div>';
 		},
 		updateFolderList: function () {
 			var slots = this.folderLists.slots;
@@ -1013,19 +1009,14 @@
 			var buf = '<p><label class="label">Format:</label><button class="select formatselect" name="selectTierFormat" value="' + BattleLog.escapeHTML(this.tierFormat || '') + '">' +
 				(this.tierFormat ? BattleLog.escapeFormat(this.tierFormat) : '(All formats)') + '</button>' + (this.dexEditable ? this.dexSaveHTML('button dexsave') : '') + '</p>';
 			if (details) {
-				buf += '<p><small>' + BattleLog.escapeFormat(details.id) + ' uses <strong>' + info[1] + '</strong> tiers. Changes here only affect this format.</small>' +
-					(this.dexEditable && info[2] && overridden ? ' <button class="button" name="resetDexTiers">Reset to All formats</button>' : '') + '</p>';
+				if (this.dexEditable && info[2] && overridden) buf += '<p><button class="button" name="resetDexTiers">Reset to All formats</button></p>';
 			} else {
 				buf += '<p><label class="label">Tiers: <select name="tierstyle" class="button">' + TIER_STYLES.map(function (entry) {
 					return '<option value="' + entry[0] + '"' + (entry[0] === style ? ' selected' : '') + '>' + entry[1] + '</option>';
 				}).join('') + '</select></label></p>';
 			}
 			buf += '<p class="dextierbar"><input type="search" class="textbox" name="tiersearch" placeholder="Search Pok&eacute;mon" size="24" autocomplete="off" />';
-			if (this.dexEditable && info[2]) {
-				buf += ' <span class="dextierselection dexselectslot"></span>';
-			} else if (this.dexEditable) {
-				buf += ' <small>VGC groups come from each Pok&eacute;mon\'s tags, so they can\'t be changed here.</small>';
-			}
+			if (this.dexEditable && info[2]) buf += ' <span class="dextierselection dexselectslot"></span>';
 			buf += '</p><div class="teambuilder-results dextierlist"></div>';
 			this.$('.dextierpage').html(buf);
 			var $list = this.$('.dextierlist');
@@ -1202,13 +1193,20 @@
 			var dex = this.dexView.dex;
 			var names = dex.types.names().filter(function (name) { return dex.types.get(name).exists !== false; });
 			var editable = this.dexEditable;
-			var buf = editable ? '<p><button class="button" name="newDexEffect"><i class="fa fa-plus"></i> Create</button>' + this.dexSaveHTML('button dexsave') + '</p>' : '';
-			buf += '<p><small>Rows are the attacking type, columns are the defending type.' + (editable ? ' Click a matchup to change it.' : '') + '</small></p>';
-			buf += '<div class="ladder dextypechart' + (editable ? ' dextypeedit' : '') + '"><table><tr><th></th>';
+			var buf = editable ? '<p>' + this.dexSaveHTML('button dexsave') + '</p>' : '';
+			buf += '<div class="ladder dextypechart' + (editable ? ' dextypeedit' : '') + '"><table>';
+			if (editable) {
+				buf += '<tr><th class="dextypebare"></th>' + names.map(function (name) {
+					var escaped = BattleLog.escapeHTML(name);
+					return '<th class="dextypebare"><button class="dextypex" name="deleteDexType" value="' + escaped + '" title="Delete ' + escaped + '">&times;</button></th>';
+				}).join('') + '</tr>';
+			}
+			buf += '<tr class="dextypeheads"><th></th>';
 			var typeHeader = function (name) {
 				return '<th title="' + BattleLog.escapeHTML(name) + '"' + (editable ? ' data-type="' + BattleLog.escapeHTML(name) + '"' : '') + '>' + Dex.getTypeIcon(name) + '</th>';
 			};
 			for (var i = 0; i < names.length; i++) buf += typeHeader(names[i]);
+			if (editable) buf += '<th class="dextypebare"><button class="button" name="newDexEffect" title="Create a new type"><i class="fa fa-plus"></i></button></th>';
 			buf += '</tr>';
 			for (var i = 0; i < names.length; i++) {
 				buf += '<tr>' + typeHeader(names[i]);
@@ -1228,6 +1226,12 @@
 				buf += editable ? '<button class="button" data-type="' + BattleLog.escapeHTML(name) + '" title="Restore ' + BattleLog.escapeHTML(name) + '">' + Dex.getTypeIcon(name) + '</button> ' : Dex.getTypeIcon(name) + ' ';
 			}
 			return buf + '</p>';
+		},
+		deleteDexType: function (name) {
+			var escaped = BattleLog.escapeHTML(name);
+			var vanilla = !!window.BattleTypeChart[toID(name)];
+			confirmTypeEdit(this, name, (vanilla ? 'Remove the ' : 'Delete the ') + escaped + ' type from this dex?', "Delete",
+				vanilla ? { type: { name: name, removed: true } } : { deletetype: name });
 		},
 		openDexType: function (e) {
 			e.stopPropagation();
@@ -1395,7 +1399,7 @@
 		dexSourceHTML: function (kind) {
 			if (!SOURCED[kind] || this.dexScope !== 'out') return '';
 			var current = this.dexSource || '';
-			return '<label>from <select name="dexsource" class="button">' + optionHTML('', "This dex's world", current) + worldOptions(current, this.dexid) + '</select></label>';
+			return '<label>from <select name="dexsource" class="button dexsearch">' + optionHTML('', "This dex's world", current) + worldOptions(current, this.dexid) + '</select></label>';
 
 		},
 		changeDexSource: function (e) {
@@ -1509,10 +1513,8 @@
 			if (!shown.length) return;
 			var noun = pokemon ? 'Pok&eacute;mon' : table.toLowerCase();
 			var one = shown.length === 1;
-			var warning = 'Teams using ' + (one ? 'it' : 'them') + ' stop being legal, ' + (pokemon ? 'dexes set in this one lose ' + (one ? 'it' : 'them') + ' too, ' : '') +
-				'and ' + (one ? 'its' : 'their') + ' edits are lost.';
-			var message = reset ? 'Reset ' + namesHTML(shown, noun) + ' to ' + (one ? 'its' : 'their') + ' base data? Every edit to ' + (one ? 'it' : 'them') + ' in this dex is removed.' :
-				'Delete ' + namesHTML(shown, noun) + ' from this dex?<br /><small>' + warning + '</small>';
+			var message = reset ? 'Reset ' + namesHTML(shown, noun) + ' to ' + (one ? 'its' : 'their') + ' base data?' :
+				'Delete ' + namesHTML(shown, noun) + ' from this dex?';
 			app.addPopup(DexConfirmPopup, {
 				message: message,
 				button: reset ? "Reset to base" : "Delete",
@@ -1593,7 +1595,7 @@
 				return;
 			}
 			app.addPopup(DexNamePopup, {
-				fields: '<p><label class="label">World:<br /><select name="base" class="button">' + baseOptions(null) + '</select></label></p>' +
+				fields: '<p><label class="label">World:<br /><select name="base" class="button dexsearch">' + baseOptions(null) + '</select></label></p>' +
 					'<p><label class="label"><input type="checkbox" name="unlisted" /> Private (unlisted)</label></p>',
 				sourceEl: sourceEl,
 				callback: function (name, data) {
@@ -1823,9 +1825,6 @@
 			buf += '<p><strong>Made by:</strong> ' + BattleLog.escapeHTML(summary.owner);
 			if (summary.editors && summary.editors.length) buf += '<br /><strong>Edited by:</strong> ' + BattleLog.escapeHTML(summary.editors.join(', '));
 			buf += '<br /><strong>World:</strong> ' + BattleLog.escapeHTML(summary.base) + ' (Gen ' + DexViews.genOf(summary.mod) + ')';
-			buf += '<br /><small>' + summary.counts.map(function (count) {
-				return '<strong>' + count.name + ':</strong> ' + count.total + ' total, ' + count.custom + ' custom, ' + count.modified + ' modified';
-			}).join(' &middot; ') + '</small>';
 			return buf + '</p><p><button class="button" name="worldDex"><i class="fa fa-globe"></i> Use as world</button>' +
 				(DexViews.ui.canEdit(summary) ? ' <button class="button" name="editViewedDex"><i class="fa fa-pencil"></i> Edit</button>' : '') + '</p>';
 		},
