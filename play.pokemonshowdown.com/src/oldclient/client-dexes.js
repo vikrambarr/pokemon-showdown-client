@@ -10,6 +10,10 @@
 	var ENTRY_TABLES = { pokemon: 'Pokedex', move: 'Moves', ability: 'Abilities', item: 'Items', condition: 'Conditions' };
 	var SEARCH_TABLES = { move: 'Moves', ability: 'Abilities', item: 'Items' };
 	var GETTERS = { Pokedex: 'species', Moves: 'moves', Abilities: 'abilities', Items: 'items' };
+	var NONSTANDARD = [['Past', "Past"], ['Unobtainable', "Unobtainable"], ['Future', "Future"], ['Gmax', "Gigantamax"], ['Legends', "Legends"], ['LGPE', "Let's Go"], ['CAP', "CAP"], ['Custom', "Showdown-only"]];
+	var NONSTANDARD_ORDER = NONSTANDARD.map(function (entry) { return entry[0]; });
+	var TIER_FIELDS = { singles: 'tier', lc: 'tier', natdex: 'natDexTier', doubles: 'doublesTier' };
+	var VIEW_COLUMNS = { singles: 'singles', lc: 'singles', natdex: 'natdex', doubles: 'doubles', vgc: 'doubles' };
 
 	var FORMAT_TIERS = ['Random Battle', 'Randbat', 'OU', 'Ubers', 'UU', 'RU', 'NU', 'PU', 'AG', 'LC', 'VGC'];
 	var FORMAT_GROUPS = [/Doubles|VGC/, /Free-for-all|FFA|Multi/i, /Draft/, /Custom Game|\bCG$/];
@@ -184,7 +188,10 @@
 		request('dexformat', formatid).then(function (details) {
 			var legal = {};
 			for (var i = 0; i < details.legal.pokemon.length; i++) legal[details.legal.pokemon[i]] = 1;
-			DexViews.formatDetails[formatid] = { rules: details.rules, gameType: details.gameType, mod: details.mod, tiers: details.tiers, legal: legal };
+			DexViews.formatDetails[formatid] = {
+				rules: details.rules, gameType: details.gameType, mod: details.mod, tiers: details.tiers,
+				tierview: details.tierview, tiercolumns: details.tiercolumns, legal: legal
+			};
 			if (!room.curTeam || room.curTeam.format !== formatid) return;
 			room.update();
 			if (room.curSet && room.curChartType) room.updateChart(true);
@@ -480,11 +487,12 @@
 		var getTier = TypedSearch.prototype.getTier;
 		TypedSearch.prototype.getTier = function (species) {
 			if (!this.dexView) return getTier.apply(this, arguments);
-			var override = !this.isVGC && this.tierOverrides && this.tierOverrides[species.id];
-			var field = this.isDoubles ? 'doublesTier' : this.isNatDex ? 'natDexTier' : 'tier';
+			var view = searchView(this);
+			var override = view !== 'vgc' && this.tierOverrides && this.tierOverrides[species.id];
+			var field = TIER_FIELDS[view] || 'tier';
 			if (override && override[field]) return override[field];
 			var data = DexViews.tierData(this.dexView, species);
-			if (this.isVGC) {
+			if (view === 'vgc') {
 				var tags = this.dex.species.get(species.baseSpecies).tags || [];
 				if (species.isNonstandard && species.isNonstandard !== 'Unobtainable') return 'Illegal';
 				if (tags.includes('Mythical')) return 'Mythical';
@@ -492,12 +500,12 @@
 				if (data.tier === 'NFE' || data.tier === 'LC') return data.tier;
 				return 'Regular';
 			}
-			var tier = (this.isDoubles ? data.doublesTier : this.isNatDex ? data.natDexTier : '') || data.tier ||
+			var tier = (field !== 'tier' ? data[field] : '') || data.tier ||
 				((data.doublesTier || data.natDexTier) && 'Illegal');
-			if (tier && this.isDoubles && !DOUBLES_TIERS.includes(tier)) return '(DUU)';
+			if (tier && field === 'doublesTier' && !DOUBLES_TIERS.includes(tier)) return '(DUU)';
 			if (tier) return tier;
 			var formatType = this.formatType;
-			this.formatType = this.isDoubles ? 'doubles' : this.isNatDex ? 'natdex' : formatType;
+			this.formatType = field === 'doublesTier' ? 'doubles' : field === 'natDexTier' ? 'natdex' : formatType;
 			tier = getTier.apply(this, arguments);
 			this.formatType = formatType;
 			return tier;
@@ -507,24 +515,26 @@
 		PokemonSearch.getBaseResults = function () {
 			if (!this.dexView) return getPokemonResults.apply(this, arguments);
 			var self = this;
+			var view = searchView(this);
 			var tiers = {};
 			for (var id in this.dexPool || this.dexView.species) {
 				var species = this.dex.species.get(id);
 				if (!species.exists) continue;
-				var tier = this.getTier(species) || 'Illegal';
+				var tier = view === 'dexorder' ? 'Pok\u00e9mon' : this.getTier(species) || 'Illegal';
+				if ((tier === 'Illegal' || view === 'dexorder') && NONSTANDARD_ORDER.includes(species.isNonstandard)) tier = ':' + species.isNonstandard;
 				(tiers[tier] || (tiers[tier] = [])).push(species);
 			}
 			var order = Object.keys(tiers).sort(function (a, b) {
-				var i = TIERS.indexOf(a);
-				var j = TIERS.indexOf(b);
+				var i = a.charAt(0) === ':' ? TIERS.length + NONSTANDARD_ORDER.indexOf(a.slice(1)) : TIERS.indexOf(a);
+				var j = b.charAt(0) === ':' ? TIERS.length + NONSTANDARD_ORDER.indexOf(b.slice(1)) : TIERS.indexOf(b);
 				if (i < 0) i = TIERS.length - 2;
 				if (j < 0) j = TIERS.length - 2;
 				return i - j || (a < b ? -1 : a > b ? 1 : 0);
 			});
 			var results = [];
 			for (var i = 0; i < order.length; i++) {
-				if (order[i] === 'Illegal' && this.formatDetails || this.isLC && order[i] !== 'LC') continue;
-				results.push(['header', tierHeader(order[i])]);
+				if ((order[i] === 'Illegal' || order[i].charAt(0) === ':') && this.formatDetails || view === 'lc' && order[i] !== 'LC') continue;
+				results.push(['header', order[i].charAt(0) === ':' ? NONSTANDARD[NONSTANDARD_ORDER.indexOf(order[i].slice(1))][1] + " Pok\u00e9mon" : tierHeader(order[i])]);
 				tiers[order[i]].sort(function (a, b) { return a.num - b.num || (a.name < b.name ? -1 : 1); });
 				for (var j = 0; j < tiers[order[i]].length; j++) results.push(['pokemon', tiers[order[i]][j].id]);
 			}
@@ -668,10 +678,16 @@
 					}).sort(function (a, b) {
 						return dex.species.get(a).name.localeCompare(dex.species.get(b).name);
 					});
+					var category = function (id) {
+						var value = dex.species.get(id).isNonstandard;
+						return NONSTANDARD_ORDER.includes(value) ? value : '';
+					};
 					var results = [];
-					$.each([["Custom Pok\u00e9mon", custom], ["Modified Pok\u00e9mon", modified], ["Pok\u00e9mon", null]], function (i, group) {
+					$.each([["Custom Pok\u00e9mon", custom], ["Modified Pok\u00e9mon", modified], ["Pok\u00e9mon", '']].concat(NONSTANDARD.map(function (entry) {
+						return [entry[1] + " Pok\u00e9mon", entry[0]];
+					})), function (i, group) {
 						var rows = ids.filter(function (id) {
-							return group[1] ? !!group[1][id] : !custom[id] && !modified[id];
+							return typeof group[1] === 'object' ? !!group[1][id] : !custom[id] && !modified[id] && category(id) === group[1];
 						});
 						if (rows.length) results.push(['header', group[0]]);
 						results = results.concat(rows.map(function (id) { return ['pokemon', id]; }));
@@ -685,17 +701,34 @@
 			typedSearch.getBaseResults = function () {
 				var shown = DexViews.entries[dexid];
 				var pool = this.dexPool;
+				var getter = this.dex[GETTERS[table]];
+				var mine = toSet(shown && !pool ? shown.custom[table].concat(shown.modified[table]) : []);
 				var seen = {};
-				var results = dropEmptyHeaders(this.getDefaultResults().filter(function (row) {
+				var groups = {};
+				var results = this.getDefaultResults().filter(function (row) {
 					if (row[0] !== searchType) return true;
 					seen[row[1]] = 1;
 					return pool ? !!pool[row[1]] : !!shown && !!shown[table][row[1]];
-				}));
+				});
 				var others = Object.keys(pool || (shown ? shown[table] : {})).filter(function (id) { return !seen[id]; }).sort();
-				if (!others.length) return results;
-				return results.concat([['header', "Other " + table.toLowerCase()]], others.map(function (id) {
-					return [searchType, id];
+				if (others.length) {
+					results = results.concat([['header', "Other " + table.toLowerCase()]], others.map(function (id) {
+						return [searchType, id];
+					}));
+				}
+				results = dropEmptyHeaders(results.filter(function (row) {
+					var value = row[0] === searchType && !mine[row[1]] && getter.get(row[1]).isNonstandard;
+					if (!NONSTANDARD_ORDER.includes(value)) return true;
+					(groups[value] || (groups[value] = [])).push(row);
+					return false;
 				}));
+				$.each(NONSTANDARD, function (i, entry) {
+					var rows = groups[entry[0]];
+					if (!rows) return;
+					rows.sort(function (a, b) { return a[1] < b[1] ? -1 : 1; });
+					results = results.concat([['header', entry[1] + " " + table.toLowerCase()]], rows);
+				});
+				return results;
 			};
 		};
 	}
@@ -882,6 +915,16 @@
 		search.isVGC = search.isDoubles && details.rules.includes('flatrules');
 		search.isLC = details.rules.includes('littlecup');
 		search.tierOverrides = details.tiers || null;
+		search.tierView = details.tierview || '';
+		if (search.tierView) return;
+		var guess = searchView(search);
+		var columns = details.tiercolumns || [];
+		if (columns.length && !columns.includes(VIEW_COLUMNS[guess])) search.tierView = columns[0];
+	}
+
+	function searchView(search) {
+		if (search.tierView) return search.tierView;
+		return search.isVGC ? 'vgc' : search.isDoubles ? 'doubles' : search.isLC ? 'lc' : search.isNatDex ? 'natdex' : 'singles';
 	}
 
 	function tierHeader(tier) {
@@ -1037,7 +1080,7 @@
 		request: request, compareFormats: compareFormats, openDexPage: openDexPage, DexConfirmPopup: DexConfirmPopup,
 		HIDE_BUTTON: HIDE_BUTTON, OFFICIAL_BADGE: OFFICIAL_BADGE, canEdit: canEdit, viewSearch: viewSearch, panelSearch: panelSearch, rowClasses: rowClasses, selectable: selectable,
 		EFFECT_KINDS: EFFECT_KINDS, ENTRY_TABLES: ENTRY_TABLES, GETTERS: GETTERS, dexEntryResults: dexEntryResults, chartHTML: chartHTML, chartRowHTML: chartRowHTML, sentenceRowHTML: sentenceRowHTML,
-		dropEmptyHeaders: dropEmptyHeaders, shownInDex: shownInDex, learnRows: learnRows, showSaveProblems: showSaveProblems, listDexes: listDexes, setTierStyle: setTierStyle, tierHeader: tierHeader, changedValue: changedValue
+		dropEmptyHeaders: dropEmptyHeaders, shownInDex: shownInDex, learnRows: learnRows, showSaveProblems: showSaveProblems, listDexes: listDexes, setTierStyle: setTierStyle, searchView: searchView, tierHeader: tierHeader, changedValue: changedValue
 	};
 
 })(window.jQuery);

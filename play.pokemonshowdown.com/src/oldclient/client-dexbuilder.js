@@ -7,21 +7,17 @@
 	var TAB_ICONS = { Pokedex: 'paw', Moves: 'bolt', Abilities: 'star', Items: 'shopping-bag', TypeChart: 'th' };
 	var SINGLES_TIERS = ['AG', 'Uber', '(Uber)', 'OU', '(OU)', 'UUBL', 'UU', 'RUBL', 'RU', 'NUBL', 'NU', '(NU)', 'PUBL', 'PU', '(PU)', 'ZUBL', 'ZU', 'NFE', 'LC', 'Illegal', 'Unreleased'];
 	var DOUBLES_TIERS = ['DUber', '(DUber)', 'DOU', 'DBL', '(DOU)', 'DUU', '(DUU)', 'NFE', 'LC', 'Illegal', 'Unreleased'];
-	var TIER_STYLES = [['singles', "Singles", 'tier'], ['natdex', "National Dex", 'natDexTier'], ['doubles', "Doubles", 'doublesTier'], ['vgc', "VGC", '']];
+	var TIER_STYLES = [['singles', "Singles", 'tier'], ['natdex', "National Dex", 'natDexTier'], ['doubles', "Doubles", 'doublesTier'], ['vgc', "VGC", ''], ['lc', "LC", 'tier'], ['dexorder', "Pok\u00E9dex order", '']];
+	var TIER_COLUMNS = { singles: "Singles", natdex: "National Dex", doubles: "Doubles" };
 	var EFFECT_KINDS = DexViews.ui.EFFECT_KINDS;
 
 	var GAME_WORLDS = [];
 	for (var gen = 9; gen >= 1; gen--) {
 		GAME_WORLDS.push(['gen' + gen, "Gen " + gen]);
-		if (gen >= 8) GAME_WORLDS.push(['gen' + gen + 'natdex', "Gen " + gen + " National Dex"]);
-		GAME_WORLDS.push(['gen' + gen + 'all', "Gen " + gen + " (all Pok\u00E9mon)"]);
-		if (gen === 9) GAME_WORLDS.push(['champions', "Champions"]);
-		if (gen === 8) GAME_WORLDS.push(['gen8bdsp', "BDSP"]);
-		if (gen === 7) GAME_WORLDS.push(['gen7letsgo', "Let's Go"]);
 	}
 
 	function baseValue(summary) {
-		return summary.parents.length ? summary.parents.join('+') : summary.mod + (summary.pool || '');
+		return summary.parents.length ? summary.parents.join('+') : summary.mod;
 	}
 
 	function optionHTML(value, label, current) {
@@ -1000,7 +996,7 @@
 			if (details) {
 				var probe = {};
 				DexViews.ui.setTierStyle(probe, details);
-				style = probe.isVGC ? 'vgc' : probe.isDoubles ? 'doubles' : probe.isNatDex ? 'natdex' : 'singles';
+				style = DexViews.ui.searchView(probe);
 			}
 			var info = TIER_STYLES.filter(function (entry) { return entry[0] === style; })[0];
 			var formatid = details ? details.id : '';
@@ -1026,12 +1022,13 @@
 			this.tierActiveStyle = style;
 			var buf = '<p><label class="label">Format:</label><button class="select formatselect" name="selectTierFormat" value="' + BattleLog.escapeHTML(this.tierFormat || '') + '">' +
 				(this.tierFormat ? BattleLog.escapeFormat(this.tierFormat) : '(All formats)') + '</button>' + (this.dexEditable ? this.dexSaveHTML('button dexsave') : '') + '</p>';
+			buf += '<p><label class="label">Tiers: <select name="tierstyle" class="button"' + (details && !this.dexEditable ? ' disabled' : '') + '>' + TIER_STYLES.map(function (entry) {
+				return '<option value="' + entry[0] + '"' + (entry[0] === style ? ' selected' : '') + '>' + entry[1] + '</option>';
+			}).join('') + '</select></label></p>';
 			if (details) {
+				var columns = (details.tiercolumns || []).map(function (column) { return TIER_COLUMNS[column]; });
+				buf += '<p><small>' + (columns.length ? "This format's bans use the " + columns.join(" and ") + " tiers." : "This format doesn't ban by tier, so tiers here don't change what's allowed.") + '</small></p>';
 				if (this.dexEditable && info[2] && overridden) buf += '<p><button class="button" name="resetDexTiers">Reset to All formats</button></p>';
-			} else {
-				buf += '<p><label class="label">Tiers: <select name="tierstyle" class="button">' + TIER_STYLES.map(function (entry) {
-					return '<option value="' + entry[0] + '"' + (entry[0] === style ? ' selected' : '') + '>' + entry[1] + '</option>';
-				}).join('') + '</select></label></p>';
 			}
 			buf += '<p class="dextierbar"><input type="search" class="textbox" name="tiersearch" placeholder="Search Pok&eacute;mon" size="24" autocomplete="off" />';
 			if (this.dexEditable && info[2]) buf += ' <span class="dextierselection dexselectslot"></span>';
@@ -1056,9 +1053,7 @@
 				}
 			});
 			DexViews.ui.viewSearch(search, this.dexView, function (typedSearch) {
-				typedSearch.isNatDex = style === 'natdex';
-				typedSearch.isDoubles = style === 'doubles' || style === 'vgc';
-				typedSearch.isVGC = style === 'vgc';
+				typedSearch.tierView = style;
 				typedSearch.tierOverrides = overrides;
 			});
 			search.setType('pokemon', 'gen' + this.dexView.gen);
@@ -1070,6 +1065,7 @@
 			var summary = this.dexSummary;
 			app.addPopup(DexViews.ui.DexFormatPopup, {
 				format: this.tierFormat || '', sourceEl: button, section: summary.name, dexid: summary.id, selectType: 'watch',
+				formats: summary.owner ? null : summary.formats.map(function (each) { return each.id; }),
 				onselect: function (format) {
 					room.leaveDex(button, function () {
 						this.tierFormat = format;
@@ -1082,6 +1078,11 @@
 			this.selectTierStyle(e.currentTarget.value);
 		},
 		selectTierStyle: function (style) {
+			if (this.tierDetails) {
+				this.draftDex('formats', this.tierDetails.id, { id: this.tierDetails.id, name: this.tierDetails.name, tierview: style });
+				this.renderDexTiers();
+				return;
+			}
 			this.tierStyle = style;
 			this.renderDexTierPage(null);
 		},
@@ -1096,7 +1097,7 @@
 				if (this.tierSearch.addFilter(e.currentTarget)) this.tierSearch.find('');
 				return;
 			}
-			if (!this.dexEditable || this.tierActiveStyle === 'vgc') return;
+			if (!this.dexEditable || ['vgc', 'dexorder'].includes(this.tierActiveStyle)) return;
 			e.stopPropagation();
 			app.dismissPopups();
 			app.addPopup(DexTierPopup, { room: this, species: [this.dexView.dex.species.get(entry[1]).name], sourceEl: e.currentTarget });

@@ -168,6 +168,8 @@
 			$page.find('.dexformattabs button').removeClass('cur').filter('[value="' + kind + '"], [value="' + (kind === 'rule' ? 'rule' : 'banlist') + '"]').addClass('cur');
 			$page.find('.dexformatsubtabs').toggle(kind !== 'rule');
 			if (kind === 'rule' || kind === 'ban') {
+				var listEl = $page.find('.dexformatlist')[0];
+				this.dexLists = (this.dexLists || []).filter(function (other) { return other.el !== listEl; });
 				this.dexFormatSearch = null;
 				$page.find('.dexformatsearch').show().find('input').val('').attr('placeholder', kind === 'rule' ? "Search rulesets" : "Search banlist");
 				if (kind === 'rule') {
