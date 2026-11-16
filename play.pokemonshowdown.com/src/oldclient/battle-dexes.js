@@ -453,7 +453,7 @@
 			var ids = window.BattlePokedex && BattlePokedex[id] && !DexViews.custom.Pokedex[id] ? [id] : [id, toID((view ? view.dex : Dex).species.get(id).baseSpecies)];
 			var image = null;
 			for (var i = 0; i < ids.length && !image; i++) {
-				var sprites = spritesOf(view, ids[i]) || spritesOf(null, ids[i]);
+				var sprites = spritesOf(view, ids[i]) || !(view && view.species[ids[i]]) && spritesOf(null, ids[i]);
 				image = sprites && (pokemon.gender === 'F' && sprites['icon-f'] || sprites.icon);
 			}
 			if (!image) return icon;
@@ -489,7 +489,7 @@
 		Dex.getItemIcon = function (item) {
 			var id = item && toID(typeof item === 'string' ? item : item.id || item.name);
 			var view = DexViews.current;
-			var image = id && (view && view.images[view.itemSprites[id]] || DexViews.itemSprites[id]);
+			var image = id && (view && view.Items[id] ? view.images[view.itemSprites[id]] : DexViews.itemSprites[id]);
 			if (!image) return getItemIcon.apply(this, arguments);
 			var size = fit(image, 24, 24);
 			return 'background:transparent url(' + imageURL(image) + ') no-repeat center / ' + size[0] + 'px ' + size[1] + 'px' +
@@ -500,7 +500,7 @@
 		Dex.getTypeIcon = function (type, b) {
 			var id = toID(type);
 			var view = DexViews.current;
-			var image = view && view.images[view.typeSprites[id]] || TYPES.indexOf(id) < 0 && DexViews.typeSprites[id];
+			var image = view && view.TypeChart[id] ? view.images[view.typeSprites[id]] : TYPES.indexOf(id) < 0 && DexViews.typeSprites[id];
 			if (image) {
 				var size = fit(image, 32, 14);
 				return '<img src="' + imageURL(image) + '" alt="' + BattleLog.escapeHTML(Dex.types.get(type).name || id) + '" width="' + size[0] + '" height="' + size[1] + '" class="pixelated' + (b ? ' b' : '') + '" />';

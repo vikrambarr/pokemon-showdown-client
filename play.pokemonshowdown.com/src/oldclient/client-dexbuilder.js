@@ -679,21 +679,11 @@
 			this.name = data.name;
 			var room = this.room;
 			var id = toID(data.name);
-			var entries = DexViews.entries[room.dexid];
-			var own = entries && entries.types[id];
-			var drafted = !!(room.dexDraft && room.dexDraft.effects['TypeChart:' + id]);
-			var removed = !!(room.dexView.TypeChart[id] && room.dexView.TypeChart[id].isNonstandard);
-			var image = !removed && DexViews.typeSprite(room.dexView, id);
-			var buf = '<div class="dexspriteview dexspriteview-type">' + Dex.getTypeIcon(data.name) + '</div><div class="dexspritebuttons">';
-			if (removed) {
-				buf += '<button type="button" class="button" name="restoreType">Restore</button>';
-			} else {
-				buf += '<button type="button" class="button" name="pickSprite" title="Upload"><i class="fa fa-upload"></i></button>' +
-					(image ? '<button type="button" class="button" name="clearSprite" title="Remove"><i class="fa fa-trash"></i></button>' : '');
-			}
-			buf += '</div>';
-			if ((own || drafted) && window.BattleTypeChart[id]) buf += '<div class="dexspritebuttons"><button type="button" class="button" name="resetType">Reset to base</button></div>';
-			if (!removed) buf += '<input type="file" name="file" accept="image/png,image/gif" style="display:none" />';
+			var image = DexViews.typeSprite(room.dexView, id);
+			var buf = '<div class="dexspriteview dexspriteview-type">' + Dex.getTypeIcon(data.name) + '</div><div class="dexspritebuttons">' +
+				'<button type="button" class="button" name="pickSprite" title="Upload"><i class="fa fa-upload"></i></button>' +
+				(image ? '<button type="button" class="button" name="clearSprite" title="Remove"><i class="fa fa-trash"></i></button>' : '') +
+				'</div><input type="file" name="file" accept="image/png,image/gif" style="display:none" />';
 			this.$el.addClass('dexspritepopup').html(buf);
 		},
 		pickSprite: DexSpritePopup.prototype.pickSprite,
@@ -706,14 +696,6 @@
 		clearSprite: function () {
 			this.close();
 			this.room.editDex({ sprite: { name: this.name, kind: 'type', image: null } });
-		},
-		restoreType: function () {
-			this.close();
-			confirmTypeEdit(this.room, this.name, null, null, { type: { name: this.name, removed: null } });
-		},
-		resetType: function () {
-			this.close();
-			confirmTypeEdit(this.room, this.name, 'Reset ' + BattleLog.escapeHTML(this.name) + ' to its base matchups and look?', "Reset to base", { deletetype: this.name });
 		}
 	});
 
@@ -754,8 +736,7 @@
 			'click .dextierpage a[data-entry]': 'clickDexTierEntry',
 			'change select[name=dexsource]': 'changeDexSource',
 			'click .dextypeedit td[data-defender]': 'cycleDexTypeMatchup',
-			'click .dextypeedit th[data-type]': 'openDexType',
-			'click .dexremovedtypes button[data-type]': 'openDexType'
+			'click .dextypeedit th[data-type]': 'openDexType'
 		},
 		initialize: function () {
 			this.$el.addClass('ps-room-light').addClass('scrollable');
@@ -1193,23 +1174,32 @@
 			var dex = this.dexView.dex;
 			var names = dex.types.names().filter(function (name) { return dex.types.get(name).exists !== false; });
 			var editable = this.dexEditable;
-			var buf = editable ? '<p>' + this.dexSaveHTML('button dexsave') + '</p>' : '';
-			buf += '<div class="ladder dextypechart' + (editable ? ' dextypeedit' : '') + '"><table>';
+			var buf = '<div class="dextypebox">';
 			if (editable) {
-				buf += '<tr><th class="dextypebare"></th>' + names.map(function (name) {
-					var escaped = BattleLog.escapeHTML(name);
-					return '<th class="dextypebare"><button class="dextypex" name="deleteDexType" value="' + escaped + '" title="Delete ' + escaped + '">&times;</button></th>';
+				buf += '<div class="setmenu">' + this.dexSaveHTML('dexsave') +
+					(this.dexTypesResettable().length ? ' <button name="resetDexTypes"><i class="fa fa-undo"></i>Reset to base</button>' : '') + '</div>';
+			}
+			buf += '<div class="ladder dextypechart' + (editable ? ' dextypeedit' : '') + '"><table>';
+			var deleteButton = function (name, className) {
+				var escaped = BattleLog.escapeHTML(name);
+				return '<th class="' + className + '"><button class="dextypex" name="deleteDexType" value="' + escaped + '" title="Delete ' + escaped + '">&times;</button></th>';
+			};
+			var plusButton = '<button class="dextypex dextypeplus" name="newDexEffect" title="Create a new type">+</button>';
+			var xcol = editable ? '<th class="dextypebare dextypexcol"></th>' : '';
+			if (editable) {
+				buf += '<tr class="dextypexrow">' + xcol + '<th class="dextypebare dextypelabel"></th>' + names.map(function (name) {
+					return deleteButton(name, 'dextypebare');
 				}).join('') + '</tr>';
 			}
-			buf += '<tr class="dextypeheads"><th></th>';
-			var typeHeader = function (name) {
-				return '<th title="' + BattleLog.escapeHTML(name) + '"' + (editable ? ' data-type="' + BattleLog.escapeHTML(name) + '"' : '') + '>' + Dex.getTypeIcon(name) + '</th>';
+			buf += '<tr class="dextypeheads">' + xcol + '<th class="dextypelabel"></th>';
+			var typeHeader = function (name, className) {
+				return '<th' + (className ? ' class="' + className + '"' : '') + ' title="' + BattleLog.escapeHTML(name) + '"' + (editable ? ' data-type="' + BattleLog.escapeHTML(name) + '"' : '') + '>' + Dex.getTypeIcon(name) + '</th>';
 			};
 			for (var i = 0; i < names.length; i++) buf += typeHeader(names[i]);
-			if (editable) buf += '<th class="dextypebare"><button class="button" name="newDexEffect" title="Create a new type"><i class="fa fa-plus"></i></button></th>';
+			if (editable) buf += '<th class="dextypebare">' + plusButton + '</th>';
 			buf += '</tr>';
 			for (var i = 0; i < names.length; i++) {
-				buf += '<tr>' + typeHeader(names[i]);
+				buf += '<tr>' + (editable ? deleteButton(names[i], 'dextypebare dextypexcol') : '') + typeHeader(names[i], 'dextypelabel');
 				for (var j = 0; j < names.length; j++) {
 					var taken = (dex.types.get(names[j]).damageTaken || {})[names[i]] || 0;
 					buf += '<td class="' + ['', 'super', 'resist', 'immune'][taken] + '"' +
@@ -1217,15 +1207,35 @@
 				}
 				buf += '</tr>';
 			}
-			buf += '</table></div>';
-			var removed = Object.keys(this.dexView.TypeChart).filter(function (id) { return dex.types.get(id).isNonstandard; });
-			if (!removed.length) return buf;
-			buf += '<p class="dexremovedtypes"><small>Removed types:</small> ';
-			for (var i = 0; i < removed.length; i++) {
-				var name = dex.types.get(removed[i]).name;
-				buf += editable ? '<button class="button" data-type="' + BattleLog.escapeHTML(name) + '" title="Restore ' + BattleLog.escapeHTML(name) + '">' + Dex.getTypeIcon(name) + '</button> ' : Dex.getTypeIcon(name) + ' ';
+			if (editable) buf += '<tr>' + xcol + '<th class="dextypebare dextypelabel">' + plusButton + '</th></tr>';
+			return buf + '</table></div></div>';
+		},
+		dexTypesResettable: function () {
+			var entries = DexViews.entries[this.dexid];
+			var effects = this.dexDraft && this.dexDraft.effects || {};
+			var ids = Object.keys(effects).filter(function (key) { return key.indexOf('TypeChart:') === 0; }).map(function (key) { return key.slice(10); });
+			for (var id in entries && entries.types) {
+				if (entries.types[id] === 'edited' && ids.indexOf(id) < 0) ids.push(id);
 			}
-			return buf + '</p>';
+			return ids;
+		},
+		resetDexTypes: function (value, button) {
+			var room = this;
+			app.addPopup(DexConfirmPopup, {
+				message: 'Reset the type chart to its base?',
+				button: "Reset to base",
+				sourceEl: button,
+				callback: function () {
+					var entries = DexViews.entries[room.dexid];
+					var names = room.dexTypesResettable().filter(function (id) {
+						if (room.dexDraft) delete room.dexDraft.effects['TypeChart:' + id];
+						return entries && entries.types[id] === 'edited';
+					}).map(function (id) { return room.dexView.dex.types.get(id).name; });
+					room.applyDexDraft();
+					if (names.length) room.editDex({ deletetype: names });
+					room.$('.dextabempty').html(room.renderDexTypes());
+				}
+			});
 		},
 		deleteDexType: function (name) {
 			var escaped = BattleLog.escapeHTML(name);

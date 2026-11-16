@@ -343,13 +343,36 @@
 .dexcreate select {
 	width: 100%;
 }
+.dextabempty {
+	container-type: inline-size;
+	padding-right: 8px;
+}
+.dextypebox {
+	position: relative;
+	width: fit-content;
+	margin: 0 auto 8px;
+	padding-top: 24px;
+}
+.dextypebox .setmenu {
+	top: 0;
+	left: auto;
+	right: 0;
+	width: max-content;
+}
 .dextypechart {
-	overflow-x: auto;
-	margin-bottom: 8px;
+	overflow: auto;
+	width: fit-content;
+	aspect-ratio: 1;
+	max-width: min(100cqi - 16px, 100vh - 186px);
+	max-height: min(100cqi - 16px, 100vh - 210px);
+	border: 1px solid #999999;
+	border-radius: 5px;
+	background: var(--dexpanel);
 }
 .dextypechart td {
-	padding: 3px 0;
+	padding: 0;
 	width: 24px;
+	height: 24px;
 	text-align: center;
 	font-weight: bold;
 }
@@ -362,12 +385,57 @@
 }
 .dextypechart table {
 	border: none;
+	border-collapse: separate;
+	border-spacing: 0;
+}
+.dextypechart td,
+.dextypechart th {
+	border-width: 0 1px 1px 0;
+}
+.dextypechart tr.dextypeheads th {
+	border-top-width: 1px;
+}
+.dextypechart th.dextypelabel {
+	border-left-width: 1px;
 }
 .dextypechart th.dextypebare {
 	border: none;
-	background: none;
+	background: var(--dexpanel);
 	padding: 0 2px;
 	text-align: center;
+}
+.dextypechart tr.dextypexrow th,
+.dextypechart tr.dextypeheads th {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+}
+.dextypechart tr.dextypexrow th {
+	height: 20px;
+}
+.dextypeedit tr.dextypeheads th {
+	top: 20px;
+}
+.dextypechart th.dextypexcol,
+.dextypechart th.dextypelabel {
+	position: sticky;
+	left: -1px;
+	z-index: 1;
+}
+.dextypechart th.dextypexcol {
+	left: 0;
+	width: 20px;
+	min-width: 20px;
+	padding: 0;
+}
+.dextypeedit th.dextypelabel {
+	left: 20px;
+}
+.dextypechart tr.dextypexrow th.dextypexcol,
+.dextypechart tr.dextypexrow th.dextypelabel,
+.dextypechart tr.dextypeheads th.dextypexcol,
+.dextypechart tr.dextypeheads th.dextypelabel {
+	z-index: 2;
 }
 .dextypex {
 	border: none;
@@ -380,9 +448,8 @@
 .dextypex:hover {
 	color: #CC3333;
 }
-.dextypechart th:first-child {
-	position: sticky;
-	left: -1px;
+.dextypeplus:hover {
+	color: var(--dexgoodtext);
 }
 .dextypechart td.immune {
 	background: #555555;
