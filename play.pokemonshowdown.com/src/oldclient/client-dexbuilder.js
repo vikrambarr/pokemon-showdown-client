@@ -10,8 +10,18 @@
 	var TIER_STYLES = [['singles', "Singles", 'tier'], ['natdex', "National Dex", 'natDexTier'], ['doubles', "Doubles", 'doublesTier'], ['vgc', "VGC", '']];
 	var EFFECT_KINDS = DexViews.ui.EFFECT_KINDS;
 
+	var GAME_WORLDS = [];
+	for (var gen = 9; gen >= 1; gen--) {
+		GAME_WORLDS.push(['gen' + gen, "Gen " + gen]);
+		if (gen >= 8) GAME_WORLDS.push(['gen' + gen + 'natdex', "Gen " + gen + " National Dex"]);
+		GAME_WORLDS.push(['gen' + gen + 'all', "Gen " + gen + " (all Pok\u00E9mon)"]);
+		if (gen === 9) GAME_WORLDS.push(['champions', "Champions"]);
+		if (gen === 8) GAME_WORLDS.push(['gen8bdsp', "BDSP"]);
+		if (gen === 7) GAME_WORLDS.push(['gen7letsgo', "Let's Go"]);
+	}
+
 	function baseValue(summary) {
-		return summary.parents.length ? summary.parents.join('+') : summary.mod;
+		return summary.parents.length ? summary.parents.join('+') : summary.mod + (summary.pool || '');
 	}
 
 	function optionHTML(value, label, current) {
@@ -31,7 +41,7 @@
 		};
 		var others = DexViews.list.filter(function (dex) { return dex.id !== exceptid; });
 		var buf = '<optgroup label="Games">';
-		for (var gen = 9; gen >= 1; gen--) buf += optionHTML('gen' + gen, 'Gen ' + gen, current);
+		GAME_WORLDS.forEach(function (world) { buf += optionHTML(world[0], world[1], current); });
 		buf += '</optgroup>' + group("Official dexes", others.filter(function (dex) { return dex.official; }));
 		return buf + (unofficial ? group("Dexes", others.filter(function (dex) { return !dex.official; })) : '');
 	}
@@ -52,8 +62,7 @@
 		}).sort(function (a, b) {
 			return a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' });
 		});
-		var games = [];
-		for (var gen = 9; gen >= 1; gen--) games.push({ value: 'gen' + gen, label: 'Gen ' + gen });
+		var games = GAME_WORLDS.map(function (world) { return { value: world[0], label: world[1] }; });
 		return [
 			["Games", games],
 			["Official dexes", dexes.filter(function (dex) { return dex.official; })],
@@ -1351,7 +1360,7 @@
 			e.preventDefault();
 			if (this.dexSelect.click(e)) return;
 			var entry = e.currentTarget.dataset.entry.split('|');
-			if (SOURCED[entry[0]] && entry[0] === this.dexKind() && this.dexScope === 'out' && this.dexSource) {
+			if (SOURCED[entry[0]] && entry[0] === this.dexKind() && this.dexScope === 'out') {
 				this.openSourceEntry(entry[0], entry[1]);
 				return;
 			}
@@ -1457,7 +1466,7 @@
 			if (this.dexScope !== 'out' || !SOURCED[kind] || this.dexSourceView(kind)) return;
 			var key = kind + ':' + source;
 			var summary = DexViews.list.filter(function (each) { return each.id === source; })[0];
-			var gen = /^gen(\d)$/.exec(source);
+			var gen = /^gen(\d)/.exec(source);
 			Promise.all([DexViews.ui.request('dexsource', this.dexid + ', ' + source + ', ' + kind), summary && DexViews.load(summary)]).then(function (results) {
 				if (room.dexKind() + ':' + (room.dexSource || '') !== key) return;
 				room.dexSourceData = { key: key, ids: results[0].species, view: results[1] || (gen ? room.genView(Number(gen[1])) : null) };
@@ -1502,12 +1511,8 @@
 			this.loadDexSource();
 		},
 		openSourceEntry: function (kind, name) {
-			var source = this.dexSource;
 			var table = DexViews.ui.ENTRY_TABLES[kind];
-			if (/^gen\d$/.test(source)) {
-				window.open('https://' + Config.routes.dex + '/' + { Pokedex: 'pokemon', Moves: 'moves', Abilities: 'abilities', Items: 'items' }[table] + '/' + toID(name), '_blank');
-				return;
-			}
+			var source = this.dexSource || this.worldSource(table, toID(name));
 			DexViews.ui.openDexPage(app, source);
 			var room = app.rooms['dex-' + source];
 			var tries = 0;
@@ -1516,6 +1521,16 @@
 				if (++tries < 40) setTimeout(open, 250);
 			};
 			open();
+		},
+		worldSource: function (table, id) {
+			var parents = this.dexSummary.parents || [];
+			var world = baseValue(this.dexSummary);
+			if (!parents.length) return GAME_WORLDS.some(function (each) { return each[0] === world; }) ? world : 'gen' + DexViews.genOf(this.dexSummary.mod);
+			return parents.filter(function (parentid) {
+				var summary = DexViews.list.filter(function (each) { return each.id === parentid; })[0];
+				var view = summary && DexViews.views[summary.hash];
+				return view && (table === 'Pokedex' ? view.species[id] : view[table][id]);
+			})[0] || parents[0];
 		},
 		addDexEntriesFrom: function (kind, source, ids) {
 			var dex = (this.dexSourceView(kind) || this.dexView).dex;
@@ -1892,6 +1907,7 @@
 			if (!DexViews.list.length || this.viewQuerying) return null;
 			this.viewQuerying = true;
 			DexViews.query(dexid).then(function (data) {
+				data.formats.sort(DexViews.ui.compareFormats);
 				self.viewQuery = data;
 				self.update();
 			}, function () {
@@ -1914,6 +1930,7 @@
 		dexHeaderHTML: function (summary) {
 			var buf = '<h2>' + (summary.official ? OFFICIAL_BADGE : '') + BattleLog.escapeHTML(summary.name) + '</h2>';
 			if (summary.description) buf += '<p>' + BattleLog.escapeHTML(summary.description).replace(/\n/g, '<br />') + '</p>';
+			if (!summary.owner) return buf + '<p><button class="button" name="worldDex"><i class="fa fa-globe"></i> Use as world</button></p>';
 			buf += '<p><strong>Made by:</strong> ' + BattleLog.escapeHTML(summary.owner);
 			if (summary.editors && summary.editors.length) buf += '<br /><strong>Edited by:</strong> ' + BattleLog.escapeHTML(summary.editors.join(', '));
 			buf += '<br /><strong>World:</strong> ' + BattleLog.escapeHTML(summary.base) + ' (Gen ' + DexViews.genOf(summary.mod) + ')';

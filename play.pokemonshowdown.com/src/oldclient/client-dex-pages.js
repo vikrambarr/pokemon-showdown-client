@@ -412,15 +412,15 @@
 					return '<option value="' + BattleLog.escapeHTML(target.id) + '"' + (target.id === room.copyTarget ? ' selected' : '') + '>' + BattleLog.escapeHTML(target.name) + '</option>';
 				}).join('') + '</optgroup>';
 			};
-			var buf = '<form class="dexcreate"><p><label class="label">Copy ' + BattleLog.escapeHTML(data.name) + ' into:<br /><select name="target" class="button dexsearch">' +
+			var buf = '<form class="dexcreate"><p><label class="label">Add ' + BattleLog.escapeHTML(data.name) + ' to:<br /><select name="target" class="button dexsearch">' +
 				group("This dex", room.dexEditable ? [source] : []) +
 				group("Your dexes", targets.filter(function (dex) { return toID(dex.owner) === userid; })) +
 				group("Shared with you", targets.filter(function (dex) { return toID(dex.owner) !== userid; })) + '</select></label></p>';
 			if (room.dexEditable) targets.unshift(source);
 			buf += '<p class="dexcopyname"><label class="label">New name:<br /><input type="text" class="textbox" name="name" maxlength="40" /></label></p>';
 			if (data.line) buf += '<p class="dexcopyline"><label class="checkbox"><input type="checkbox" name="line" /> With its evolution line</label></p>';
-			buf += '<p class="buttonbar"><button type="submit" class="button"><strong>Copy</strong></button> <button type="button" name="close" class="button">Cancel</button></p></form>';
-			this.$el.html(targets.length ? buf : '<p>You don\'t have a dex to copy ' + BattleLog.escapeHTML(data.name) + ' into yet.</p>' +
+			buf += '<p class="buttonbar"><button type="submit" class="button"><strong>Add</strong></button> <button type="button" name="close" class="button">Cancel</button></p></form>';
+			this.$el.html(targets.length ? buf : '<p>You don\'t have a dex to add ' + BattleLog.escapeHTML(data.name) + ' to yet.</p>' +
 				'<p class="buttonbar"><button type="button" name="close" class="button">Close</button></p>');
 			this.updateTarget();
 		},
@@ -504,7 +504,7 @@
 						buf += '</li>';
 						return;
 					}
-					buf += '<li data-species="' + BattleLog.escapeHTML(row.species.name) + '"' + stageAttrs(row.hue) + '><div class="setmenu"><button name="copyDexPokemon" value="' + BattleLog.escapeHTML(row.species.name) + '"><i class="fa fa-clone"></i>Copy</button>';
+					buf += '<li data-species="' + BattleLog.escapeHTML(row.species.name) + '"' + stageAttrs(row.hue) + '><div class="setmenu"><button name="copyDexPokemon" value="' + BattleLog.escapeHTML(row.species.name) + '"><i class="fa fa-plus"></i>Add to Dex</button>';
 					if (editable) buf += room.dexMembershipHTML(row.species);
 					buf += '</div>' + room.dexSpeciesRowHTML(row.species, editable) + '</li>';
 					if (editable && !inBattle(row.species)) {
@@ -1082,7 +1082,7 @@
 		},
 		dexMenuHTML: function (copy, remove, removeValue, extra) {
 			var buf = '<div class="setmenu">' + (this.dexEditable ? this.dexSaveHTML('dexsave') : '') + this.dexEditsHTML() +
-				' <button name="' + copy + '"><i class="fa fa-clone"></i>Copy</button>' + (this.dexEditable && extra || '');
+				(copy ? ' <button name="' + copy + '"><i class="fa fa-plus"></i>Add to Dex</button>' : '') + (this.dexEditable && extra || '');
 			if (this.dexEditable && remove) {
 				buf += ' <button name="' + remove[0] + '"' + (removeValue ? ' value="' + BattleLog.escapeHTML(removeValue) + '"' : '') + '><i class="fa fa-trash"></i>' + remove[1] + '</button>';
 			}

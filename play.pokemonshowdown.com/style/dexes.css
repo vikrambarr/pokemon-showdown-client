@@ -288,6 +288,12 @@
 }
 .ruletree .button:not([name]) {
 	cursor: default;
+	box-shadow: none;
+}
+.ruletree .button:not([name]):not(.ruleon):not(.ruleoff):not(.ruleelsewhere) {
+	background: var(--dexsoft);
+	border-color: var(--dexsoftborder);
+	color: var(--dexmuted);
 }
 .ruletree .button.ruleon,
 .dexboostup {

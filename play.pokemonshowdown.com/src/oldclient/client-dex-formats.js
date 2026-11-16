@@ -12,27 +12,31 @@
 		initialize: function (data) {
 			this.open = {};
 			this.open[data.section] = true;
+			if (data.formats) {
+				for (var id in BattleFormats) this.open[BattleFormats[id].section] = true;
+			}
 			FormatPopup.prototype.initialize.call(this, data);
 		},
 		updateOpen: function () {},
 		shouldDisplayFormat: function (format) {
+			if (this.data.formats) return !format.dexid && this.data.formats.includes(format.id);
 			return format.dexid === this.data.dexid;
 		}
 	});
 
 	window.DexViews.ui.DexFormatPopup = DexFormatPopup;
 
-	var DexEnginePopup = Popup.extend({
+	var DexModPopup = Popup.extend({
 		initialize: function (data) {
 			this.pick = data.pick;
-			this.$el.html('<ul class="popupmenu">' + data.details.engines.map(function (engine) {
-				return '<li><button class="option' + (engine.id === data.details.engine ? ' cur' : '') + '" name="pickEngine" value="' + BattleLog.escapeHTML(engine.id) + '">' +
-					BattleLog.escapeHTML(engine.name) + '</button></li>';
+			this.$el.html('<ul class="popupmenu">' + data.details.mods.map(function (mod) {
+				return '<li><button class="option' + (mod.name === data.details.mod ? ' cur' : '') + '" name="pickMod" value="' + BattleLog.escapeHTML(mod.id) + '">' +
+					BattleLog.escapeHTML(mod.name) + '</button></li>';
 			}).join('') + '</ul>');
 		},
-		pickEngine: function (engine) {
+		pickMod: function (mod) {
 			this.close();
-			this.pick(engine);
+			this.pick(mod);
 		}
 	});
 
@@ -63,7 +67,8 @@
 	_.extend(window.DexBuilderRoom.prototype, {
 		selectDexFormat: function (format, button) {
 			var room = this;
-			app.addPopup(DexFormatPopup, { format: format, sourceEl: button, section: this.dexSummary.name, dexid: this.dexSummary.id, onselect: function (newFormat) {
+			var formats = this.dexSummary.owner ? null : this.dexSummary.formats.map(function (each) { return each.id; });
+			app.addPopup(DexFormatPopup, { format: format, sourceEl: button, section: this.dexSummary.name, dexid: this.dexSummary.id, formats: formats, onselect: function (newFormat) {
 				room.leaveDex(button, function () {
 					this.dexFormat = newFormat;
 					this.openDexFormat(newFormat);
@@ -99,9 +104,8 @@
 			buf += '<p><label class="label">Format:</label><button class="select formatselect" name="selectDexFormat" value="' + BattleLog.escapeHTML(details.id) + '">' + BattleLog.escapeFormat(details.id) + '</button></p>';
 			buf += '<div class="formatsettings"><p>';
 			buf += '<label class="label">Dex: <strong>' + BattleLog.escapeHTML(details.dex) + '</strong></label> ';
-			buf += '<label class="label">Mod: <strong>' + BattleLog.escapeHTML(details.mod) + '</strong></label> ';
-			var engineName = BattleLog.escapeHTML((details.engines.find(function (engine) { return engine.id === details.engine; }) || { name: details.engine }).name);
-			buf += '<label class="label">Engine: ' + (this.dexEditable ? '<button class="select" name="selectDexEngine">' + engineName + '</button>' : '<strong>' + engineName + '</strong>') + '</label> ';
+			var mod = BattleLog.escapeHTML(details.mod);
+			buf += '<label class="label">Mod: ' + (this.dexEditable ? '<button class="select" name="selectDexMod">' + mod + '</button>' : '<strong>' + mod + '</strong>') + '</label> ';
 			buf += '<label class="label">Game type: <strong>' + BattleLog.escapeHTML(FORMAT_GAME_TYPES[details.gameType] || details.gameType) + '</strong></label></p>';
 			if (this.dexEditable) {
 				buf += '<p><label class="label">Name: <input type="text" class="textbox" name="formatname" value="' + BattleLog.escapeHTML(details.name) + '" size="20" maxlength="40" /></label> ' +
@@ -342,10 +346,12 @@
 				app.addPopup(Popup, { message: "That change doesn't work for the following reason:\n\n- " + err.message });
 			});
 		},
-		selectDexEngine: function (value, button) {
+		selectDexMod: function (value, button) {
 			var room = this;
-			app.addPopup(DexEnginePopup, { details: this.dexFormatDetails, sourceEl: button, pick: function (engine) {
-				if (engine !== room.dexFormatDetails.engine) room.saveDexFormat({ engine: engine });
+			var details = this.dexFormatDetails;
+			app.addPopup(DexModPopup, { details: details, sourceEl: button, pick: function (mod) {
+				var current = details.mods.filter(function (each) { return each.name === details.mod; })[0];
+				if (!current || mod !== current.id) room.saveDexFormat({ mod: mod });
 			} });
 		},
 		renameDexFormat: function (e) {

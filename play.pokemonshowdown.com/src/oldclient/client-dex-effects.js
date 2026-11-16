@@ -751,7 +751,7 @@
 			buf += ' <button name="showDexEffectPanel" value="code" class="pokemon"><i class="fa fa-code"></i> Code</button>';
 			buf += '</div>';
 			buf += '<div class="teamchartbox individual"><ol class="teamchart"><li>';
-			buf += this.dexMenuHTML('copyDexEffect', null, '', this.dexEffectMembershipHTML(info));
+			buf += this.dexMenuHTML(!this.dexSummary.owner && !GETTERS[this.dexEffect.table] ? '' : 'copyDexEffect', null, '', this.dexEffectMembershipHTML(info));
 			buf += '<div class="setchart dexmonchart dexeffectchart">';
 
 			buf += '<div class="setcol setcol-icon"><div class="setcell-sprite dexmoveicons">' + this.dexEffectIconHTML(data) + '</div>';

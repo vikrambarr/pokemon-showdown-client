@@ -146,7 +146,7 @@
 					searchShow: false, challengeShow: true, tournamentShow: true, rated: false,
 					isTeambuilderFormat: data.name.slice(-11) !== 'Custom Game', teambuilderFormat: '',
 					gen: summary.gen, mod: view ? view.modid : 'gen' + summary.gen, dexid: summary.id,
-					isChampions: data.engine === 'champions', teambuilderLevel: data.engine === 'champions' ? 50 : null
+					isChampions: /^champions/.test(data.mod), teambuilderLevel: /^champions/.test(data.mod) ? 50 : null
 				});
 				format.id = data.id;
 				if (Dex.formats.cache[data.id]) {
