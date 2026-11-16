@@ -280,7 +280,7 @@
 				var id = toID(name);
 				if (!view.TypeChart[id]) return getType(name);
 				if (!dex.cache.Types.hasOwnProperty(id)) {
-					var typeName = id.charAt(0).toUpperCase() + id.slice(1);
+					var typeName = view.TypeChart[id].name || id.charAt(0).toUpperCase() + id.slice(1);
 					dex.cache.Types[id] = $.extend({}, Dex.types.get(typeName), view.TypeChart[id], {
 						id: id, name: typeName, exists: true, effectType: 'Type'
 					});

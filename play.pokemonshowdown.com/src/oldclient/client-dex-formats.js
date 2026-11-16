@@ -64,8 +64,10 @@
 		selectDexFormat: function (format, button) {
 			var room = this;
 			app.addPopup(DexFormatPopup, { format: format, sourceEl: button, section: this.dexSummary.name, dexid: this.dexSummary.id, onselect: function (newFormat) {
-				room.dexFormat = newFormat;
-				room.openDexFormat(newFormat);
+				room.leaveDex(button, function () {
+					this.dexFormat = newFormat;
+					this.openDexFormat(newFormat);
+				});
 			} });
 		},
 		openDexFormat: function (formatid) {
@@ -432,6 +434,7 @@
 			this.dexFormatSearch.find('');
 		},
 		newDexFormat: function (value, button) {
+			if (this.dexDraft) return this.leaveDex(button, function () { this.newDexFormat(value, button); });
 			var room = this;
 			var options = '';
 			var section = null;

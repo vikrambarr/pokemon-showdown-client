@@ -1519,8 +1519,10 @@
 			var panel = $(e.currentTarget).closest('[data-panel]').attr('data-panel');
 			if (entry[0] === 'attribute') return this.showDexAttribute(entry[1]);
 			if (table && panel === 'picker') {
-				this.openDexEffect(table, entry[1], this.dexEffect.from);
-				this.dexPanel = 'picker';
+				this.leaveDex(e.currentTarget, function () {
+					this.openDexEffect(table, entry[1], this.dexEffect.from);
+					this.dexPanel = 'picker';
+				});
 				return;
 			}
 			if (entry[0] === 'flag') {
@@ -1535,7 +1537,7 @@
 				return;
 			}
 			if (entry[0] === 'pokemon') {
-				this.openDexPokemon(entry[1]);
+				this.leaveDex(e.currentTarget, function () { this.openDexPokemon(entry[1]); });
 				return;
 			}
 			var search = panel === 'picker' ? this.dexPicker : this.dexListSearch;
@@ -1727,6 +1729,7 @@
 			});
 		},
 		copyDexEffect: function (value, button) {
+			if (this.dexDraft) return this.leaveDex(button, function () { this.copyDexEffect(value, button); });
 			app.addPopup(DexViews.ui.DexCopyPopup, { room: this, kind: KINDS[this.dexEffect.table], name: this.dexEffectData.name, sourceEl: button });
 		}
 	});

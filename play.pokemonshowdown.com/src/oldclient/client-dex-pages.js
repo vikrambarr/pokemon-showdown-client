@@ -1371,6 +1371,7 @@
 			};
 		},
 		copyDexPokemon: function (value, button) {
+			if (this.dexDraft) return this.leaveDex(button, function () { this.copyDexPokemon(value, button); });
 			var species = this.dexView.dex.species.get(value || this.dexSpecies.name);
 			var line = evoParent(this.dexView, species) || (species.evos || []).some(function (evo) { return this.dexView.species[toID(evo)]; }, this);
 			app.addPopup(DexCopyPopup, { room: this, kind: 'pokemon', name: species.name, line: !!line, sourceEl: button });
@@ -1528,7 +1529,9 @@
 				else this.openDexEffect('Moves', entry[1], this.dexSpecies.name);
 				return;
 			}
-			if (entry[0] === 'pokemon' && panel === 'picker') return this.openDexPokemon(dexView.dex.species.get(entry[1]).name, true);
+			if (entry[0] === 'pokemon' && panel === 'picker') {
+				return this.leaveDex(e.currentTarget, function () { this.openDexPokemon(dexView.dex.species.get(entry[1]).name, true); });
+			}
 			if (field && entry[0] === (field === 'abilities' ? 'ability' : 'pokemon')) {
 				return this.toggleDexRelative(field, dexView.dex[field === 'abilities' ? 'abilities' : 'species'].get(entry[1]).name);
 			}
