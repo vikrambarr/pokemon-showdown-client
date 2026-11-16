@@ -71,7 +71,7 @@
 		var current = DexViews.list.filter(function (other) { return other.id === dexid; })[0];
 		delete preloaded[dexid];
 		(ready && current && ready.hash === current.hash ? Promise.resolve(ready.entries) : request('dexentries', dexid)).then(function (data) {
-			var entries = { custom: data.custom, modified: data.modified, names: data.names, choices: data.choices, species: data.Pokedex, world: toSet(data.world || []), needed: toSet(data.needed || []), own: data.own, originals: data.originals || {}, conditions: data.conditions || {}, types: data.types || {} };
+			var entries = { custom: data.custom, modified: data.modified, names: data.names, choices: data.choices, species: data.Pokedex, world: toSet(data.world || []), needed: toSet(data.needed || []), own: data.own, originals: data.originals || {}, conditions: data.conditions || {}, types: data.types || {}, copies: data.copies || {} };
 			$.each(['Moves', 'Abilities', 'Items', 'Conditions'], function (i, table) {
 				var ids = entries[table] = {};
 				for (var j = 0; j < data[table].length; j++) ids[data[table][j]] = 1;

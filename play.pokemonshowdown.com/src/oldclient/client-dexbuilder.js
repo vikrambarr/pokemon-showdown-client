@@ -744,6 +744,20 @@
 		}
 	});
 
+	var DexCopyPopup = Popup.extend({
+		type: 'semimodal',
+		initialize: function (data) {
+			this.callback = data.callback;
+			this.$el.html('<p>Should what you add from ' + BattleLog.escapeHTML(data.source) + ' follow changes made there, keeping your own edits on top, or be static copies that never change?</p>' +
+				'<p class="buttonbar"><button type="button" class="button" name="pickCopy" value="follow"><strong>Follow changes</strong></button> ' +
+				'<button type="button" class="button" name="pickCopy" value="static">Static copies</button> <button type="button" name="close" class="button">Cancel</button></p>');
+		},
+		pickCopy: function (value) {
+			this.close();
+			this.callback(value === 'static');
+		}
+	});
+
 	window.DexBuilderRoom = window.Room.extend({
 		type: 'dexbuilder',
 		title: 'Dexbuilder',
@@ -1406,7 +1420,7 @@
 					{ label: "Reset", icon: 'undo', applies: function (id) { return room.dexResettable('Pokedex', id); }, run: function (ids, button, done) {
 						room.deleteDexEntries('Pokedex', ids, true, button, done);
 					} }
-				];
+				].concat(this.dexCopyActions('Pokedex'));
 			}
 			var table = DexViews.ui.ENTRY_TABLES[kind];
 			var mine = entries.own[table] || {};
@@ -1417,7 +1431,7 @@
 				{ label: "Reset", icon: 'undo', applies: function (id) { return room.dexResettable(table, id); }, run: function (ids, button, done) {
 					room.deleteDexEntries(table, ids, true, button, done);
 				} }
-			];
+			].concat(this.dexCopyActions(table));
 		},
 		dexSourceData: null,
 		dexKind: function () {
@@ -1533,11 +1547,30 @@
 			})[0] || parents[0];
 		},
 		addDexEntriesFrom: function (kind, source, ids) {
+			var room = this;
 			var dex = (this.dexSourceView(kind) || this.dexView).dex;
 			var getter = DexViews.ui.GETTERS[DexViews.ui.ENTRY_TABLES[kind]];
-			var edit = {};
-			edit[kind === 'pokemon' ? 'addpokemon' : 'add' + kind] = { from: source, names: ids.map(function (id) { return dex[getter].get(id).name; }) };
-			this.editDex(edit);
+			var names = ids.map(function (id) { return dex[getter].get(id).name; });
+			var summary = DexViews.list.filter(function (each) { return each.id === source; })[0];
+			var add = function (frozen) {
+				var edit = {};
+				edit[kind === 'pokemon' ? 'addpokemon' : 'add' + kind] = { from: source, names: names, 'static': frozen };
+				room.editDex(edit);
+			};
+			if (!summary) return add(false);
+			app.addPopup(DexCopyPopup, { source: summary.name, callback: add });
+		},
+		dexCopyActions: function (table) {
+			var room = this;
+			var copies = DexViews.entries[this.dexid].copies[table] || {};
+			return [
+				{ label: "Make static", icon: 'chain-broken', applies: function (id) { return !!copies[id] && copies[id].follows; }, run: function (ids, button, done) {
+					var edit = {};
+					edit['freeze' + (table === 'Pokedex' ? 'pokemon' : EFFECT_KINDS[table])] = ids.map(function (id) { return room.dexEntryName(table, id); });
+					room.editDex(edit);
+					done();
+				} }
+			];
 		},
 		dexSavedEdit: function (table, id) {
 			var entries = DexViews.entries[this.dexid];
@@ -1545,6 +1578,8 @@
 		},
 		dexResettable: function (table, id) {
 			var entries = DexViews.entries[this.dexid];
+			var copy = entries && entries.copies[table] && entries.copies[table][id];
+			if (copy) return copy.edited;
 			if (!entries || this.dexSavedEdit(table, id)) return !!entries;
 			var pokemon = table === 'Pokedex';
 			var layer = this.dexDraft && this.dexDraft[pokemon ? 'pokemon' : 'effects'];

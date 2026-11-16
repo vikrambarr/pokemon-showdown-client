@@ -14,6 +14,13 @@
 		['front', 'F', 'Front'], ['back', 'B', 'Back'], ['front-shiny', SHINY_STAR + 'F</span></span>', 'Shiny front'], ['back-shiny', SHINY_STAR + 'B</span></span>', 'Shiny back'], ['icon', 'I', 'Icon']
 	];
 
+	function originOf(view, id) {
+		var origin = view.origins[id];
+		var entries = DexViews.entries[view.dexid];
+		var copy = origin && entries && entries.copies.Pokedex && entries.copies.Pokedex[id];
+		return copy ? origin + (copy.follows ? ' (follows changes)' : ' (static copy)') : origin;
+	}
+
 	function listValue(text) {
 		return text.split(',').map(function (part) { return $.trim(part); }).filter(Boolean);
 	}
@@ -997,7 +1004,7 @@
 				(species.gender ? { M: 'Male', F: 'Female', N: '&mdash;' }[species.gender] : ratio ? (ratio.M * 100) + '% M' : '50% M') + '</span>';
 			buf += '<span class="detailcell"><label>Weight</label>' + (species.weightkg || '&mdash;') + ' kg</span>';
 			buf += '<span class="detailcell"><label>Height</label>' + (species.heightm || '&mdash;') + ' m</span>';
-			var origin = view.origins[species.id];
+			var origin = originOf(view, species.id);
 			if (origin) buf += '<span class="detailcell"><label>Origin</label>' + BattleLog.escapeHTML(origin) + '</span>';
 			buf += '</button></div></div>';
 			buf += '<div class="setrow setrow-icons"><div class="setcell"><span class="itemicon"></span></div><div class="setcell setcell-typeicons dextypeselects">';
@@ -1255,7 +1262,7 @@
 				return ['data-detail="' + detail[0] + '"', detail[1], parts[0] + (editable ? value : '<span class="dexvalue">' + value + '</span>') + parts[1], removable && ['removeDexDetail', detail[0]]];
 			});
 			var data = this.dexView.Pokedex[species.id] || {};
-			var origin = this.dexView.origins[species.id];
+			var origin = originOf(this.dexView, species.id);
 			$.each([["Origin", origin], ["Category", data.category && 'The ' + data.category + ' Pok\u00e9mon'], ["Dex entry", data.dexEntry]], function (i, info) {
 				if (info[1]) boxes.push(['', info[0], BattleLog.escapeHTML(info[1])]);
 			});
